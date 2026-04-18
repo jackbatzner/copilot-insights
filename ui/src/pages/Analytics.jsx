@@ -379,8 +379,12 @@ function WorkStyleChart({ data }) {
 }
 
 function CreateEditChart({ data }) {
-  if (!data || data.total === 0) return <p className="card-subtitle">No file operations recorded.</p>;
-  const { creates, edits, total, ratio, insight } = data;
+  const creates = data?.overall?.creates ?? 0;
+  const edits = data?.overall?.edits ?? 0;
+  const total = creates + edits;
+  if (!data || total === 0) return <p className="card-subtitle">No file operations recorded.</p>;
+  const { ratio } = data.overall;
+  const { insight } = data;
   const createPct = total > 0 ? (creates / total) * 100 : 0;
   const editPct = total > 0 ? (edits / total) * 100 : 0;
   return (
@@ -423,14 +427,14 @@ function CreateEditChart({ data }) {
 const TYPE_COLORS = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#f0883e", "#8b949e", "#39d353"];
 
 function FileTypeChart({ data }) {
-  if (!data || !data.types || data.types.length === 0) return <p className="card-subtitle">No file type data.</p>;
-  const top = data.types.slice(0, 8);
+  if (!data || !data.extensions || data.extensions.length === 0) return <p className="card-subtitle">No file type data.</p>;
+  const top = data.extensions.slice(0, 8);
   const maxCount = Math.max(...top.map((t) => t.count));
   return (
     <div style={{ padding: "8px 0", display: "flex", flexDirection: "column", gap: 6 }}>
       {top.map((t, i) => (
-        <div key={t.extension} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-          <code style={{ color: "#e6edf3", minWidth: 50, textAlign: "right" }}>{t.extension}</code>
+        <div key={t.ext} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+          <code style={{ color: "#e6edf3", minWidth: 50, textAlign: "right" }}>{t.ext}</code>
           <div style={{ flex: 1, height: 18, background: "#21262d", borderRadius: 4, overflow: "hidden" }}>
             <div style={{
               width: `${maxCount > 0 ? (t.count / maxCount) * 100 : 0}%`,
@@ -439,7 +443,7 @@ function FileTypeChart({ data }) {
             }} />
           </div>
           <span style={{ color: "#8b949e", minWidth: 60, fontVariantNumeric: "tabular-nums" }}>
-            {t.count} ({t.percentage}%)
+            {t.count} ({t.pct}%)
           </span>
         </div>
       ))}
