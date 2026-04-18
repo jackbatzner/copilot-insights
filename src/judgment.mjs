@@ -177,8 +177,8 @@ function analyzeSessionJudgment(session, turns, files) {
 /**
  * Analyze judgment quality across all sessions.
  */
-export function analyzeJudgment({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function analyzeJudgment({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
 
   const sessionResults = [];
   let totalApprovals = 0;

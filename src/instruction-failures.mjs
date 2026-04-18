@@ -149,8 +149,8 @@ function detectImmediateCorrections(turns) {
 /**
  * Analyze all sessions for instruction failures.
  */
-export function analyzeInstructionFailures({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function analyzeInstructionFailures({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
 
   let totalFailureSignals = 0;
   let totalIntraRepetitions = 0;

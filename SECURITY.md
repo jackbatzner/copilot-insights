@@ -49,6 +49,7 @@ Copilot Insights is a **local-only** development tool:
 | `text` | `POST /api/practice/analyze` | Must be a string, max 10,000 characters. Returns 400 if missing or invalid. |
 | `tag` | `GET /api/practice/library` | Validated against a whitelist of known tags. Invalid tags silently dropped. |
 | `:id` | `/api/sessions/:id/*` | Path parameter used as a session ID lookup key. Passed to parameterized SQL queries. Returns 404 if not found. |
+| `:id` | `POST/DELETE /api/sessions/:id/hide` | Validated as a UUID v4 format (`/^[0-9a-f]{8}-…$/i`). Returns 400 if invalid. Returns 429 if hidden set cap (5,000) reached. Hidden IDs stored in-memory only — reset on server restart. |
 
 ### SQL safety
 
@@ -99,3 +100,6 @@ All endpoints are read-only (GET) except where noted. The server exposes:
 | `GET /api/analytics/tools` | Tool usage statistics |
 | `GET /api/analytics/create-edit-ratio` | Create vs. edit ratio |
 | `GET /api/analytics/file-types` | File type diversity |
+| `GET /api/hidden-sessions` | List hidden session IDs (in-memory) |
+| `POST /api/sessions/:id/hide` | Hide a session from analysis |
+| `DELETE /api/sessions/:id/hide` | Unhide a session |

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity } from "../api.js";
+import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
@@ -12,6 +12,7 @@ export default function SessionDetail() {
   const [efficiency, setEfficiency] = useState(null);
   const [replay, setReplay] = useState(null);
   const [complexity, setComplexity] = useState(null);
+  const [isHidden, setIsHidden] = useState(false);
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,11 +24,21 @@ export default function SessionDetail() {
       fetchSessionEfficiency(id).catch(() => null),
       fetchSessionReplay(id).catch(() => null),
       fetchSessionComplexity(id).catch(() => null),
+      fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
     ])
-      .then(([d, s, e, r, c]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); })
+      .then(([d, s, e, r, c, h]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const toggleHide = useCallback(async () => {
+    try {
+      if (isHidden) { await unhideSession(id); setIsHidden(false); }
+      else { await hideSession(id); setIsHidden(true); }
+    } catch (err) {
+      console.warn("Failed to toggle session visibility:", err.message);
+    }
+  }, [id, isHidden]);
 
   if (loading) return <div className="loading">Loading session…</div>;
   if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
@@ -44,9 +55,22 @@ export default function SessionDetail() {
 
       <div className="page-header">
         <h1>🔍 Session Detail</h1>
-        <p>
-          <code>{session.id}</code>
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <p style={{ margin: 0 }}>
+            <code>{session.id}</code>
+          </p>
+          <button
+            onClick={toggleHide}
+            style={{
+              background: isHidden ? "#da3633" : "var(--bg-card)",
+              color: isHidden ? "#fff" : "var(--text-secondary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 13,
+            }}
+          >
+            {isHidden ? "🙈 Hidden from analysis" : "Hide from analysis"}
+          </button>
+        </div>
       </div>
 
       {/* Session metadata */}

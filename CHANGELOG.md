@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Session hiding** — Hide specific sessions (e.g., automated loops) from all analysis
+  - 🙈 toggle per session row in the Sessions table, hide/unhide button in Session Detail
+  - Hidden sessions are excluded from every analysis endpoint (summary, patterns, coaching, analytics, etc.)
+  - `GET /api/hidden-sessions`, `POST /api/sessions/:id/hide`, `DELETE /api/sessions/:id/hide`
+  - In-memory only — resets on server restart, no file persistence
+  - UUID validation on hide/unhide, 5,000 session cap to prevent memory exhaustion
+
 ### Changed
 
 - **Extension linking is now opt-in** — global `npm install` no longer auto-links the Copilot CLI extension; run `copilot-insights link` to opt in

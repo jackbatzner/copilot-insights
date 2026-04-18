@@ -94,8 +94,8 @@ export function analyzeSession(sessionId) {
 /**
  * Analyze multiple recent sessions and return a summary.
  */
-export function analyzeRecent({ repo, limit = 500, since } = {}) {
-  const sessions = listSessions({ repo, limit, since });
+export function analyzeRecent({ repo, limit = 500, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, limit, since, excludeIds });
   const results = [];
 
   for (const s of sessions) {
@@ -141,8 +141,8 @@ export function analyzeRecent({ repo, limit = 500, since } = {}) {
 /**
  * Find the most common redirection patterns across sessions.
  */
-export function findTopPatterns({ repo, limit = 500, since } = {}) {
-  const { sessions } = analyzeRecent({ repo, limit, since });
+export function findTopPatterns({ repo, limit = 500, since, excludeIds } = {}) {
+  const { sessions } = analyzeRecent({ repo, limit, since, excludeIds });
 
   const patternCounts = {};
   for (const s of sessions) {

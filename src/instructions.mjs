@@ -77,8 +77,8 @@ function extractConventions(message) {
  * Analyze sessions for instruction gaps — repeated conventions that
  * should be codified in instruction files.
  */
-export function analyzeInstructionGaps({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function analyzeInstructionGaps({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
   const conventionMap = {};
   const repoConventions = {};
 

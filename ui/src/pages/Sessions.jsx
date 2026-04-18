@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchSessions } from "../api.js";
+import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
@@ -8,6 +8,8 @@ import { useRefresh } from "../App.jsx";
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
   const [data, setData] = useState(null);
+  const [hiddenIds, setHiddenIds] = useState(new Set());
+  const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [repoFilter, setRepoFilter] = useState("");
@@ -18,11 +20,32 @@ export default function Sessions() {
 
   useEffect(() => {
     setLoading(true);
-    fetchSessions(timeframe, repoFilter || undefined)
-      .then(setData)
+    Promise.all([
+      fetchSessions(timeframe, repoFilter || undefined),
+      fetchHiddenSessions(),
+    ])
+      .then(([sessions, hidden]) => {
+        setData(sessions);
+        setHiddenIds(new Set(hidden.sessionIds));
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [repoFilter, timeframe, refreshKey]);
+
+  const toggleHide = useCallback(async (id, e) => {
+    e.stopPropagation();
+    try {
+      if (hiddenIds.has(id)) {
+        await unhideSession(id);
+        setHiddenIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      } else {
+        await hideSession(id);
+        setHiddenIds((prev) => new Set(prev).add(id));
+      }
+    } catch (err) {
+      console.warn("Failed to toggle session visibility:", err.message);
+    }
+  }, [hiddenIds]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -67,6 +90,20 @@ export default function Sessions() {
         />
         <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
           {sorted.length} session(s)
+          {hiddenIds.size > 0 && (
+            <>
+              {" · "}
+              <button
+                onClick={() => setShowHidden(!showHidden)}
+                style={{
+                  background: "none", border: "none", color: "#58a6ff",
+                  cursor: "pointer", fontSize: 13, padding: 0, textDecoration: "underline",
+                }}
+              >
+                {showHidden ? "hide" : "show"} {hiddenIds.size} hidden
+              </button>
+            </>
+          )}
         </span>
       </div>
 
@@ -91,10 +128,12 @@ export default function Sessions() {
                   Rate{arrow("redirectionRate")}
                 </th>
                 <th>Top Issue</th>
+                <th style={{ width: 40 }}></th>
               </tr>
             </thead>
             <tbody>
-              {sorted.slice(0, 30).map((s) => {
+              {sorted.filter((s) => showHidden || !hiddenIds.has(s.id)).slice(0, 30).map((s) => {
+                const isHidden = hiddenIds.has(s.id);
                 const topCat = Object.entries(s.categoryBreakdown || {}).sort(
                   (a, b) => b[1].count - a[1].count
                 )[0];
@@ -103,7 +142,7 @@ export default function Sessions() {
                   : null;
 
                 return (
-                  <tr key={s.id} onClick={() => navigate(`/sessions/${s.id}`)}>
+                  <tr key={s.id} onClick={() => navigate(`/sessions/${s.id}`)} style={isHidden ? { opacity: 0.4 } : undefined}>
                     <td>
                       <div style={{ fontWeight: 500, fontSize: 13 }}>
                         {s.summary?.substring(0, 50) || s.branch?.substring(0, 30) || s.id.substring(0, 8)}
@@ -125,6 +164,19 @@ export default function Sessions() {
                           {topMeta.emoji} {topMeta.label}
                         </span>
                       )}
+                    </td>
+                    <td>
+                      <button
+                        title={isHidden ? "Unhide session" : "Hide session from analysis"}
+                        onClick={(e) => toggleHide(s.id, e)}
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          fontSize: 16, padding: "2px 6px", borderRadius: 4,
+                          opacity: isHidden ? 1 : 0.4,
+                        }}
+                      >
+                        {isHidden ? "👁️" : "🙈"}
+                      </button>
                     </td>
                   </tr>
                 );

@@ -67,8 +67,8 @@ function scoreFeedback(firstMessage) {
  * Compute weekly pillar score snapshots.
  * @param {{ repo?: string, since?: string }} opts
  */
-export function computePillarTrends({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since, limit: 10000 });
+export function computePillarTrends({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds, limit: 10000 });
 
   // Group sessions by ISO week
   const weekMap = new Map();

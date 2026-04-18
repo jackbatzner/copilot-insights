@@ -136,8 +136,8 @@ const REWRITE_GUIDES = {
 /**
  * Generate prompt improvement suggestions from actual session data.
  */
-export function generateSuggestions({ repo, limit = 500, since } = {}) {
-  const result = analyzeRecent({ repo, limit, since });
+export function generateSuggestions({ repo, limit = 500, since, excludeIds } = {}) {
+  const result = analyzeRecent({ repo, limit, since, excludeIds });
   const suggestions = [];
 
   // Collect actual redirection messages grouped by category
