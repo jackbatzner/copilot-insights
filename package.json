@@ -1,6 +1,6 @@
 {
   "name": "copilot-insights",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Copilot CLI extension that analyzes session logs for prompting patterns — clarity, efficiency, redirections, and actionable coaching.",
   "type": "module",
   "main": "extension.mjs",
