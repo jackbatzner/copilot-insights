@@ -114,6 +114,10 @@ The web dashboard gives you a full view of your prompting habits:
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="Copilot Insights full demo" width="800" />
+</p>
+
 <details>
 <summary>📸 More screenshots</summary>
 
@@ -145,8 +149,6 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
 
-<img src="docs/screenshots/live-demo.gif" alt="Live Monitor demo" width="800" />
-
 </details>
 
 ### Pages
@@ -166,10 +168,6 @@ All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 ### Practice Lab
 
 The Practice Lab is an interactive sandbox for improving your prompting skills:
-
-<p align="center">
-  <img src="docs/screenshots/practice-demo.gif" alt="Practice Lab demo" width="800" />
-</p>
 
 **🧪 Sandbox Mode** — Type any prompt and click **Analyze** to get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions. Coaching nudges help you improve — "try mentioning the specific file" or "what should the result look like?"
 

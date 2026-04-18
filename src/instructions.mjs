@@ -81,7 +81,6 @@ export function analyzeInstructionGaps({ repo, since } = {}) {
   const sessions = listSessions({ repo, since });
   const conventionMap = {};
   const repoConventions = {};
-  const examples = [];
 
   for (const s of sessions) {
     if (s.turn_count < 2) continue;
@@ -164,7 +163,7 @@ export function analyzeInstructionGaps({ repo, since } = {}) {
 /**
  * Generate concrete suggestions for instruction file improvements.
  */
-function generateInstructionSuggestions(gaps, repoConventions) {
+function generateInstructionSuggestions(gaps, _repoConventions) {
   const suggestions = [];
 
   // Find repeated conventions (3+ occurrences = should be in instructions)

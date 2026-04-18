@@ -46,13 +46,19 @@ extension.mjs  → Copilot CLI extension entry point
 
 ## Testing
 
-There are no automated tests yet. Before submitting a PR, run the linter and verify manually:
+```bash
+npm test        # runs node --test test/*.test.mjs
+npm run lint    # runs eslint across the project
+```
 
-1. **Run the linter:** `npm run lint` (should complete with no errors or warnings)
-2. **Build the UI:** `cd ui && npm run build` (should complete with no errors)
-3. **Start the server:** `cd server && node index.mjs` → visit http://localhost:3002
-4. **Check all pages:** Navigate through Overview, Coaching, Learn, Analytics, Instructions, and Sessions
-5. **Check the console:** Open browser dev tools (F12) and verify no JavaScript errors
+Before submitting a PR:
+
+1. **Run the tests:** `npm test` (should pass with no failures)
+2. **Run the linter:** `npm run lint` (should complete with no errors)
+3. **Build the UI:** `cd ui && npm run build` (should complete with no errors)
+4. **Start the server:** `cd server && node index.mjs` → visit http://localhost:3002
+5. **Check all pages:** Navigate through Overview, Coaching, Learn, Analytics, Instructions, Sessions, Practice, and Live Monitor
+6. **Check the console:** Open browser dev tools (F12) and verify no JavaScript errors
 
 ## Code Style
 

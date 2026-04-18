@@ -5,7 +5,7 @@
 import { analyzeDelegation } from "./delegation.mjs";
 import { analyzeJudgment } from "./judgment.mjs";
 import { analyzeFirstTurnClarity } from "./clarity.mjs";
-import { analyzeEfficiency, analyzeEfficiencyBatch } from "./efficiency.mjs";
+import { analyzeEfficiencyBatch } from "./efficiency.mjs";
 import { analyzeInstructionGaps } from "./instructions.mjs";
 import { analyzeInstructionFailures } from "./instruction-failures.mjs";
 import { listSessions, getSessionTurns, getSessionRefs } from "./db.mjs";
@@ -548,7 +548,7 @@ export function generateProgressCheck({ repo, since } = {}) {
  */
 export function generateRetro({ repo, since } = {}) {
   const data = gatherMetrics({ repo, since });
-  const { sessions, delegation, judgment, clarityResult, efficiency } = data;
+  const { sessions, delegation, judgment, efficiency } = data;
 
   if (sessions.length === 0) {
     return { empty: true, message: "No sessions in this timeframe to review." };

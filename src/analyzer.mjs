@@ -6,7 +6,7 @@ import {
   getSession,
   getFileEditCounts,
 } from "./db.mjs";
-import { matchPatterns, REDIRECTION_CATEGORIES } from "./patterns.mjs";
+import { matchPatterns } from "./patterns.mjs";
 
 /**
  * Analyze a single session for redirection signals.

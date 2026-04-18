@@ -35,9 +35,7 @@ Copilot Insights is a **local-only** development tool:
 - The Express JSON body parser is limited to **50 KB**.
 - All regex patterns used for prompt analysis are designed to avoid catastrophic backtracking (ReDoS). Greedy quantifiers like `.*` are bounded (e.g., `.{0,200}?`) and nested quantifiers use explicit upper bounds.
 
-## Input Validation
-
-### Request body limits
+### Input Validation Details
 
 - JSON body parser limit: **50 KB** (`express.json({ limit: "50kb" })`)
 

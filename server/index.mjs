@@ -32,7 +32,7 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
-import { listSessions, getSession, getSessionTurns, getSessionRefs, getDb } from "../src/db.mjs";
+import { listSessions, getSessionTurns, getSessionRefs, getDb } from "../src/db.mjs";
 import { matchPatterns, REDIRECTION_CATEGORIES } from "../src/patterns.mjs";
 import { analyzePrompt } from "../src/practice.mjs";
 import CHALLENGE_LIBRARY from "../src/challenge-library.mjs";
