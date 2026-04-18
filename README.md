@@ -89,11 +89,18 @@ Open [http://localhost:3002](http://localhost:3002) to see your dashboard.
 
 ### 3. Use as a Copilot CLI Extension (optional)
 
-To get insights directly inside Copilot CLI chat, install it as an extension:
+To get insights directly inside Copilot CLI chat, link it as an extension:
 
 ```bash
-# Symlink into your Copilot extensions directory
-ln -s "$(pwd)" ~/.copilot/extensions/copilot-insights
+copilot-insights link    # if installed globally
+node bin/cli.mjs link    # if running from source
+```
+
+To remove the extension later:
+
+```bash
+copilot-insights unlink    # if installed globally
+node bin/cli.mjs unlink    # if running from source
 ```
 
 Then restart Copilot CLI. The extension registers 7 tools that the agent can invoke:

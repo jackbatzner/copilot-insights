@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Extension linking is now opt-in** — global `npm install` no longer auto-links the Copilot CLI extension; run `copilot-insights link` to opt in
+
 ### Added
 
 - **Practice Lab** dashboard page with two modes:
