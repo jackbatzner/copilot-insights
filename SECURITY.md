@@ -30,5 +30,7 @@ Copilot Insights is a **local-only** development tool:
 ### Input Validation
 
 - The `POST /api/practice/analyze` endpoint enforces a **10,000 character** input limit and validates that the body contains a string.
+- The `GET /api/practice/library` endpoint validates tag query parameters against a **whitelist** of known tags — unrecognized tags are silently dropped.
+- The `GET /api/practice/challenge` and `GET /api/practice/weaknesses` endpoints validate timeframe parameters with a strict pattern (`\d{1,4}[dwmy]` or `all`).
 - The Express JSON body parser is limited to **50 KB**.
-- All regex patterns used for prompt analysis are designed to avoid catastrophic backtracking (ReDoS).
+- All regex patterns used for prompt analysis are designed to avoid catastrophic backtracking (ReDoS). Greedy quantifiers like `.*` are bounded (e.g., `.{0,200}?`) and nested quantifiers use explicit upper bounds.

@@ -39,7 +39,8 @@ function ScoreGauge({ score, grade }) {
 
   return (
     <div style={{ textAlign: "center" }}>
-      <svg width="130" height="130" viewBox="0 0 130 130">
+      <svg width="130" height="130" viewBox="0 0 130 130" role="img" aria-label={`Score: ${score} out of 100, ${grade?.label || "unknown"}`}>
+        <title>Prompt quality score: {score}/100</title>
         <circle cx="65" cy="65" r={radius} fill="none" stroke="var(--border)" strokeWidth="10" />
         <circle cx="65" cy="65" r={radius} fill="none" stroke={color} strokeWidth="10"
           strokeDasharray={circumference} strokeDashoffset={offset}
@@ -148,7 +149,9 @@ function SandboxMode() {
   return (
     <div className="practice-layout">
       <div className="practice-input-section">
+        <label htmlFor="sandbox-prompt" className="sr-only">Enter a prompt to analyze</label>
         <textarea
+          id="sandbox-prompt"
           className="practice-textarea"
           placeholder="Type a prompt to analyze...&#10;&#10;Example: &quot;Fix the login bug&quot; vs. &quot;The login endpoint POST /api/auth/login returns 401 even with valid credentials. Check the JWT verification in src/auth.ts — I think the token expiry check is using seconds instead of milliseconds.&quot;"
           value={text}
@@ -434,8 +437,9 @@ function ChallengeMode() {
         {/* Tag filter for library source */}
         {source === "library" && (
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Filter:</span>
+            <label htmlFor="tag-filter" style={{ fontSize: 12, color: "var(--text-muted)" }}>Filter:</label>
             <select
+              id="tag-filter"
               className="practice-tag-select"
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
@@ -451,7 +455,9 @@ function ChallengeMode() {
       {/* Rewrite area */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">✍️ Your Rewrite</div>
+        <label htmlFor="rewrite-prompt" className="sr-only">Rewrite the prompt to improve its score</label>
         <textarea
+          id="rewrite-prompt"
           className="practice-textarea"
           placeholder="Rewrite the prompt above to eliminate the detected patterns..."
           value={rewrite}

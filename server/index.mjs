@@ -586,6 +586,15 @@ app.get("/api/analytics/file-types", (req, res) => {
 
 // ── Practice Lab endpoints ───────────────────────────────────────
 
+/** Valid tag values for the challenge library. */
+const VALID_LIBRARY_TAGS = new Set([
+  "vague", "no-files", "no-context", "no-constraints", "no-criteria",
+  "no-examples", "no-format", "no-steps", "correction", "frustration", "rollback",
+]);
+
+/** Accepted timeframe patterns: digits + d/w/m/y, or "all". */
+const TIMEFRAME_RE = /^(?:\d{1,4}[dwmy]|all)$/;
+
 /**
  * POST /api/practice/analyze
  * Analyze a prompt text for quality and redirection patterns.
@@ -614,7 +623,11 @@ app.post("/api/practice/analyze", (req, res) => {
  */
 app.get("/api/practice/challenge", (req, res) => {
   try {
-    const since = parseSince(req.query.timeframe || "90d");
+    const tf = req.query.timeframe || "90d";
+    if (typeof tf !== "string" || !TIMEFRAME_RE.test(tf)) {
+      return res.status(400).json({ error: "Invalid timeframe parameter" });
+    }
+    const since = parseSince(tf);
     const result = analyzeRecent({ since, limit: 200 });
 
     // Collect user turns that had redirection patterns
@@ -663,7 +676,11 @@ app.get("/api/practice/challenge", (req, res) => {
  */
 app.get("/api/practice/weaknesses", (req, res) => {
   try {
-    const since = parseSince(req.query.timeframe || "90d");
+    const tf = req.query.timeframe || "90d";
+    if (typeof tf !== "string" || !TIMEFRAME_RE.test(tf)) {
+      return res.status(400).json({ error: "Invalid timeframe parameter" });
+    }
+    const since = parseSince(tf);
     const result = analyzeRecent({ since, limit: 200 });
 
     // Aggregate heuristic gaps across all user turns
@@ -722,7 +739,7 @@ app.get("/api/practice/weaknesses", (req, res) => {
  */
 app.get("/api/practice/library", (req, res) => {
   try {
-    const tags = [].concat(req.query.tag || []).filter(Boolean);
+    const tags = [].concat(req.query.tag || []).filter((t) => typeof t === "string" && VALID_LIBRARY_TAGS.has(t));
     let pool = CHALLENGE_LIBRARY;
     if (tags.length > 0) {
       pool = pool.filter((c) => tags.some((t) => c.tags.includes(t)));

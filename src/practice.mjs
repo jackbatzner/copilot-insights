@@ -183,7 +183,7 @@ function evaluateHeuristics(text) {
 
   // Examples provided — "for example", "e.g.", "such as", "like this:", sample input/output
   // Recommended by: GitHub, Anthropic, Google, OpenAI
-  const hasExamples = /\b(for example|e\.g\.|such as|like this|sample|input.*output|example:?)\b/i.test(text);
+  const hasExamples = /\b(for example|e\.g\.|such as|like this|sample|input.{0,200}?output|example:?)\b/i.test(text);
   if (hasExamples) {
     details.push({ id: "has-examples", label: "Includes examples", severity: "ok", tip: "Examples help the agent understand the expected format and behavior. (GitHub, Anthropic, Google, OpenAI)" });
   } else if (words > 20) {
