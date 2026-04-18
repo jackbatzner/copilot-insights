@@ -32,7 +32,7 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
-import { listSessions, getSession, getSessionTurns, getSessionRefs } from "../src/db.mjs";
+import { listSessions, getSessionTurns, getSessionRefs } from "../src/db.mjs";
 
 import { analyzePrompt } from "../src/practice.mjs";
 

@@ -168,7 +168,7 @@ function evaluateHeuristics(text) {
   }
 
   // Acceptance criteria — mentions "should", "expect", "when...then", "return", "output"
-  const hasCriteria = /\b(should\s+\w+|expect|when\s+.+\s+then|returns?|outputs?|results?\s+in|produces?)\b/i.test(text);
+  const hasCriteria = /\b(should\s+\w+|expect|when\s+\S+(?:\s+\S+){0,10}\s+then|returns?|outputs?|results?\s+in|produces?)\b/i.test(text);
   if (hasCriteria) {
     details.push({ id: "has-criteria", label: "Has acceptance criteria", severity: "ok", tip: "Clear expected outcomes help the agent verify its work." });
   } else if (words > 20) {
@@ -184,6 +184,7 @@ function evaluateHeuristics(text) {
   return {
     wordCount: words,
     charCount: chars,
+    rawText: text,
     hasFilePaths,
     hasConstraints,
     hasCriteria,
@@ -194,10 +195,23 @@ function evaluateHeuristics(text) {
 
 /**
  * Compute a quality score (0-100) from pattern matches and heuristics.
- * Starts at 100, deducts for detected issues, adds for good practices.
+ * Starts at a baseline determined by prompt substance, then adjusts.
  */
 function computeScore(matches, heuristics) {
-  let score = 100;
+  // Start with a baseline based on prompt length/substance
+  // Short/vague prompts start low; longer prompts start higher
+  let score;
+  if (heuristics.charCount < 15) {
+    score = 20;
+  } else if (heuristics.charCount < 30) {
+    score = 35;
+  } else if (heuristics.charCount < 60) {
+    score = 45;
+  } else if (heuristics.wordCount < 15) {
+    score = 50;
+  } else {
+    score = 55;
+  }
 
   // Deductions for redirection patterns
   for (const m of matches) {
@@ -207,14 +221,22 @@ function computeScore(matches, heuristics) {
   // Deductions for heuristic warnings
   for (const d of heuristics.details) {
     if (d.severity === "warning") score -= 10;
-    if (d.severity === "info") score -= 3;
+    if (d.severity === "info") score -= 5;
   }
 
-  // Bonuses for good practices
-  if (heuristics.hasFilePaths) score += 5;
-  if (heuristics.hasConstraints) score += 5;
-  if (heuristics.hasCriteria) score += 5;
-  if (heuristics.hasContext) score += 3;
+  // Bonuses for quality signals — these are how you earn a high score
+  if (heuristics.hasFilePaths) score += 12;
+  if (heuristics.hasConstraints) score += 10;
+  if (heuristics.hasCriteria) score += 10;
+  if (heuristics.hasContext) score += 8;
+
+  // Bonus for technical specificity (error codes, HTTP methods, line numbers, etc.)
+  const hasSpecifics = /\b(line\s+\d+|status\s+\d{3}|port\s+\d+|GET|POST|PUT|DELETE|PATCH|404|500|401|403|200|null|undefined|TypeError|Error)\b/i.test(heuristics.rawText || "");
+  if (hasSpecifics) score += 5;
+
+  // Bonus for substantive length (diminishing returns)
+  if (heuristics.wordCount >= 20) score += 5;
+  if (heuristics.wordCount >= 40) score += 5;
 
   return Math.max(0, Math.min(100, score));
 }
@@ -268,9 +290,9 @@ function findRewrites(text, matches) {
  * Score label and color based on score value.
  */
 function scoreGrade(score) {
-  if (score >= 90) return { label: "Excellent", color: "green" };
-  if (score >= 70) return { label: "Good", color: "yellow" };
-  if (score >= 50) return { label: "Needs Work", color: "orange" };
+  if (score >= 85) return { label: "Excellent", color: "green" };
+  if (score >= 65) return { label: "Good", color: "yellow" };
+  if (score >= 45) return { label: "Needs Work", color: "orange" };
   return { label: "Poor", color: "red" };
 }
 
@@ -322,12 +344,15 @@ export function analyzePrompt(text) {
 
   const suggestions = findRewrites(text, matches);
 
+  // Strip rawText from heuristics before returning (internal only)
+  const { rawText: _raw, ...safeHeuristics } = heuristics;
+
   return {
     score,
     grade,
     patterns: matches,
     categories,
     suggestions,
-    heuristics,
+    heuristics: safeHeuristics,
   };
 }

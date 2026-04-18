@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge } from "../api";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
@@ -66,13 +66,51 @@ function PatternBadge({ category, emoji, label, matchedText }) {
   );
 }
 
+/* ── Nudges ─────────────────────────────────────────────────── */
+
+function Nudges({ result }) {
+  if (!result || result.score >= 85) return null;
+
+  const nudges = [];
+  const h = result.heuristics || {};
+
+  if (h.charCount < 30) {
+    nudges.push("Try expanding your prompt — what file, function, or endpoint are you working with?");
+  }
+  if (!h.hasFilePaths && h.wordCount >= 5) {
+    nudges.push("What if you mentioned the specific file? e.g. \"in src/auth.ts\" or \"the /api/login endpoint\"");
+  }
+  if (!h.hasConstraints && h.wordCount >= 8) {
+    nudges.push("Try adding a boundary — \"don't modify tests\", \"only change the middleware\", \"keep backward compat\"");
+  }
+  if (!h.hasCriteria && h.wordCount >= 10) {
+    nudges.push("What should the result look like? Try \"it should return 200 with…\" or \"the test should pass when…\"");
+  }
+  if (!h.hasContext && h.wordCount >= 12) {
+    nudges.push("Try adding why — \"because the token is expiring too early\" or \"so that the redirect works for OAuth\"");
+  }
+  if (result.patterns.length > 0 && result.score < 45) {
+    nudges.push("Try rephrasing without correction language — describe what you want, not what went wrong");
+  }
+
+  if (nudges.length === 0) return null;
+
+  return (
+    <div className="practice-nudges">
+      <div className="practice-nudges-header">💬 Try this</div>
+      {nudges.map((n, i) => (
+        <div key={i} className="practice-nudge">{n}</div>
+      ))}
+    </div>
+  );
+}
+
 /* ── Sandbox Mode ──────────────────────────────────────────── */
 
 function SandboxMode() {
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const timerRef = useRef(null);
 
   const analyze = useCallback(async (prompt) => {
     if (!prompt || prompt.trim().length < 3) {
@@ -91,13 +129,12 @@ function SandboxMode() {
   }, []);
 
   const handleChange = (e) => {
-    const val = e.target.value;
-    setText(val);
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => analyze(val), 300);
+    setText(e.target.value);
   };
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  const handleAnalyzeClick = () => {
+    analyze(text);
+  };
 
   return (
     <div className="practice-layout">
@@ -109,9 +146,14 @@ function SandboxMode() {
           onChange={handleChange}
           rows={8}
         />
-        <div className="practice-char-count">
-          {text.length} chars · {text.trim().split(/\s+/).filter(Boolean).length} words
-          {analyzing && <span style={{ marginLeft: 8, color: "var(--accent)" }}>analyzing…</span>}
+        <div className="practice-char-count" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>
+            {text.length} chars · {text.trim().split(/\s+/).filter(Boolean).length} words
+            {analyzing && <span style={{ marginLeft: 8, color: "var(--accent)" }}>analyzing…</span>}
+          </span>
+          <button className="practice-analyze-btn" onClick={handleAnalyzeClick} disabled={analyzing || text.trim().length < 3}>
+            {result ? "Re-analyze" : "Analyze"}
+          </button>
         </div>
       </div>
 
@@ -130,6 +172,8 @@ function SandboxMode() {
               ))}
             </div>
           </div>
+
+          <Nudges result={result} />
 
           {result.patterns.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
@@ -190,25 +234,57 @@ function SandboxMode() {
 
 /* ── Challenge Mode ────────────────────────────────────────── */
 
+const GENERIC_CHALLENGES = [
+  "fix the bug",
+  "make it work",
+  "the tests are failing, can you look at it?",
+  "do the auth thing",
+  "update the styles to look better",
+  "something is wrong with the API, investigate",
+  "refactor that file",
+  "add error handling",
+  "write tests",
+  "clean up the code and make it production ready",
+  "the page is slow, optimize it",
+  "implement the feature from the ticket",
+];
+
 function ChallengeMode() {
+  const [source, setSource] = useState(null); // null = picker, "mine" | "generic"
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [rewrite, setRewrite] = useState("");
   const [rewriteResult, setRewriteResult] = useState(null);
   const [analyzingRewrite, setAnalyzingRewrite] = useState(false);
-  const timerRef = useRef(null);
 
-  const loadChallenge = async () => {
+  const loadChallenge = async (src) => {
+    const effectiveSource = src || source;
     setLoading(true);
     setError(null);
     setRewrite("");
     setRewriteResult(null);
     try {
-      const data = await fetchPracticeChallenge();
-      setChallenge(data.challenge);
-      if (!data.challenge) {
-        setError(data.message || "No challenges available.");
+      if (effectiveSource === "mine") {
+        const data = await fetchPracticeChallenge();
+        setChallenge(data.challenge);
+        if (!data.challenge) {
+          setError(data.message || "No challenges available.");
+        }
+      } else {
+        // Generic: pick a random curated bad prompt and analyze it
+        const prompt = GENERIC_CHALLENGES[Math.floor(Math.random() * GENERIC_CHALLENGES.length)];
+        const analysis = await analyzePracticePrompt(prompt);
+        setChallenge({
+          originalPrompt: prompt,
+          score: analysis.score,
+          grade: analysis.grade,
+          patterns: analysis.patterns,
+          categories: analysis.categories,
+          suggestions: analysis.suggestions,
+          sessionId: null,
+          turnIndex: null,
+        });
       }
     } catch (err) {
       setError(err.message);
@@ -234,23 +310,39 @@ function ChallengeMode() {
   }, []);
 
   const handleRewriteChange = (e) => {
-    const val = e.target.value;
-    setRewrite(val);
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => analyzeRewrite(val), 300);
+    setRewrite(e.target.value);
   };
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  // Source picker — choose between your own bad prompts or generic ones
+  if (!source) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: "48px 24px" }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🏆</div>
+        <h2 style={{ marginBottom: 8 }}>Rewrite Challenge</h2>
+        <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
+          Pick a poorly-written prompt and rewrite it to score higher.
+        </p>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+          <button className="practice-challenge-btn" onClick={() => { setSource("mine"); loadChallenge("mine"); }}>
+            🔍 My Bad Prompts
+          </button>
+          <button className="practice-challenge-btn" style={{ background: "var(--bg-card)", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { setSource("generic"); loadChallenge("generic"); }}>
+            📝 Generic Examples
+          </button>
+        </div>
+        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 16 }}>
+          &ldquo;My Bad Prompts&rdquo; pulls real low-scoring prompts from your Copilot sessions.
+        </p>
+      </div>
+    );
+  }
 
   if (!challenge && !loading && !error) {
     return (
       <div className="card" style={{ textAlign: "center", padding: "48px 24px" }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🏆</div>
         <h2 style={{ marginBottom: 8 }}>Rewrite Challenge</h2>
-        <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
-          We&rsquo;ll pull a real past prompt that scored poorly. Your job: rewrite it to score higher.
-        </p>
-        <button className="practice-challenge-btn" onClick={loadChallenge}>
+        <button className="practice-challenge-btn" onClick={() => loadChallenge()}>
           Start Challenge
         </button>
       </div>
@@ -274,7 +366,12 @@ function ChallengeMode() {
     <div>
       {/* Original prompt card */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">📝 Original Prompt</div>
+        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>📝 Original Prompt</span>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {source === "mine" ? "From your sessions" : "Generic example"}
+          </span>
+        </div>
         <div className="practice-challenge-original">
           <q style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{challenge.originalPrompt}</q>
         </div>
@@ -300,9 +397,14 @@ function ChallengeMode() {
           onChange={handleRewriteChange}
           rows={5}
         />
-        <div className="practice-char-count">
-          {rewrite.length} chars
-          {analyzingRewrite && <span style={{ marginLeft: 8, color: "var(--accent)" }}>analyzing…</span>}
+        <div className="practice-char-count" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>
+            {rewrite.length} chars
+            {analyzingRewrite && <span style={{ marginLeft: 8, color: "var(--accent)" }}>analyzing…</span>}
+          </span>
+          <button className="practice-analyze-btn" onClick={() => analyzeRewrite(rewrite)} disabled={analyzingRewrite || rewrite.trim().length < 3}>
+            {rewriteResult ? "Re-analyze" : "Analyze"}
+          </button>
         </div>
       </div>
 
@@ -340,6 +442,8 @@ function ChallengeMode() {
         </div>
       )}
 
+      {rewriteResult && <Nudges result={rewriteResult} />}
+
       {/* Rewrite analysis */}
       {rewriteResult && rewriteResult.patterns.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
@@ -368,9 +472,16 @@ function ChallengeMode() {
         </div>
       )}
 
-      <div style={{ textAlign: "center", marginTop: 24 }}>
-        <button className="practice-challenge-btn" onClick={loadChallenge}>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+        <button className="practice-challenge-btn" onClick={() => loadChallenge()}>
           Next Challenge →
+        </button>
+        <button
+          className="practice-challenge-btn"
+          style={{ background: "var(--bg-card)", color: "var(--text)", border: "1px solid var(--border)" }}
+          onClick={() => { setSource(null); setChallenge(null); setRewrite(""); setRewriteResult(null); setError(null); }}
+        >
+          Switch Source
         </button>
       </div>
     </div>
