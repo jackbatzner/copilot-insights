@@ -4,8 +4,6 @@
 import {
   listSessions,
   getSessionTurns,
-  getFileEditCounts,
-  getSessionRefs,
   getDb,
 } from "./db.mjs";
 import { matchPatterns } from "./patterns.mjs";

@@ -2,7 +2,7 @@
 // Good judgment = catching issues early, not approving bad work, knowing
 // when to stop and redirect vs. when to let the agent run.
 
-import { listSessions, getSessionTurns, getSessionFiles, getSessionRefs } from "./db.mjs";
+import { listSessions, getSessionTurns, getSessionFiles } from "./db.mjs";
 import { matchPatterns } from "./patterns.mjs";
 
 /**
@@ -141,7 +141,7 @@ function analyzeSessionJudgment(session, turns, files) {
   // - Low approval-before-correction rate (not rubber-stamping = good)
   // - Low file thrashing (getting it right first time = good review)
   // - Low late catches (reviewing carefully = good)
-  const catchRate = userTurns > 0 ? catches / userTurns : 0;
+  const _catchRate = userTurns > 0 ? catches / userTurns : 0;
   const rubberStampRate = approvals > 0 ? approvalsBeforeCorrection / approvals : 0;
   const thrashScore = thrashedFiles.length;
 

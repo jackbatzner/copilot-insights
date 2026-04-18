@@ -4,7 +4,6 @@
 // gaps = missing rules; failures = rules that don't stick.
 
 import { listSessions, getSessionTurns } from "./db.mjs";
-import { matchPatterns } from "./patterns.mjs";
 
 /**
  * Patterns indicating the user is RE-STATING something the agent should

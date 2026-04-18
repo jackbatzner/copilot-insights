@@ -5,7 +5,7 @@
 // ALL SIGNALS ARE USER-DRIVEN — we only look at what the user typed/decided,
 // not what the agent chose to do.
 
-import { listSessions, getSessionTurns } from "./db.mjs";
+import { listSessions } from "./db.mjs";
 import { getDb } from "./db.mjs";
 
 const PLAN_WORDS =

@@ -125,20 +125,11 @@ try {
     console.log(`   → ${detailPath}`);
   }
 
-  // ── 4. Record GIFs (optional) ─────────────────────────────────
+  // ── 4. Record full-app demo GIF (optional) ─────────────────────
 
   if (doGif) {
-    console.log("\n🎬 Recording demo GIFs…");
-
-    // Practice Lab demo — type a prompt and watch the score update
-    if (!pageFilter || pageFilter.includes("practice")) {
-      await recordPracticeGif(browser, baseUrl);
-    }
-
-    // Live Monitor demo
-    if (!pageFilter || pageFilter.includes("live")) {
-      await recordLiveGif(page, baseUrl);
-    }
+    console.log("\n🎬 Recording full-app demo GIF…");
+    await recordFullDemoGif(browser, baseUrl);
   }
 
   await browser.close();
@@ -147,10 +138,15 @@ try {
   server.kill();
 }
 
-// ── GIF recorders ───────────────────────────────────────────────
+// ── GIF recorder ────────────────────────────────────────────────
 
-async function recordPracticeGif(browser, baseUrl) {
-  console.log("🎬 Recording practice-demo.gif…");
+/**
+ * Record a single full-app demo GIF that walks through the major pages:
+ * Overview → Sessions → Session Detail → Coaching → Analytics → Practice
+ * (type a prompt) → Live Monitor. Outputs docs/screenshots/demo.gif.
+ */
+async function recordFullDemoGif(browser, baseUrl) {
+  console.log("🎬 Recording demo.gif (full-app walkthrough)…");
   const videoDir = resolve(SCREENSHOTS_DIR, ".video-tmp");
   mkdirSync(videoDir, { recursive: true });
 
@@ -161,52 +157,68 @@ async function recordPracticeGif(browser, baseUrl) {
   });
   const gifPage = await gifContext.newPage();
 
-  // Navigate to Practice Lab
-  await gifPage.goto(`${baseUrl}/practice`, { waitUntil: "networkidle" });
+  // ── Scene 1: Overview — show the main dashboard ───────────────
+  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(3000);
+
+  // ── Scene 2: Sessions list ────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/sessions`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
+
+  // ── Scene 3: Click into a session detail ──────────────────────
+  const sessionLink = gifPage.locator("a[href^='/sessions/']").first();
+  if (await sessionLink.count()) {
+    await sessionLink.click();
+    await gifPage.waitForURL(/\/sessions\/.+/);
+    await gifPage.waitForLoadState("networkidle");
+    await gifPage.waitForTimeout(2500);
+  }
+
+  // ── Scene 4: Coaching ─────────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/coaching`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2000);
+
+  // ── Scene 5: Analytics ────────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2000);
+
+  // ── Scene 6: Practice Lab — type a prompt ─────────────────────
+  await gifPage.goto(`${baseUrl}/practice`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(1500);
 
   const textarea = gifPage.locator(".practice-textarea").first();
   try {
-    await textarea.waitFor({ state: "visible", timeout: 15_000 });
+    await textarea.waitFor({ state: "visible", timeout: 10_000 });
+    await textarea.click();
+    await textarea.type("fix the bug", { delay: 60 });
+    await gifPage.waitForTimeout(2000);
+
+    await textarea.fill("");
+    await gifPage.waitForTimeout(400);
+    await textarea.type(
+      "The login endpoint POST /api/auth/login returns 401 for valid credentials. " +
+      "Debug JWT verification in src/middleware/auth.ts — the token expiry check on " +
+      "line 42 compares seconds vs milliseconds. Add a unit test in tests/auth.test.ts.",
+      { delay: 20 },
+    );
+    await gifPage.waitForTimeout(2500);
   } catch {
-    console.warn("⚠️  Practice textarea not found — skipping GIF (SPA may not have hydrated)");
-    await gifContext.close();
-    return;
+    console.warn("⚠️  Practice textarea not found — skipping typing scene");
   }
 
-  // ── Scene 1: Type a vague prompt → low score ──────────────────
-  await textarea.click();
-  await textarea.type("fix the bug in the auth module", { delay: 60 });
-  await gifPage.waitForTimeout(2500); // let analysis + gauge animate
+  // ── Scene 7: Live Monitor ─────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(3000);
 
-  // ── Scene 2: Clear and type a well-structured prompt → high score
-  await textarea.fill("");
-  await gifPage.waitForTimeout(600);
-  const goodPrompt =
-    "The login endpoint POST /api/auth/login returns 401 for valid credentials. " +
-    "Debug the JWT verification in src/middleware/auth.ts — the token expiry " +
-    "check on line 42 compares seconds vs milliseconds. Add a unit test for " +
-    "the fix in tests/auth.test.ts.";
-  await textarea.type(goodPrompt, { delay: 25 });
-  await gifPage.waitForTimeout(3000); // let the high score render
-
-  // ── Scene 3: Switch to Challenge tab briefly ──────────────────
-  const challengeTab = gifPage.locator("button", { hasText: "Rewrite Challenge" });
-  if (await challengeTab.count()) {
-    await challengeTab.click();
-    await gifPage.waitForTimeout(3000); // show the challenge UI
-  }
-
-  // Close context to finalize video
+  // ── Finalize ──────────────────────────────────────────────────
   const videoPath = await gifPage.video().path();
   await gifContext.close();
 
-  // Convert webm → gif with ffmpeg-static
-  const gifPath = resolve(SCREENSHOTS_DIR, "practice-demo.gif");
+  const gifPath = resolve(SCREENSHOTS_DIR, "demo.gif");
   try {
     execFileSync(ffmpegPath, [
       "-y", "-i", videoPath,
-      "-vf", "fps=12,scale=960:-1:flags=lanczos",
+      "-vf", "fps=12,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
       "-loop", "0",
       gifPath,
     ], { stdio: "pipe" });
@@ -243,88 +255,4 @@ async function waitForServer(url, timeoutMs) {
   }
   console.error("Server output:\n", serverOutput);
   throw new Error(`Server did not start within ${timeoutMs}ms`);
-}
-
-/**
- * Record ~8 seconds of the Live Monitor page, showing the real-time feed
- * updating with pattern badges and coaching alerts. Outputs a GIF.
- */
-async function recordLiveGif(page, baseUrl) {
-  console.log("🎥 Recording Live Monitor GIF…");
-
-  const webmPath = resolve(SCREENSHOTS_DIR, "live-demo.webm");
-  const gifPath = resolve(SCREENSHOTS_DIR, "live-demo.gif");
-
-  // Navigate to the live page and let it poll
-  await page.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(3000); // let initial data load
-
-  // Start screen recording
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Page.startScreencast", { format: "png", maxWidth: 1280, maxHeight: 800 });
-
-  // Collect frames for ~8 seconds
-  const frames = [];
-  cdp.on("Page.screencastFrame", async (params) => {
-    frames.push(Buffer.from(params.data, "base64"));
-    await cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId });
-  });
-
-  await page.waitForTimeout(8000);
-  await cdp.send("Page.stopScreencast");
-
-  if (frames.length === 0) {
-    console.warn("⚠ No frames captured, skipping GIF generation");
-    return;
-  }
-
-  // Write frames as individual PNGs and convert to GIF via ffmpeg
-  const framesDir = resolve(SCREENSHOTS_DIR, "_frames");
-  mkdirSync(framesDir, { recursive: true });
-
-  for (let i = 0; i < frames.length; i++) {
-    const { writeFileSync } = await import("node:fs");
-    writeFileSync(resolve(framesDir, `frame-${String(i).padStart(4, "0")}.png`), frames[i]);
-  }
-
-  // Find ffmpeg binary
-  let ffmpegBin;
-  try {
-    const ffmpegStaticPath = resolve(ROOT, "node_modules", "ffmpeg-static", "index.js");
-    if (existsSync(ffmpegStaticPath)) {
-      const mod = await import(`file://${ffmpegStaticPath.replace(/\\/g, "/")}`);
-      ffmpegBin = mod.default || mod;
-    }
-  } catch { /* fall through */ }
-
-  if (!ffmpegBin || !existsSync(ffmpegBin)) {
-    // Try system ffmpeg
-    ffmpegBin = "ffmpeg";
-  }
-
-  try {
-    console.log(`   Converting ${frames.length} frames to GIF…`);
-    execFileSync(ffmpegBin, [
-      "-y",
-      "-framerate", "10",
-      "-i", resolve(framesDir, "frame-%04d.png"),
-      "-vf", "fps=10,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-      gifPath,
-    ], { stdio: "pipe" });
-    console.log(`   → ${gifPath}`);
-  } catch (err) {
-    console.warn("⚠ ffmpeg conversion failed:", err.message);
-    console.warn("   Install ffmpeg-static: npm install --save-dev ffmpeg-static");
-  }
-
-  // Clean up frames
-  const { readdirSync } = await import("node:fs");
-  for (const f of readdirSync(framesDir)) {
-    unlinkSync(resolve(framesDir, f));
-  }
-  const { rmdirSync } = await import("node:fs");
-  rmdirSync(framesDir);
-
-  // Also clean up webm if it was created
-  if (existsSync(webmPath)) unlinkSync(webmPath);
 }
