@@ -187,6 +187,18 @@ cd server && npm run dev
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
+### Releasing
+
+```bash
+npm run release patch         # 0.1.0 → 0.1.1
+npm run release minor         # 0.1.0 → 0.2.0
+npm run release major         # 0.1.0 → 1.0.0
+npm run release 0.2.0-beta.1  # explicit version
+npm run release patch --dry-run  # preview without changes
+```
+
+This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then creates the release automatically.
+
 ## Architecture
 
 ```mermaid

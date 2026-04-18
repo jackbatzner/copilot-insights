@@ -25,6 +25,7 @@
     "dev": "cd server && node --watch index.mjs",
     "lint": "eslint *.mjs src/ server/",
     "seed": "node scripts/seed-mock-db.mjs",
+    "release": "node scripts/release.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "prepack": "cd ui && npm install && npm run build",
     "postinstall": "cd server && npm install --omit=dev && cd ../ui && npm install && npm run build"
