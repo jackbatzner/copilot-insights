@@ -1,0 +1,65 @@
+{
+  "name": "copilot-insights",
+  "version": "0.1.0-alpha.1",
+  "description": "Copilot CLI extension that analyzes session logs for prompting patterns — clarity, efficiency, redirections, and actionable coaching.",
+  "type": "module",
+  "main": "extension.mjs",
+  "bin": {
+    "copilot-insights": "bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "extension.mjs",
+    "src/",
+    "server/index.mjs",
+    "server/package.json",
+    "ui/dist/",
+    "logo.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "setup": "npm install --legacy-peer-deps && cd server && npm install && cd ../ui && npm install && npm run build",
+    "build": "cd ui && npm run build",
+    "start": "cd server && node index.mjs",
+    "dev": "cd server && node --watch index.mjs",
+    "lint": "eslint *.mjs src/ server/",
+    "seed": "node scripts/seed-mock-db.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "prepack": "cd ui && npm install && npm run build",
+    "postinstall": "cd server && npm install --omit=dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.59.1",
+    "eslint": "^9.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "peerDependencies": {
+    "@github/copilot-sdk": ">=0.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "copilot",
+    "copilot-cli",
+    "extension",
+    "session-analysis",
+    "redirection",
+    "drift-detection",
+    "prompt-quality",
+    "ai-prompting"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jackbatzner/copilot-insights.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jackbatzner/copilot-insights/issues"
+  },
+  "homepage": "https://github.com/jackbatzner/copilot-insights#readme"
+}

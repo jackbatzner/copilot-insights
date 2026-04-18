@@ -1,0 +1,165 @@
+// Core analysis engine — scans session turns and produces a redirection report.
+
+import {
+  listSessions,
+  getSessionTurns,
+  getSession,
+  getFileEditCounts,
+} from "./db.mjs";
+import { matchPatterns, REDIRECTION_CATEGORIES } from "./patterns.mjs";
+
+/**
+ * Analyze a single session for redirection signals.
+ * Returns a structured report with per-turn matches and aggregate stats.
+ */
+export function analyzeSession(sessionId) {
+  const session = getSession(sessionId);
+  if (!session) return null;
+
+  const turns = getSessionTurns(sessionId);
+  const fileEdits = getFileEditCounts(sessionId);
+
+  const redirections = [];
+  let totalWeight = 0;
+
+  for (const turn of turns) {
+    if (!turn.user_message) continue;
+
+    const matches = matchPatterns(turn.user_message);
+    if (matches.length > 0) {
+      const turnWeight = matches.reduce((sum, m) => sum + m.weight, 0);
+      totalWeight += turnWeight;
+      redirections.push({
+        turnIndex: turn.turn_index,
+        timestamp: turn.timestamp,
+        message: turn.user_message.substring(0, 300),
+        matches,
+        weight: turnWeight,
+      });
+    }
+  }
+
+  // Detect file thrashing (same file edited 3+ times)
+  const thrashedFiles = fileEdits.filter((f) => f.edit_count >= 3);
+
+  // Compute category breakdown
+  const categoryBreakdown = {};
+  for (const r of redirections) {
+    for (const m of r.matches) {
+      if (!categoryBreakdown[m.category]) {
+        categoryBreakdown[m.category] = { count: 0, weight: 0 };
+      }
+      categoryBreakdown[m.category].count++;
+      categoryBreakdown[m.category].weight += m.weight;
+    }
+  }
+
+  // Redirection rate: fraction of user turns that contain a redirection
+  const userTurnCount = turns.filter((t) => t.user_message).length;
+  const redirectionRate =
+    userTurnCount > 0 ? redirections.length / userTurnCount : 0;
+
+  return {
+    session: {
+      id: session.id,
+      repository: session.repository,
+      branch: session.branch,
+      summary: session.summary,
+      createdAt: session.created_at,
+      turnCount: session.turn_count,
+    },
+    stats: {
+      totalRedirections: redirections.length,
+      totalWeight,
+      userTurnCount,
+      redirectionRate,
+      thrashedFileCount: thrashedFiles.length,
+    },
+    categoryBreakdown,
+    redirections,
+    thrashedFiles,
+  };
+}
+
+/**
+ * Analyze multiple recent sessions and return a summary.
+ */
+export function analyzeRecent({ repo, limit = 500, since } = {}) {
+  const sessions = listSessions({ repo, limit, since });
+  const results = [];
+
+  for (const s of sessions) {
+    if (s.turn_count < 2) continue; // skip trivial sessions
+    const report = analyzeSession(s.id);
+    if (report && report.stats.totalRedirections > 0) {
+      results.push(report);
+    }
+  }
+
+  // Sort by redirection weight (most problematic first)
+  results.sort((a, b) => b.stats.totalWeight - a.stats.totalWeight);
+
+  // Aggregate stats across all sessions
+  const aggregate = {
+    sessionsAnalyzed: sessions.length,
+    sessionsWithRedirections: results.length,
+    totalRedirections: results.reduce(
+      (s, r) => s + r.stats.totalRedirections,
+      0
+    ),
+    avgRedirectionRate:
+      results.length > 0
+        ? results.reduce((s, r) => s + r.stats.redirectionRate, 0) /
+          results.length
+        : 0,
+    categoryTotals: {},
+  };
+
+  for (const r of results) {
+    for (const [cat, data] of Object.entries(r.categoryBreakdown)) {
+      if (!aggregate.categoryTotals[cat]) {
+        aggregate.categoryTotals[cat] = { count: 0, weight: 0 };
+      }
+      aggregate.categoryTotals[cat].count += data.count;
+      aggregate.categoryTotals[cat].weight += data.weight;
+    }
+  }
+
+  return { aggregate, sessions: results };
+}
+
+/**
+ * Find the most common redirection patterns across sessions.
+ */
+export function findTopPatterns({ repo, limit = 500, since } = {}) {
+  const { sessions } = analyzeRecent({ repo, limit, since });
+
+  const patternCounts = {};
+  for (const s of sessions) {
+    for (const r of s.redirections) {
+      for (const m of r.matches) {
+        const key = `${m.category}::${m.label}`;
+        if (!patternCounts[key]) {
+          patternCounts[key] = {
+            category: m.category,
+            label: m.label,
+            count: 0,
+            weight: 0,
+            examples: [],
+          };
+        }
+        patternCounts[key].count++;
+        patternCounts[key].weight += m.weight;
+        if (patternCounts[key].examples.length < 3) {
+          patternCounts[key].examples.push({
+            sessionId: s.session.id,
+            repo: s.session.repository,
+            message: r.message.substring(0, 120),
+          });
+        }
+      }
+    }
+  }
+
+  return Object.values(patternCounts).sort((a, b) => b.count - a.count);
+}

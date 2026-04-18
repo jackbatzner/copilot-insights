@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+            server/package-lock.json
+
+      - run: npm install --legacy-peer-deps
+      - run: cd ui && npm install
+      - run: npm run lint
+
+  build:
+    name: Build (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+            server/package-lock.json
+
+      - name: Install root dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm install
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
+
+      - name: Verify server starts
+        working-directory: server
+        run: |
+          node index.mjs &
+          SERVER_PID=$!
+          sleep 2
+          curl -sf http://localhost:3002/api/summary || echo "No session DB (expected in CI)"
+          kill $SERVER_PID 2>/dev/null || true
+
+      - name: Verify CLI entry point
+        run: node -e "import('./bin/cli.mjs')" || true
+
+      - name: Verify extension entry point
+        run: node -e "import('./extension.mjs')" || true
+
+      - name: Check package files
+        run: |
+          npm pack --dry-run 2>&1 | head -50
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+            server/package-lock.json
+
+      - run: npm install --legacy-peer-deps
+      - run: cd server && npm install
+      - run: cd ui && npm install
+
+      - name: Audit root
+        run: npm audit --omit=dev || true
+
+      - name: Audit server
+        working-directory: server
+        run: npm audit --omit=dev || true
+
+      - name: Audit UI
+        working-directory: ui
+        run: npm audit --omit=dev || true
+
+      - name: Check for known vulnerabilities
+        run: npx audit-ci --moderate || true

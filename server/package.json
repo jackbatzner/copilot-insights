@@ -1,0 +1,21 @@
+{
+  "name": "copilot-insights-server",
+  "version": "0.1.0",
+  "description": "Express API server for the Copilot Insights dashboard",
+  "type": "module",
+  "main": "index.mjs",
+  "private": true,
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node --watch index.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

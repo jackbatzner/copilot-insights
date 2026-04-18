@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      production:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "eslint*"
+          - "@eslint*"
+        update-types:
+          - minor
+          - patch
+      linting:
+        patterns:
+          - "eslint*"
+          - "@eslint*"
+
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns:
+          - "react*"
+      vite:
+        patterns:
+          - "vite*"
+          - "@vitejs*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

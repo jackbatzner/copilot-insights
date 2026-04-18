@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1e2e"/>
+      <stop offset="100%" style="stop-color:#0d1117"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#58a6ff"/>
+      <stop offset="100%" style="stop-color:#bc8cff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3fb950"/>
+      <stop offset="100%" style="stop-color:#58a6ff"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <!-- Score ring -->
+  <circle cx="64" cy="58" r="32" fill="none" stroke="#30363d" stroke-width="6"/>
+  <circle cx="64" cy="58" r="32" fill="none" stroke="url(#ring)" stroke-width="6"
+          stroke-dasharray="152 200" stroke-linecap="round"
+          transform="rotate(-90 64 58)"/>
+  <!-- Lightbulb icon (insights) -->
+  <path d="M64 42 C56 42 50 48 50 56 C50 61 53 65 57 67 L57 72 L71 72 L71 67 C75 65 78 61 78 56 C78 48 72 42 64 42Z"
+        fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linejoin="round"/>
+  <line x1="58" y1="76" x2="70" y2="76" stroke="#e6edf3" stroke-width="2" stroke-linecap="round"/>
+  <line x1="60" y1="80" x2="68" y2="80" stroke="#e6edf3" stroke-width="2" stroke-linecap="round"/>
+  <!-- Sparkle dots -->
+  <circle cx="40" cy="38" r="2" fill="#d29922" opacity="0.8"/>
+  <circle cx="88" cy="42" r="1.5" fill="#3fb950" opacity="0.8"/>
+  <circle cx="44" cy="78" r="1.5" fill="#f85149" opacity="0.6"/>
+  <!-- Bottom bar chart hint -->
+  <rect x="30" y="98" width="10" height="14" rx="2" fill="#58a6ff" opacity="0.6"/>
+  <rect x="44" y="94" width="10" height="18" rx="2" fill="#bc8cff" opacity="0.7"/>
+  <rect x="58" y="90" width="10" height="22" rx="2" fill="url(#accent)" opacity="0.8"/>
+  <rect x="72" y="96" width="10" height="16" rx="2" fill="#d29922" opacity="0.6"/>
+  <rect x="86" y="100" width="10" height="12" rx="2" fill="#58a6ff" opacity="0.5"/>
+</svg>

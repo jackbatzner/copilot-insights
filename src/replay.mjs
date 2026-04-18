@@ -1,0 +1,229 @@
+// Session replay with per-turn coaching annotations.
+// All tags reflect USER behavior only.
+
+import { getSessionTurns } from "./db.mjs";
+
+/** Strip XML/HTML system tags from a message before analysis. */
+function stripTags(msg) {
+  if (!msg) return "";
+  return msg
+    .replace(/<[^>]*>[\s\S]*?<\/[^>]*>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .trim();
+}
+
+// ── Pattern regexes ──
+
+const CORRECTION_RE =
+  /\b(no[,.]|not\s+that|go\s+back|change\s+it|instead|actually|wait|undo|revert|wrong)\b/i;
+
+const DRIP_FEED_RE =
+  /^(oh\s+and|also[,.]|btw|one\s+more\s+thing|forgot\s+to\s+mention|can\s+you\s+also|and\s+add)\b/i;
+
+const GOAL_VERB_RE = /\b(build|create|implement|add|make|write)\b/i;
+const STEP_BY_STEP_RE = /\b(step\s+1|first[,.]|then[,.]|after\s+that)\b/i;
+
+const APPROVAL_RE =
+  /^(yes|yeah|yep|yup|ok|okay|sure|go\s+ahead|looks\s+good|lgtm|perfect|great|nice|ship\s+it|approved|do\s+it|go\s+for\s+it|sounds\s+good)\b/i;
+
+const CATCH_RE =
+  /\b(wait|hold\s+on|actually|that'?s\s+wrong|not\s+right|broken|fix|bug|issue|error)\b/i;
+
+const SPECIFIC_RE =
+  /(\b\w+\.\w{1,5}\b|function\s+\w|\/[\w/]+\.\w+|line\s+\d|`[^`]+`)/i;
+
+// ── Tag detection ──
+
+function detectTags(cleanMsg, rawAssistant, turnIndex) {
+  const tags = [];
+  const msgLen = cleanMsg.length;
+
+  // Redirection
+  if (CORRECTION_RE.test(cleanMsg)) {
+    tags.push({
+      type: "redirection",
+      emoji: "🔄",
+      label: "Redirection",
+      detail: "Changed direction from previous instruction",
+    });
+  }
+
+  // Drip-feed (only after first turn)
+  if (turnIndex > 0 && DRIP_FEED_RE.test(cleanMsg)) {
+    tags.push({
+      type: "drip_feed",
+      emoji: "💧",
+      label: "Drip-feed",
+      detail: "Adding context that should have been in the first message",
+    });
+  }
+
+  // Good delegation
+  if (
+    GOAL_VERB_RE.test(cleanMsg) &&
+    msgLen < 500 &&
+    !STEP_BY_STEP_RE.test(cleanMsg)
+  ) {
+    tags.push({
+      type: "good_delegation",
+      emoji: "🎯",
+      label: "Good delegation",
+      detail: "Clear goal with room for agent autonomy",
+    });
+  }
+
+  // Approval (short affirmative)
+  const isApproval = msgLen < 60 && APPROVAL_RE.test(cleanMsg);
+  if (isApproval) {
+    tags.push({
+      type: "approval",
+      emoji: "✅",
+      label: "Approval",
+      detail: "Accepted agent work",
+    });
+  }
+
+  // Rubber stamp — approval after significant agent output, very short user response
+  const assistantLen = rawAssistant ? rawAssistant.length : 0;
+  if (isApproval && assistantLen > 2000 && msgLen < 30) {
+    tags.push({
+      type: "rubber_stamp",
+      emoji: "🔴",
+      label: "Rubber stamp",
+      detail: "Approved without apparent review",
+    });
+  }
+
+  // Quality catch — catch patterns in user message
+  if (CATCH_RE.test(cleanMsg)) {
+    tags.push({
+      type: "quality_catch",
+      emoji: "🔍",
+      label: "Quality catch",
+      detail: "Spotted an issue in agent output",
+    });
+  }
+
+  // Clear feedback — redirection with specifics
+  const isRedirection = CORRECTION_RE.test(cleanMsg);
+  if (isRedirection && SPECIFIC_RE.test(cleanMsg)) {
+    tags.push({
+      type: "clear_feedback",
+      emoji: "💬",
+      label: "Clear feedback",
+      detail: "Specific, actionable correction",
+    });
+  }
+
+  // Vague feedback — redirection without specifics, short
+  if (isRedirection && msgLen < 80 && !SPECIFIC_RE.test(cleanMsg)) {
+    tags.push({
+      type: "vague_feedback",
+      emoji: "❓",
+      label: "Vague feedback",
+      detail: "Correction without specifics",
+    });
+  }
+
+  return tags;
+}
+
+const NEGATIVE_TYPES = new Set([
+  "redirection",
+  "drip_feed",
+  "rubber_stamp",
+  "vague_feedback",
+]);
+
+function coachingTipForTags(tags) {
+  const types = new Set(tags.map((t) => t.type));
+  if (types.has("drip_feed"))
+    return "Consider front-loading all requirements in your initial prompt";
+  if (types.has("rubber_stamp"))
+    return "Take time to review agent output before approving — skim the diff at minimum";
+  if (types.has("vague_feedback"))
+    return "Include specific file paths, function names, or code snippets in corrections";
+  if (types.has("redirection"))
+    return "Clarify expectations up front to reduce mid-session course corrections";
+  return null;
+}
+
+function overallGrade(redirections) {
+  if (redirections === 0) return "A";
+  if (redirections <= 2) return "B";
+  if (redirections <= 5) return "C";
+  return "D";
+}
+
+function topCoachingTip(summary) {
+  if (summary.dripFeeds > 0)
+    return "You added context mid-session that could have been included upfront. Try writing a more complete initial prompt.";
+  if (summary.rubberStamps > 0)
+    return "Some approvals came very quickly after large agent outputs. Spend a moment reviewing before accepting.";
+  if (summary.redirections > 3)
+    return "Your redirections suggest the initial prompt could be clearer — try stating constraints and expected behavior upfront.";
+  if (summary.redirections > 0)
+    return "A few course corrections were needed. Consider adding acceptance criteria to your initial request.";
+  if (summary.qualityCatches > 0)
+    return "Good job catching issues! Keep reviewing agent output critically.";
+  return "Solid session — keep maintaining clear, goal-oriented prompts.";
+}
+
+/**
+ * Annotate every turn in a session with coaching signals.
+ * @param {string} sessionId
+ */
+export function annotateSession(sessionId) {
+  const turns = getSessionTurns(sessionId);
+
+  const annotated = [];
+  const counts = {
+    redirections: 0,
+    dripFeeds: 0,
+    goodDelegations: 0,
+    approvals: 0,
+    rubberStamps: 0,
+    qualityCatches: 0,
+  };
+
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
+    const cleanMsg = stripTags(turn.user_message);
+
+    // For rubber-stamp detection we need the PREVIOUS assistant response
+    const prevAssistant = i > 0 ? turns[i - 1].assistant_response : null;
+
+    const tags = detectTags(cleanMsg, prevAssistant, turn.turn_index);
+
+    // Tally counts
+    for (const tag of tags) {
+      if (tag.type === "redirection") counts.redirections++;
+      if (tag.type === "drip_feed") counts.dripFeeds++;
+      if (tag.type === "good_delegation") counts.goodDelegations++;
+      if (tag.type === "approval") counts.approvals++;
+      if (tag.type === "rubber_stamp") counts.rubberStamps++;
+      if (tag.type === "quality_catch") counts.qualityCatches++;
+    }
+
+    const hasNegative = tags.some((t) => NEGATIVE_TYPES.has(t.type));
+    const tip = hasNegative ? coachingTipForTags(tags) : null;
+
+    annotated.push({
+      turnIndex: turn.turn_index,
+      userMessage: turn.user_message,
+      assistantResponse: turn.assistant_response,
+      timestamp: turn.timestamp,
+      tags,
+      coachingTip: tip,
+    });
+  }
+
+  const summary = {
+    totalTurns: turns.length,
+    ...counts,
+    overallGrade: overallGrade(counts.redirections),
+    topCoachingTip: topCoachingTip(counts),
+  };
+
+  return { sessionId, turns: annotated, summary };
+}
