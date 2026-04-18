@@ -146,6 +146,7 @@ The web dashboard gives you a full view of your prompting habits:
 - **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
+- **Instructions** — Custom instruction effectiveness analysis
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 
@@ -311,15 +312,25 @@ copilot-insights/
 │   ├── analyzer.mjs       # Core analysis engine
 │   ├── practice.mjs       # Shared prompt analyzer (pure function, no DB)
 │   ├── tiers.mjs          # Tier badge system (shared UI + CLI)
+│   ├── trends.mjs         # Weekly pillar-score trend computation
 │   ├── suggestions.mjs    # Prompt rewrite engine
+│   ├── analytics.mjs      # Session analytics (hourly, depth, tools)
+│   ├── clarity.mjs        # Prompt clarity scoring
+│   ├── efficiency.mjs     # Efficiency metrics
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
-│   ├── dev-plan.mjs       # Personalized coaching
+│   ├── sprawl.mjs         # Scope sprawl detection
+│   ├── dev-plan.mjs       # Personalized coaching & dev plans
+│   ├── replay.mjs         # Turn-by-turn session replay
+│   ├── work-style.mjs     # Work style analysis
+│   ├── session-insights.mjs # Per-session insight computation
+│   ├── instructions.mjs   # Custom instruction analysis
+│   ├── instruction-failures.mjs # Instruction failure detection
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching
+│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Instructions
 │   └── components/        # Charts, badges, timeline, insights
 ├── scripts/               # Mock data seeder + screenshot capture
 └── .github/workflows/     # CI + Release (GitHub Releases)

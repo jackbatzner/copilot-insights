@@ -28,7 +28,7 @@ import {
   formatTopPatterns,
 } from "./src/formatter.mjs";
 import { computePillarTrends } from "./src/trends.mjs";
-import { TIERS, getTier } from "./src/tiers.mjs";
+import { getTier } from "./src/tiers.mjs";
 import { analyzePrompt } from "./src/practice.mjs";
 import { listSessions, getSessionTurns } from "./src/db.mjs";
 import { REDIRECTION_CATEGORIES } from "./src/patterns.mjs";
