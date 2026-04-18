@@ -862,7 +862,17 @@ function generateInsights(analysisResult, topPatterns) {
  */
 app.get("/api/live/feed", (req, res) => {
   try {
-    const since = req.query.since || new Date(Date.now() - 3600_000).toISOString();
+    let since;
+    if (req.query.since) {
+      // Validate ISO 8601 date format
+      const d = new Date(req.query.since);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Invalid since parameter. Expected ISO 8601 date." });
+      }
+      since = d.toISOString();
+    } else {
+      since = new Date(Date.now() - 3600_000).toISOString();
+    }
     const db = getDb();
     const rows = db
       .prepare(

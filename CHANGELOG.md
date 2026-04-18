@@ -25,11 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/practice/challenge` endpoint to fetch random low-scoring prompts from user sessions
 - `GET /api/practice/library` endpoint with tag filtering and random pick
 - `GET /api/practice/weaknesses` endpoint for personalized category recommendations
-- **Live Monitor** page — real-time feed of session turns with pattern badges and coaching alerts
-- `GET /api/live/feed?since=<ISO>` endpoint for polling recent annotated turns
+- **Live Monitor** page (`/live`) — real-time feed of session turns with pattern badges and coaching alerts
+- `GET /api/live/feed?since=<ISO>` endpoint — polls session-store.db for recent turns, annotates each with `matchPatterns()`, returns annotated turns with redirection pattern matches
+- Coaching alert cards — inline tips when high-severity patterns (weight ≥ 3) are detected
+- Pause/resume toggle and polling status indicator on Live Monitor
+- `fetchLiveFeed(since)` API client function
+- `.sr-only` CSS utility class for screen-reader-only content
 - Screenshot capture script now supports `--gif` flag for animated demo GIF generation
 - `--pages` flag for screenshot capture script to filter which pages to capture
 - `ffmpeg-static` dev dependency for GIF creation from Playwright recordings
+- Live Monitor demo GIF and screenshot in documentation
 
 ### Changed
 
@@ -45,9 +50,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Express 5 compatibility: `app.get("*", ...)` → `app.get("/{*path}", ...)` for `path-to-regexp` v8
 - Express 5 `sendFile`: use `{ root }` option instead of absolute path resolution
-- Removed unused imports (`useEffect`, `useRef`, `getSession`)
-- Added accessible labels (`<label>`, ARIA attributes) to all Practice Lab form controls
+- Removed unused imports (`useEffect`, `useRef`, `getSession`, `TIERS`)
+- Added accessible labels (`<label>`, ARIA attributes) to all Practice Lab and Live Monitor form controls
 - SVG score gauge now has `role="img"` and `aria-label` for screen readers
+- Validate `since` query parameter on `/api/live/feed` — returns 400 for invalid dates
+
+### Improved
+
+- Added `aria-label` to Live Monitor pause/resume button
+- Added `<label>` with `htmlFor` to Sessions page repository filter input
+- Added `.sr-only` CSS utility class for visually hidden, screen-reader accessible elements
+- SECURITY.md now documents all API endpoints with input validation details
+- README file tree updated to list all `src/` modules
+- README pages section updated to include all pages
+- README badges cleaned up (removed CI and Node version badges)
 
 ## [0.1.0-alpha.1] - 2026-04-18
 

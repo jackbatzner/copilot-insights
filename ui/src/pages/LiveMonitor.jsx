@@ -94,7 +94,7 @@ export default function LiveMonitor() {
             <span className={`live-status-dot ${paused ? "paused" : "active"}`} />
             {paused ? "Paused" : "Polling"}
           </div>
-          <button className="live-toggle-btn" onClick={() => setPaused((p) => !p)}>
+          <button className="live-toggle-btn" onClick={() => setPaused((p) => !p)} aria-label={paused ? "Resume polling" : "Pause polling"}>
             {paused ? "▶ Resume" : "⏸ Pause"}
           </button>
           <span className="live-count">
