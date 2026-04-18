@@ -12,10 +12,8 @@
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
 <p align="center">
-  <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/jackbatzner/copilot-insights/releases/latest"><img src="https://img.shields.io/github/v/release/jackbatzner/copilot-insights" alt="GitHub release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
-  <img src="https://img.shields.io/node/v/copilot-insights" alt="Node version" />
 </p>
 
 <p align="center">
@@ -32,6 +30,7 @@
 Every time you say "no, not that" or "go back to the previous approach," that's signal. It means there's a gap between what you asked for and what the agent did. **Copilot Insights** surfaces those moments so you can learn from them.
 
 - 📊 **See your patterns** — Which corrections do you make most often?
+- 🤖 **Real-time coaching** — Get instant feedback on your prompts as you work in Copilot CLI
 - 💡 **Get coaching** — Personalized dev plans, daily check-ins, and retros
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
@@ -99,13 +98,14 @@ copilot-insights link     # create the symlink
 copilot-insights unlink   # remove the symlink
 ```
 
-Then restart Copilot CLI. The extension registers 7 tools that the agent can invoke:
+Then restart Copilot CLI. The extension registers 8 tools that the agent can invoke:
 
 ```
 > How am I doing with my prompting?          → insights_summary
 > Scan my recent sessions                    → insights_analyze
 > What are my most common correction patterns? → insights_patterns
 > Compare sessions abc123 and def456         → insights_compare
+> Coach me on my recent prompts              → insights_coach
 > Launch the insights dashboard              → insights_dashboard
 ```
 
@@ -150,6 +150,7 @@ The web dashboard gives you a full view of your prompting habits:
 - **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
+- **Instructions** — Custom instruction effectiveness analysis
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 
@@ -162,8 +163,86 @@ All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 | `insights_patterns` | Most common correction patterns with real examples |
 | `insights_summary` | Quick snapshot: tier badge, pillar scores, coaching tip |
 | `insights_compare` | Compare two sessions side-by-side |
+| `insights_coach` | Real-time prompt coaching — immediate feedback, periodic review, or progress tracking |
 | `insights_dashboard` | Launch the web dashboard from the CLI |
 | `insights_stop` | Stop the dashboard server |
+
+<details>
+<summary>🎓 <strong>insights_coach</strong> — example output for each mode</summary>
+
+**Immediate mode** — the agent passes the user's message for real-time feedback:
+
+```markdown
+## 🎓 Prompt Coach — 🟠 52/100 (C)
+
+**Detected:**
+- 😤 **Frustration Signal**: Persistent failure
+- 🚫 **Explicit Correction**: Direct rejection
+
+### 💡 Coaching
+**Diagnose, don't repeat** — Describe what you see vs. what you expected, and share error messages.
+> ✏️ *Instead of 'still broken', try: 'The server returns 200 but the UI shows empty — check the response parsing.'*
+
+**Be specific upfront** — Include the exact tool, file, or approach you want from the start.
+> ✏️ *State your preferred approach in the first message: 'Use X (not Y) because…'*
+```
+
+**Periodic mode** — reviews the last N turns across recent sessions:
+
+```markdown
+## 🎓 Periodic Coaching Review (last 10 turns)
+
+**Average score:** 71/100
+**Turns with issues:** 4/10
+
+### Top Issues
+
+| Category | Count |
+|----------|------:|
+| ↩️ Course Change | 3 |
+| 😤 Frustration Signal | 2 |
+
+### Turns Needing Attention
+
+🔴 **Score 44** — Turn 3
+> Actually, scratch that. Use a different approach entirely…
+> 💡 *Plan before you prompt: Use plan mode for complex tasks — outline the approach first.*
+
+🟡 **Score 68** — Turn 7
+> That didn't work, the tests are still failing…
+> 💡 *Diagnose, don't repeat: Describe what you see vs. what you expected, and share error messages.*
+```
+
+**Progress mode** — tracks score trends over time:
+
+```markdown
+## 🎓 Progress Report (30d)
+
+**Current tier:** ⚡ Flow State — **62/100**
+**Trend:** 📈 Improving
+
+### Score Trend
+2026-W14  ████████████░░░░░░░░  55
+2026-W15  ████████████░░░░░░░░  58
+2026-W16  ████████████░░░░░░░░  60
+2026-W17  █████████████░░░░░░░  62
+
+### Pillar Scores
+
+| Pillar | Score | Trend |
+|--------|------:|:-----:|
+| ⚖️ Judgment | 71/100 | 📈 improving |
+| 🎯 Delegation | 63/100 | ➡️ stable |
+| 💬 Feedback | 52/100 | 📈 improving |
+
+**💪 Strongest:** ⚖️ Judgment (71/100)
+**🎯 Focus area:** 💬 Feedback (52/100)
+
+💡 **Next step:** When you need to correct the agent, explain *why* the output
+was wrong, not just *what* to change. This reduces repeat corrections.
+```
+
+</details>
 
 ## How It Works
 
@@ -216,33 +295,46 @@ graph LR
         Analyzer --> Patterns[30+ regex patterns]
         Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
+        Analyzer --> Practice[practice.mjs]
     end
 
     subgraph "Delivery"
         Analyzer --> API[Express API :3002]
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
-        CLI --> Tools[7 insights_* tools]
+        Practice --> CLI
+        CLI --> Tools[8 insights_* tools]
     end
 ```
 
 ```
 copilot-insights/
-├── extension.mjs          # Copilot CLI extension entry point (7 tools)
+├── extension.mjs          # Copilot CLI extension entry point (8 tools)
 ├── src/
 │   ├── db.mjs             # SQLite read-only access
 │   ├── patterns.mjs       # 30+ regex patterns, 5 categories
 │   ├── analyzer.mjs       # Core analysis engine
+│   ├── practice.mjs       # Shared prompt analyzer (pure function, no DB)
 │   ├── tiers.mjs          # Tier badge system (shared UI + CLI)
+│   ├── trends.mjs         # Weekly pillar-score trend computation
 │   ├── suggestions.mjs    # Prompt rewrite engine
+│   ├── analytics.mjs      # Session analytics (hourly, depth, tools)
+│   ├── clarity.mjs        # Prompt clarity scoring
+│   ├── efficiency.mjs     # Efficiency metrics
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
-│   ├── dev-plan.mjs       # Personalized coaching
+│   ├── sprawl.mjs         # Scope sprawl detection
+│   ├── dev-plan.mjs       # Personalized coaching & dev plans
+│   ├── replay.mjs         # Turn-by-turn session replay
+│   ├── work-style.mjs     # Work style analysis
+│   ├── session-insights.mjs # Per-session insight computation
+│   ├── instructions.mjs   # Custom instruction analysis
+│   ├── instruction-failures.mjs # Instruction failure detection
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching
+│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Instructions
 │   └── components/        # Charts, badges, timeline, insights
 ├── scripts/               # Mock data seeder + screenshot capture
 └── .github/workflows/     # CI + Release (GitHub Releases)

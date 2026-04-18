@@ -53,9 +53,12 @@ export default function Sessions() {
       </div>
 
       <div className="filter-bar">
+        <label htmlFor="repo-filter" className="sr-only">Filter by repository</label>
         <input
+          id="repo-filter"
           type="text"
           placeholder="Filter by repository…"
+          aria-label="Filter by repository"
           value={repoFilter}
           onChange={(e) => {
             setLoading(true);
