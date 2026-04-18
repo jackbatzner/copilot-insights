@@ -32,8 +32,8 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
-import { listSessions, getSessionTurns, getSessionRefs } from "../src/db.mjs";
-
+import { listSessions, getSession, getSessionTurns, getSessionRefs, getDb } from "../src/db.mjs";
+import { matchPatterns, REDIRECTION_CATEGORIES } from "../src/patterns.mjs";
 import { analyzePrompt } from "../src/practice.mjs";
 import CHALLENGE_LIBRARY from "../src/challenge-library.mjs";
 
@@ -859,6 +859,49 @@ function generateInsights(analysisResult, topPatterns) {
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
+});
+
+// ── Live Feed ───────────────────────────────────────────────────
+
+/**
+ * GET /api/live/feed?since=<ISO>
+ * Returns recent turns annotated with redirection pattern matches.
+ */
+app.get("/api/live/feed", (req, res) => {
+  try {
+    const since = req.query.since || new Date(Date.now() - 3600_000).toISOString();
+    const db = getDb();
+    const rows = db
+      .prepare(
+        `SELECT t.session_id, t.turn_index, t.user_message, t.timestamp,
+                s.repository, s.branch
+         FROM turns t
+         JOIN sessions s ON t.session_id = s.id
+         WHERE t.timestamp > ?
+         ORDER BY t.timestamp DESC
+         LIMIT 200`
+      )
+      .all(since);
+
+    const turns = rows.map((row) => {
+      const patterns = matchPatterns(row.user_message);
+      return {
+        sessionId: row.session_id,
+        turnIndex: row.turn_index,
+        timestamp: row.timestamp,
+        userMessage: row.user_message ? row.user_message.slice(0, 300) : "",
+        repository: row.repository,
+        branch: row.branch,
+        patterns,
+        maxWeight: patterns.reduce((max, p) => Math.max(max, p.weight), 0),
+      };
+    });
+
+    res.json({ turns, serverTime: new Date().toISOString(), categories: REDIRECTION_CATEGORIES });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ── SPA fallback ────────────────────────────────────────────────

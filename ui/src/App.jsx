@@ -8,6 +8,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
+import LiveMonitor from "./pages/LiveMonitor.jsx";
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -47,6 +48,9 @@ function App() {
           <NavLink to="/analytics">
             <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
           </NavLink>
+          <NavLink to="/live">
+            <span className="nav-icon">📡</span><span className="nav-label">Live</span>
+          </NavLink>
           <NavLink to="/instructions">
             <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
           </NavLink>
@@ -69,6 +73,7 @@ function App() {
             <Route path="/coaching" element={<Coaching />} />
             <Route path="/learn" element={<Learn />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/live" element={<LiveMonitor />} />
             <Route path="/instructions" element={<Instructions />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/sessions/:id" element={<SessionDetail />} />
