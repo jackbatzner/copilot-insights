@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://www.npmjs.com/package/copilot-insights"><img src="https://img.shields.io/npm/v/copilot-insights" alt="npm version" /></a>
+  <a href="https://github.com/jackbatzner/copilot-insights/releases/latest"><img src="https://img.shields.io/github/v/release/jackbatzner/copilot-insights" alt="GitHub release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
   <img src="https://img.shields.io/node/v/copilot-insights" alt="Node version" />
 </p>
@@ -58,18 +58,12 @@ It also detects **file thrashing** — when the same file is edited 3+ times in 
 
 ### 1. Install
 
-**Option A: npm (recommended)**
+**Option A: Install from GitHub**
 
 ```bash
-npx copilot-insights
-# → http://localhost:3002
-```
-
-Or install globally:
-
-```bash
-npm i -g copilot-insights
+npm i -g jackbatzner/copilot-insights
 copilot-insights
+# → http://localhost:3002
 ```
 
 **Option B: From source**
@@ -83,8 +77,8 @@ npm run setup
 ### 2. Launch the Dashboard
 
 ```bash
+copilot-insights   # if installed from GitHub
 npm start          # if installed from source
-copilot-insights   # if installed globally via npm
 # → http://localhost:3002
 ```
 
