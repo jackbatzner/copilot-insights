@@ -53,11 +53,11 @@ export default function SessionDetail() {
         ← Back to Sessions
       </Link>
 
-      <div className="page-header">
+      <div className="page-header" style={{ flexDirection: "column", alignItems: "flex-start" }}>
         <h1>🔍 Session Detail</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <p style={{ margin: 0 }}>
-            <code>{session.id}</code>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", maxWidth: "100%" }}>
+          <p style={{ margin: 0, minWidth: 0 }}>
+            <code style={{ wordBreak: "break-all", fontSize: "clamp(10px, 2.5vw, 14px)" }}>{session.id}</code>
           </p>
           <button
             onClick={toggleHide}
@@ -66,6 +66,7 @@ export default function SessionDetail() {
               color: isHidden ? "#fff" : "var(--text-secondary)",
               border: "1px solid var(--border-color)",
               borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 13,
+              whiteSpace: "nowrap", flexShrink: 0,
             }}
           >
             {isHidden ? "🙈 Hidden from analysis" : "Hide from analysis"}
@@ -86,8 +87,8 @@ export default function SessionDetail() {
         {session.branch && (
           <div className="card" style={{ textAlign: "center" }}>
             <div className="card-header">Branch</div>
-            <div style={{ fontSize: 14 }}>
-              <code>{session.branch}</code>
+            <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>
+              <code style={{ wordBreak: "break-all" }}>{session.branch}</code>
             </div>
           </div>
         )}
@@ -287,7 +288,7 @@ export default function SessionDetail() {
           <div className="card-header">⚠️ Anti-Patterns Detected</div>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {efficiency.dripFeeding?.count > 0 && (
-              <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <h3 style={{ fontSize: 14, color: "#d29922", marginBottom: 8 }}>
                   💧 Context Drip-Feeding ({efficiency.dripFeeding.count})
                 </h3>
@@ -300,7 +301,7 @@ export default function SessionDetail() {
               </div>
             )}
             {efficiency.responseSkimming?.count > 0 && (
-              <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <h3 style={{ fontSize: 14, color: "#f85149", marginBottom: 8 }}>
                   👀 Response Skimming ({efficiency.responseSkimming.count})
                 </h3>
@@ -308,7 +309,7 @@ export default function SessionDetail() {
                   <div key={i} className="sprawl-item">
                     <span className="sprawl-turn">Turn {s.turnIndex}</span>
                     <span className="sprawl-msg">{s.message}</span>
-                    <span className="stat-sub">({s.responseLength} char response → {s.userMessageLength} char reply)</span>
+                    <span className="stat-sub" style={{ wordBreak: "break-word" }}>({s.responseLength} char response → {s.userMessageLength} char reply)</span>
                   </div>
                 ))}
               </div>
@@ -328,19 +329,20 @@ export default function SessionDetail() {
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
-                  gap: 10,
-                  padding: "10px 16px",
+                  gap: 8,
+                  padding: "10px 12px",
                   borderBottom: "1px solid #30363d",
+                  flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 12, color: "#8b949e", minWidth: 32, fontVariantNumeric: "tabular-nums" }}>
+                <span style={{ fontSize: 12, color: "#8b949e", minWidth: 28, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                   #{turn.turnIndex}
                 </span>
-                <span style={{ fontSize: 16, minWidth: 24 }}>
+                <span style={{ fontSize: 16, minWidth: 20, flexShrink: 0 }}>
                   {turn.speaker === "user" ? "👤" : "🤖"}
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "#e6edf3", marginBottom: turn.tags?.length ? 6 : 0, wordBreak: "break-word" }}>
+                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                  <div style={{ fontSize: 13, color: "#e6edf3", marginBottom: turn.tags?.length ? 6 : 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
                     {turn.messagePreview}
                   </div>
                   {turn.tags?.length > 0 && (

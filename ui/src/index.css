@@ -87,7 +87,10 @@ a:hover {
   top: 0;
   bottom: 0;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.sidebar::-webkit-scrollbar { display: none; }
 
 .sidebar-logo {
   font-size: 18px;
@@ -127,6 +130,8 @@ a:hover {
   flex: 1;
   padding: 32px;
   max-width: 1200px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -404,13 +409,15 @@ a:hover {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* ── Insights ───────────────────────────────────────────────── */
 
 .insights-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -1096,6 +1103,7 @@ a:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 400px;
+  min-width: 0;
 }
 
 .item-repos {
@@ -2069,7 +2077,7 @@ a:hover {
 
   /* Card rows stack on tablet */
   .card-row { flex-wrap: wrap; }
-  .card-row > .card { min-width: 280px; }
+  .card-row > .card { min-width: 200px; }
 
   /* Delegation chart stacks */
   .delegation-chart-row { flex-direction: column; align-items: flex-start; }
@@ -2088,22 +2096,19 @@ a:hover {
     width: 100%;
     height: auto;
     flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
     border-right: none;
     border-top: 1px solid var(--border);
     padding: 4px 4px;
     padding-bottom: env(safe-area-inset-bottom, 4px);
     gap: 0;
     z-index: 100;
-    -webkit-overflow-scrolling: touch;
   }
   .sidebar-logo { display: none; }
   .sidebar a {
     font-size: 10px;
     padding: 6px 2px;
-    flex-shrink: 0;
-    flex: 1;
+    flex: 1 1 0%;
     flex-direction: column;
     justify-content: center;
     text-align: center;
@@ -2115,8 +2120,7 @@ a:hover {
   .sidebar a .nav-label { font-size: 9px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .refresh-section {
     margin: 0;
-    flex-shrink: 0;
-    flex: 1;
+    flex: 1 1 0%;
     min-width: 0;
   }
   .refresh-btn {
@@ -2131,6 +2135,7 @@ a:hover {
     padding: 16px;
     padding-bottom: 72px;
     max-width: 100%;
+    overflow-x: hidden;
   }
   .page-header h1 { font-size: 20px; }
   .stats-grid,
@@ -2140,8 +2145,10 @@ a:hover {
   .stats-grid-overview { grid-template-columns: 1fr !important; }
   .tab-bar { overflow-x: auto; flex-wrap: nowrap; }
   .tab-btn { white-space: nowrap; flex-shrink: 0; font-size: 13px; padding: 6px 12px; }
-  .card { padding: 14px; }
+  .card { padding: 14px; overflow-x: auto; }
   .pillar-card { min-width: 0; }
+  .thrash-item { flex-wrap: wrap; gap: 4px; }
+  .thrash-item code { word-break: break-all; }
   .opp-header { flex-direction: column; align-items: flex-start; }
   .impact-badge { margin-left: 0; }
   .check-stats { flex-wrap: wrap; }
@@ -2180,6 +2187,27 @@ a:hover {
 
   /* Sprawl items wrap */
   .sprawl-item { flex-wrap: wrap; }
+  .sprawl-msg { white-space: normal; word-break: break-word; }
+
+  /* Global code overflow protection */
+  code { word-break: break-all; overflow-wrap: anywhere; }
+
+  /* Item examples constrain */
+  .item-example { max-width: 200px; }
+  .item-label { min-width: 80px; }
+
+  /* Insights grid stacks */
+  .insights-grid { grid-template-columns: 1fr !important; }
+
+  /* Practice comparison */
+  .practice-comparison { gap: 12px; padding: 16px; }
+  .practice-comparison svg { max-width: 100px; max-height: 100px; }
+
+  /* Failure bar labels */
+  .failure-type-label { min-width: 100px; font-size: 12px; }
+
+  /* Live controls wrap */
+  .live-controls { flex-wrap: wrap; }
 
   /* ── Recharts: reduce heights ── */
   .recharts-responsive-container { max-height: 180px; }
@@ -2213,8 +2241,16 @@ a:hover {
   .session-table th, .session-table td { padding: 6px 4px; font-size: 11px; }
 
   /* Truncated cells on small screens */
-  .truncate { max-width: 150px !important; }
-  .tip-cell { max-width: 120px; }
+  .truncate { max-width: 120px !important; }
+  .tip-cell { max-width: 100px; }
+
+  /* Item examples + labels shrink further */
+  .item-example { max-width: 120px; font-size: 10px; }
+  .item-label { min-width: 60px; font-size: 12px; }
+
+  /* Bar chart labels smallest */
+  .failure-type-label { min-width: 60px; font-size: 11px; }
+  .score-bucket-label { min-width: 60px; font-size: 11px; }
 
   /* Score ring smaller */
   .score-ring svg { width: 80px; height: 80px; }
@@ -2228,9 +2264,17 @@ a:hover {
   /* Heatmap grid adapts */
   .heatmap-grid { grid-template-columns: repeat(6, 1fr); }
 
-  /* Bar chart labels even smaller */
-  .failure-type-label { min-width: 80px; }
-  .score-bucket-label { min-width: 80px; }
+  /* Practice comparison tighter */
+  .practice-comparison { gap: 8px; padding: 12px; flex-direction: column; }
+  .practice-comparison svg { max-width: 80px; max-height: 80px; }
+  .practice-comparison-arrow { transform: rotate(90deg); }
+
+  /* Card row items no min */
+  .card-row > .card { min-width: 0 !important; }
+
+  /* Tab bar wraps instead of scrolling */
+  .tab-bar { flex-wrap: wrap; }
+  .tab-btn { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 6px 8px; }
 }
 
 /* ── Live Monitor ────────────────────────────────────────────── */
