@@ -854,13 +854,6 @@ function generateInsights(analysisResult, topPatterns) {
   return insights;
 }
 
-// ── Global error handler ────────────────────────────────────────
-
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "Internal server error" });
-});
-
 // ── Live Feed ───────────────────────────────────────────────────
 
 /**
@@ -902,6 +895,13 @@ app.get("/api/live/feed", (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// ── Global error handler ────────────────────────────────────────
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: "Internal server error" });
 });
 
 // ── SPA fallback ────────────────────────────────────────────────

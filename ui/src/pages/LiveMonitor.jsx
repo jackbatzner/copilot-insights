@@ -34,29 +34,31 @@ function repoName(repo) {
 
 export default function LiveMonitor() {
   const [turns, setTurns] = useState([]);
-  const [since, setSince] = useState(() => new Date(Date.now() - 3600_000).toISOString());
   const [paused, setPaused] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [alertCount, setAlertCount] = useState(0);
-  const feedRef = useRef(null);
+  const sinceRef = useRef(new Date(Date.now() - 3600_000).toISOString());
   const intervalRef = useRef(null);
 
   const poll = useCallback(async () => {
     try {
-      const data = await fetchLiveFeed(since);
+      const data = await fetchLiveFeed(sinceRef.current);
       if (data.turns && data.turns.length > 0) {
         setTurns((prev) => {
-          // Merge new turns, deduplicate by sessionId+turnIndex
           const existing = new Set(prev.map((t) => `${t.sessionId}:${t.turnIndex}`));
           const fresh = data.turns.filter((t) => !existing.has(`${t.sessionId}:${t.turnIndex}`));
           const merged = [...fresh, ...prev].slice(0, 500);
+          // Only count alerts from truly new turns
+          if (fresh.length > 0) {
+            const newAlerts = fresh.filter((t) => t.maxWeight >= 3).length;
+            if (newAlerts > 0) setAlertCount((c) => c + newAlerts);
+          }
           return merged;
         });
-        setAlertCount((prev) => prev + data.turns.filter((t) => t.maxWeight >= 3).length);
       }
       if (data.serverTime) {
-        setSince(data.serverTime);
+        sinceRef.current = data.serverTime;
       }
       setError(null);
     } catch (err) {
@@ -64,11 +66,11 @@ export default function LiveMonitor() {
     } finally {
       setLoading(false);
     }
-  }, [since]);
+  }, []);
 
   useEffect(() => {
     poll();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [poll]);
 
   useEffect(() => {
     if (paused) {
@@ -107,7 +109,7 @@ export default function LiveMonitor() {
         </div>
       )}
 
-      <div className="live-feed" ref={feedRef}>
+      <div className="live-feed">
         {turns.length === 0 ? (
           <div className="live-empty">
             <div className="live-empty-icon">📡</div>
