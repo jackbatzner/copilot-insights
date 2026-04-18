@@ -26,8 +26,9 @@ export function getDb() {
  * @param {string} [opts.repo] - Filter by repository name (partial match)
  * @param {number} [opts.limit] - Max sessions to return (default: 500)
  * @param {string} [opts.since] - ISO date string — only include sessions created on or after this date
+ * @param {Set<string>} [opts.excludeIds] - Session IDs to exclude from results
  */
-export function listSessions({ repo, limit = 500, since } = {}) {
+export function listSessions({ repo, limit = 500, since, excludeIds } = {}) {
   const db = getDb();
   const conditions = [];
   const params = [];
@@ -39,6 +40,11 @@ export function listSessions({ repo, limit = 500, since } = {}) {
   if (since) {
     conditions.push("s.created_at >= ?");
     params.push(since);
+  }
+  if (excludeIds && excludeIds.size > 0) {
+    const placeholders = [...excludeIds].map(() => "?").join(", ");
+    conditions.push(`s.id NOT IN (${placeholders})`);
+    params.push(...excludeIds);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

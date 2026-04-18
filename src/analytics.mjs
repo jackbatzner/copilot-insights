@@ -11,8 +11,8 @@ import { matchPatterns } from "./patterns.mjs";
 /**
  * Productivity by hour — turn counts and redirection rates per hour of day.
  */
-export function hourlyProductivity({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function hourlyProductivity({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
   const buckets = Array.from({ length: 24 }, (_, i) => ({
     hour: i,
     totalTurns: 0,
@@ -42,8 +42,8 @@ export function hourlyProductivity({ repo, since } = {}) {
 /**
  * Prompt length vs redirection rate — bucket message lengths.
  */
-export function promptLengthAnalysis({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function promptLengthAnalysis({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
   const buckets = [
     { label: "< 50", min: 0, max: 50, total: 0, redirected: 0 },
     { label: "50-150", min: 50, max: 150, total: 0, redirected: 0 },
@@ -84,8 +84,8 @@ export function promptLengthAnalysis({ repo, since } = {}) {
 /**
  * Per-repo health — redirection rates broken down by repository.
  */
-export function repoHealth({ since } = {}) {
-  const sessions = listSessions({ since });
+export function repoHealth({ since, excludeIds } = {}) {
+  const sessions = listSessions({ since, excludeIds });
   const repos = {};
 
   for (const s of sessions) {
@@ -163,8 +163,8 @@ export function hotFiles({ repo, since } = {}) {
 /**
  * Session depth distribution — how many turns per session.
  */
-export function sessionDepth({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function sessionDepth({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
   const buckets = [
     { label: "1-2 turns", min: 1, max: 3, count: 0 },
     { label: "3-5 turns", min: 3, max: 6, count: 0 },

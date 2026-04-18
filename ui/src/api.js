@@ -210,3 +210,21 @@ export async function fetchLiveFeed(since) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function fetchHiddenSessions() {
+  const res = await fetch(`${API_BASE}/hidden-sessions`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function hideSession(id) {
+  const res = await fetch(`${API_BASE}/sessions/${id}/hide`, { method: "POST" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function unhideSession(id) {
+  const res = await fetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

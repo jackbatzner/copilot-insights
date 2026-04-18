@@ -133,9 +133,8 @@ function analyzeSessionDelegation(session, turns, files, refs) {
 /**
  * Analyze delegation patterns across all sessions.
  */
-export function analyzeDelegation({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
-
+export function analyzeDelegation({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
   const sessionResults = [];
   const styleCounts = {};
   let totalUserChars = 0;

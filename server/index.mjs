@@ -63,6 +63,33 @@ function parseSince(timeframe) {
   return d.toISOString();
 }
 
+// ── Session Hiding (in-memory) ──────────────────────────────────
+
+const hiddenSessions = new Set();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+app.get("/api/hidden-sessions", (_req, res) => {
+  res.json({ sessionIds: [...hiddenSessions] });
+});
+
+app.post("/api/sessions/:id/hide", (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ error: "Invalid session ID format" });
+  }
+  hiddenSessions.add(id);
+  res.json({ ok: true });
+});
+
+app.delete("/api/sessions/:id/hide", (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ error: "Invalid session ID format" });
+  }
+  hiddenSessions.delete(id);
+  res.json({ ok: true });
+});
+
 /**
  * GET /api/summary
  * Aggregate redirection stats across recent sessions.
@@ -71,7 +98,7 @@ app.get("/api/summary", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const result = analyzeRecent({ repo, since });
+    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
     res.json(result.aggregate);
   } catch (err) {
     console.error(err);
@@ -87,7 +114,7 @@ app.get("/api/sessions", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const result = analyzeRecent({ repo, since });
+    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
 
     const sessions = result.sessions.map((s) => ({
       id: s.session.id,
@@ -135,7 +162,7 @@ app.get("/api/patterns", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const patterns = findTopPatterns({ repo, since });
+    const patterns = findTopPatterns({ repo, since, excludeIds: hiddenSessions });
     res.json({ patterns });
   } catch (err) {
     console.error(err);
@@ -151,7 +178,7 @@ app.get("/api/trends", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const result = analyzeRecent({ repo, since });
+    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
 
     // Bucket sessions by date
     const buckets = {};
@@ -195,8 +222,8 @@ app.get("/api/insights", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const result = analyzeRecent({ repo, since });
-    const patterns = findTopPatterns({ repo, since });
+    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
+    const patterns = findTopPatterns({ repo, since, excludeIds: hiddenSessions });
 
     const insights = generateInsights(result, patterns);
     res.json({ insights });
@@ -310,7 +337,7 @@ app.get("/api/analytics/hourly", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(hourlyProductivity({ repo, since }));
+    res.json(hourlyProductivity({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -325,7 +352,7 @@ app.get("/api/analytics/prompt-length", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(promptLengthAnalysis({ repo, since }));
+    res.json(promptLengthAnalysis({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -339,7 +366,7 @@ app.get("/api/analytics/prompt-length", (req, res) => {
 app.get("/api/analytics/repos", (req, res) => {
   try {
     const since = parseSince(req.query.timeframe);
-    res.json(repoHealth({ since }));
+    res.json(repoHealth({ since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -369,7 +396,7 @@ app.get("/api/analytics/depth", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(sessionDepth({ repo, since }));
+    res.json(sessionDepth({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -399,7 +426,7 @@ app.get("/api/instruction-gaps", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(analyzeInstructionGaps({ repo, since }));
+    res.json(analyzeInstructionGaps({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -414,7 +441,7 @@ app.get("/api/instruction-failures", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(analyzeInstructionFailures({ repo, since }));
+    res.json(analyzeInstructionFailures({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -429,7 +456,7 @@ app.get("/api/delegation", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(analyzeDelegation({ repo, since }));
+    res.json(analyzeDelegation({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -444,7 +471,7 @@ app.get("/api/judgment", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(analyzeJudgment({ repo, since }));
+    res.json(analyzeJudgment({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -459,7 +486,7 @@ app.get("/api/dev-plan", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(generateDevPlan({ repo, since }));
+    res.json(generateDevPlan({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -474,7 +501,7 @@ app.get("/api/progress-check", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(generateProgressCheck({ repo, since }));
+    res.json(generateProgressCheck({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -489,7 +516,7 @@ app.get("/api/retro", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(generateRetro({ repo, since }));
+    res.json(generateRetro({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -505,7 +532,7 @@ app.get("/api/pillar-trends", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(computePillarTrends({ repo, since }));
+    res.json(computePillarTrends({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -546,7 +573,7 @@ app.get("/api/work-style", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(analyzeWorkStyle({ repo, since }));
+    res.json(analyzeWorkStyle({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -628,7 +655,7 @@ app.get("/api/practice/challenge", (req, res) => {
       return res.status(400).json({ error: "Invalid timeframe parameter" });
     }
     const since = parseSince(tf);
-    const result = analyzeRecent({ since, limit: 200 });
+    const result = analyzeRecent({ since, limit: 200, excludeIds: hiddenSessions });
 
     // Collect user turns that had redirection patterns
     const candidates = [];
@@ -681,7 +708,7 @@ app.get("/api/practice/weaknesses", (req, res) => {
       return res.status(400).json({ error: "Invalid timeframe parameter" });
     }
     const since = parseSince(tf);
-    const result = analyzeRecent({ since, limit: 200 });
+    const result = analyzeRecent({ since, limit: 200, excludeIds: hiddenSessions });
 
     // Aggregate heuristic gaps across all user turns
     const gaps = {

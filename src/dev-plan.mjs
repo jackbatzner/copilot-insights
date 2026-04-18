@@ -131,12 +131,12 @@ const LEARNING_RESOURCES = {
 /**
  * Generate a personalized development plan.
  */
-export function generateDevPlan({ repo, since } = {}) {
+export function generateDevPlan({ repo, since, excludeIds } = {}) {
   // Gather all metrics
-  const delegation = analyzeDelegation({ repo, since });
-  const judgment = analyzeJudgment({ repo, since });
+  const delegation = analyzeDelegation({ repo, since, excludeIds });
+  const judgment = analyzeJudgment({ repo, since, excludeIds });
 
-  const sessions = listSessions({ repo, since }).filter((s) => s.turn_count >= 2);
+  const sessions = listSessions({ repo, since, excludeIds }).filter((s) => s.turn_count >= 2);
   const clarityResult = analyzeFirstTurnClarity(sessions, getSessionTurns);
   const effData = sessions.map((s) => ({
     session: s,
@@ -440,10 +440,10 @@ function computePillarScores(delegation, judgment, clarityResult, efficiency) {
 }
 
 // ── Helper: gather all metrics for a time range ─────────────────
-function gatherMetrics({ repo, since } = {}) {
-  const delegation = analyzeDelegation({ repo, since });
-  const judgment = analyzeJudgment({ repo, since });
-  const sessions = listSessions({ repo, since }).filter((s) => s.turn_count >= 2);
+function gatherMetrics({ repo, since, excludeIds } = {}) {
+  const delegation = analyzeDelegation({ repo, since, excludeIds });
+  const judgment = analyzeJudgment({ repo, since, excludeIds });
+  const sessions = listSessions({ repo, since, excludeIds }).filter((s) => s.turn_count >= 2);
   const clarityResult = analyzeFirstTurnClarity(sessions, getSessionTurns);
   const effData = sessions.map((s) => ({
     session: s,
@@ -458,9 +458,9 @@ function gatherMetrics({ repo, since } = {}) {
 /**
  * Daily progress check — compares today's sessions against overall baseline.
  */
-export function generateProgressCheck({ repo, since } = {}) {
+export function generateProgressCheck({ repo, since, excludeIds } = {}) {
   // Overall baseline (all-time or from `since`)
-  const baseline = gatherMetrics({ repo, since });
+  const baseline = gatherMetrics({ repo, since, excludeIds });
 
   // Today's sessions only
   const todayStr = new Date().toISOString().split("T")[0];
@@ -546,8 +546,8 @@ export function generateProgressCheck({ repo, since } = {}) {
 /**
  * Generate a retro for the selected timeframe — wins, misses, trends, next focus.
  */
-export function generateRetro({ repo, since } = {}) {
-  const data = gatherMetrics({ repo, since });
+export function generateRetro({ repo, since, excludeIds } = {}) {
+  const data = gatherMetrics({ repo, since, excludeIds });
   const { sessions, delegation, judgment, efficiency } = data;
 
   if (sessions.length === 0) {

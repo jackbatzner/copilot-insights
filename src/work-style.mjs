@@ -115,8 +115,8 @@ function classifySession(sessionId) {
 /**
  * Analyze work style across all sessions.
  */
-export function analyzeWorkStyle({ repo, since } = {}) {
-  const sessions = listSessions({ repo, since });
+export function analyzeWorkStyle({ repo, since, excludeIds } = {}) {
+  const sessions = listSessions({ repo, since, excludeIds });
 
   const results = sessions
     .map((s) => classifySession(s.id))
