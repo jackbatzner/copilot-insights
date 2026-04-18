@@ -25,7 +25,7 @@
     "start": "cd server && node index.mjs",
     "dev": "cd server && node --watch index.mjs",
     "lint": "eslint *.mjs src/ server/",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --experimental-test-module-mocks --test test/*.test.mjs",
     "seed": "node scripts/seed-mock-db.mjs",
     "release": "node scripts/release.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",

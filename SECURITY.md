@@ -43,8 +43,8 @@ Copilot Insights is a **local-only** development tool:
 
 | Parameter | Used by | Validation |
 |-----------|---------|------------|
-| `timeframe` | Most endpoints | Parsed by `parseSince()` — must match `/^\d+d$/` (e.g., `7d`, `30d`, `90d`) or `all`. Invalid values default to no filter. |
-| `repo` | Most endpoints | Passed as a SQL `LIKE` parameter with `%` wrapping. Used in parameterized queries only. |
+| `timeframe` | Most endpoints | Validated with strict pattern (`/^\d{1,4}[dwmy]$/` or `all`). Returns 400 for invalid values. |
+| `repo` | Most endpoints | Validated as a non-empty string. Passed as a SQL `LIKE` parameter with `%` wrapping in parameterized queries only. Returns 400 for non-string values. |
 | `since` | `/api/live/feed` | Validated as a parseable date via `new Date()`. Returns 400 if invalid. Normalized to ISO 8601 before SQL use. |
 | `text` | `POST /api/practice/analyze` | Must be a string, max 10,000 characters. Returns 400 if missing or invalid. |
 | `tag` | `GET /api/practice/library` | Validated against a whitelist of known tags. Invalid tags silently dropped. |
