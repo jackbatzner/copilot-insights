@@ -202,3 +202,11 @@ export async function fetchWeaknesses(timeframe) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function fetchLiveFeed(since) {
+  const params = new URLSearchParams();
+  if (since) params.set("since", since);
+  const res = await fetch(`${API_BASE}/live/feed?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

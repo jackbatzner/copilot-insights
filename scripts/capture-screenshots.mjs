@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Captures screenshots and demo GIFs of each dashboard page using Playwright.
-// Usage: node scripts/capture-screenshots.mjs [--gif] [--pages practice,overview,...]
+// Usage: node scripts/capture-screenshots.mjs [--gif] [--pages practice,overview,live,...]
 //
 // Flags:
 //   --gif           Also record animated GIFs for pages that have interactions
@@ -83,18 +83,19 @@ try {
   const page = await context.newPage();
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
-  const pages = [
+  const allPages = [
     { path: "/",          name: "overview" },
     { path: "/learn",     name: "learn" },
     { path: "/sessions",  name: "sessions" },
     { path: "/analytics", name: "analytics" },
     { path: "/coaching",  name: "coaching" },
     { path: "/practice",  name: "practice" },
+    { path: "/live",      name: "live" },
   ];
 
   const filtered = pageFilter
-    ? pages.filter((p) => pageFilter.includes(p.name))
-    : pages;
+    ? allPages.filter((p) => pageFilter.includes(p.name))
+    : allPages;
 
   for (const p of filtered) {
     console.log(`📸 Capturing ${p.name}…`);
@@ -110,6 +111,7 @@ try {
     console.log("📸 Capturing session-detail…");
     await page.goto(`${baseUrl}/sessions`, { waitUntil: "networkidle" });
     await page.waitForTimeout(1000);
+
 
     const sessionLink = page.locator("a[href^='/sessions/']").first();
     if (await sessionLink.count()) {
@@ -131,6 +133,11 @@ try {
     // Practice Lab demo — type a prompt and watch the score update
     if (!pageFilter || pageFilter.includes("practice")) {
       await recordPracticeGif(browser, baseUrl);
+    }
+
+    // Live Monitor demo
+    if (!pageFilter || pageFilter.includes("live")) {
+      await recordLiveGif(page, baseUrl);
     }
   }
 
@@ -236,4 +243,88 @@ async function waitForServer(url, timeoutMs) {
   }
   console.error("Server output:\n", serverOutput);
   throw new Error(`Server did not start within ${timeoutMs}ms`);
+}
+
+/**
+ * Record ~8 seconds of the Live Monitor page, showing the real-time feed
+ * updating with pattern badges and coaching alerts. Outputs a GIF.
+ */
+async function recordLiveGif(page, baseUrl) {
+  console.log("🎥 Recording Live Monitor GIF…");
+
+  const webmPath = resolve(SCREENSHOTS_DIR, "live-demo.webm");
+  const gifPath = resolve(SCREENSHOTS_DIR, "live-demo.gif");
+
+  // Navigate to the live page and let it poll
+  await page.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(3000); // let initial data load
+
+  // Start screen recording
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Page.startScreencast", { format: "png", maxWidth: 1280, maxHeight: 800 });
+
+  // Collect frames for ~8 seconds
+  const frames = [];
+  cdp.on("Page.screencastFrame", async (params) => {
+    frames.push(Buffer.from(params.data, "base64"));
+    await cdp.send("Page.screencastFrameAck", { sessionId: params.sessionId });
+  });
+
+  await page.waitForTimeout(8000);
+  await cdp.send("Page.stopScreencast");
+
+  if (frames.length === 0) {
+    console.warn("⚠ No frames captured, skipping GIF generation");
+    return;
+  }
+
+  // Write frames as individual PNGs and convert to GIF via ffmpeg
+  const framesDir = resolve(SCREENSHOTS_DIR, "_frames");
+  mkdirSync(framesDir, { recursive: true });
+
+  for (let i = 0; i < frames.length; i++) {
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(resolve(framesDir, `frame-${String(i).padStart(4, "0")}.png`), frames[i]);
+  }
+
+  // Find ffmpeg binary
+  let ffmpegBin;
+  try {
+    const ffmpegStaticPath = resolve(ROOT, "node_modules", "ffmpeg-static", "index.js");
+    if (existsSync(ffmpegStaticPath)) {
+      const mod = await import(`file://${ffmpegStaticPath.replace(/\\/g, "/")}`);
+      ffmpegBin = mod.default || mod;
+    }
+  } catch { /* fall through */ }
+
+  if (!ffmpegBin || !existsSync(ffmpegBin)) {
+    // Try system ffmpeg
+    ffmpegBin = "ffmpeg";
+  }
+
+  try {
+    console.log(`   Converting ${frames.length} frames to GIF…`);
+    execFileSync(ffmpegBin, [
+      "-y",
+      "-framerate", "10",
+      "-i", resolve(framesDir, "frame-%04d.png"),
+      "-vf", "fps=10,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+      gifPath,
+    ], { stdio: "pipe" });
+    console.log(`   → ${gifPath}`);
+  } catch (err) {
+    console.warn("⚠ ffmpeg conversion failed:", err.message);
+    console.warn("   Install ffmpeg-static: npm install --save-dev ffmpeg-static");
+  }
+
+  // Clean up frames
+  const { readdirSync } = await import("node:fs");
+  for (const f of readdirSync(framesDir)) {
+    unlinkSync(resolve(framesDir, f));
+  }
+  const { rmdirSync } = await import("node:fs");
+  rmdirSync(framesDir);
+
+  // Also clean up webm if it was created
+  if (existsSync(webmPath)) unlinkSync(webmPath);
 }

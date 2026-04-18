@@ -65,7 +65,7 @@ a:hover {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-  border-width: 0;
+  border: 0;
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -2231,4 +2231,176 @@ a:hover {
   /* Bar chart labels even smaller */
   .failure-type-label { min-width: 80px; }
   .score-bucket-label { min-width: 80px; }
+}
+
+/* ── Live Monitor ────────────────────────────────────────────── */
+
+.live-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.live-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.live-status-dot.active {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.live-status-dot.paused {
+  background: var(--yellow);
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.live-toggle-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.live-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.live-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.live-turn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  transition: border-color 0.15s;
+}
+
+.live-turn:hover {
+  border-color: var(--accent);
+}
+
+.live-turn-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.live-session-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.live-timestamp {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.live-repo {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.live-message {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.live-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.live-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.live-badge.explicit_correction { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+.live-badge.course_change { background: rgba(88, 166, 255, 0.15); color: var(--accent); }
+.live-badge.frustration { background: rgba(219, 109, 40, 0.15); color: var(--orange); }
+.live-badge.repetition { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+.live-badge.rollback { background: rgba(188, 140, 255, 0.15); color: var(--purple); }
+
+.live-coaching-card {
+  margin-top: 8px;
+  background: rgba(248, 81, 73, 0.06);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.live-coaching-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-coaching-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.live-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.live-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.live-count {
+  font-size: 12px;
+  color: var(--text-muted);
 }

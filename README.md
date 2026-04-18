@@ -35,6 +35,7 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
+- 📡 **Live monitoring** — Real-time feed of corrections as they happen
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 
@@ -140,6 +141,12 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/session-detail.png" alt="Session detail" width="800" />
 
+**Live Monitor** — real-time feed with pattern badges and coaching alerts
+
+<img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
+
+<img src="docs/screenshots/live-demo.gif" alt="Live Monitor demo" width="800" />
+
 </details>
 
 ### Pages
@@ -151,6 +158,8 @@ The web dashboard gives you a full view of your prompting habits:
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
+- **Instructions** — Custom instruction effectiveness analysis
+- **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 
@@ -167,6 +176,14 @@ The Practice Lab is an interactive sandbox for improving your prompting skills:
 **🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve. Personalized recommendations highlight which categories need the most work based on your real session patterns.
 
 Scoring is based on heuristics derived from published prompting guides — see [docs/prompting-resources.md](docs/prompting-resources.md) for the full list of sources.
+
+### Live Monitor
+
+The Live Monitor polls your session database every 5 seconds for new turns and displays them in a live feed. Each turn is annotated with detected redirection patterns shown as colored badges. When a high-severity pattern (weight ≥ 3) is detected, an inline coaching card appears with contextual tips.
+
+- **Pause/resume** — Stop and restart polling with one click
+- **Status indicator** — Green pulsing dot when active, yellow when paused
+- **Coaching alerts** — Actionable advice for explicit corrections, frustration signals, rollback requests, etc.
 
 ## CLI Tools
 
@@ -232,11 +249,14 @@ graph LR
         Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
         Patterns --> Practice[practice.mjs]
+        DB -->|polling| LiveFeed[/api/live/feed]
+        LiveFeed --> Patterns
     end
 
     subgraph "Delivery"
         Analyzer --> API[Express API :3002]
         Practice --> API
+        LiveFeed --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
         CLI --> Tools[7 insights_* tools]
@@ -261,7 +281,7 @@ copilot-insights/
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice
+│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor
 │   └── components/        # Charts, badges, timeline, insights
 ├── docs/
 │   └── prompting-resources.md  # Official guides, academic papers, scoring reference
