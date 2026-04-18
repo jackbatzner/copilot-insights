@@ -36,7 +36,7 @@
     "eslint": "^10.2.1"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0"
+    "better-sqlite3": "^12.9.0"
   },
   "peerDependencies": {
     "@github/copilot-sdk": ">=0.1.0"
