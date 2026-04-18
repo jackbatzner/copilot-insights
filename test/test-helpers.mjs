@@ -2,7 +2,7 @@
 // Set COPILOT_SESSION_DB env var BEFORE importing any src/ modules.
 
 import Database from "better-sqlite3";
-import { writeFileSync, unlinkSync, existsSync } from "node:fs";
+import { unlinkSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 

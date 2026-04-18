@@ -19,6 +19,9 @@ Thumbs.db
 coverage/
 .nyc_output/
 
+# Lint cache
+.eslintcache
+
 # Logs
 *.log
 npm-debug.log*

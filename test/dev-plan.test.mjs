@@ -39,7 +39,7 @@ after(() => teardownTestDb());
 describe("generateDevPlan", () => {
   it("returns an object", () => {
     const result = generateDevPlan({ repo: "org/app" });
-    assert.ok(result != null, "result should not be null/undefined");
+    assert.ok(result !== null, "result should not be null/undefined");
     assert.equal(typeof result, "object");
   });
 
@@ -52,7 +52,7 @@ describe("generateDevPlan", () => {
 
   it("handles empty DB gracefully", () => {
     const result = generateDevPlan({ repo: "nonexistent-repo-xyz" });
-    assert.ok(result != null, "should not crash on empty data");
+    assert.ok(result !== null, "should not crash on empty data");
     assert.equal(typeof result, "object");
   });
 });
@@ -60,13 +60,13 @@ describe("generateDevPlan", () => {
 describe("generateProgressCheck", () => {
   it("returns an object", () => {
     const result = generateProgressCheck({ repo: "org/app" });
-    assert.ok(result != null, "result should not be null/undefined");
+    assert.ok(result !== null, "result should not be null/undefined");
     assert.equal(typeof result, "object");
   });
 
   it("handles empty DB gracefully", () => {
     const result = generateProgressCheck({ repo: "nonexistent-repo-xyz" });
-    assert.ok(result != null, "should not crash on empty data");
+    assert.ok(result !== null, "should not crash on empty data");
     assert.equal(typeof result, "object");
   });
 });
@@ -74,13 +74,13 @@ describe("generateProgressCheck", () => {
 describe("generateRetro", () => {
   it("returns an object", () => {
     const result = generateRetro({ repo: "org/app" });
-    assert.ok(result != null, "result should not be null/undefined");
+    assert.ok(result !== null, "result should not be null/undefined");
     assert.equal(typeof result, "object");
   });
 
   it("handles empty DB gracefully", () => {
     const result = generateRetro({ repo: "nonexistent-repo-xyz" });
-    assert.ok(result != null, "should not crash on empty data");
+    assert.ok(result !== null, "should not crash on empty data");
     assert.equal(typeof result, "object");
   });
 });

@@ -15,13 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /api/hidden-sessions`, `POST /api/sessions/:id/hide`, `DELETE /api/sessions/:id/hide`
   - In-memory only — resets on server restart, no file persistence
   - UUID validation on hide/unhide, 5,000 session cap to prevent memory exhaustion
-
-### Changed
-
-- **Extension linking is now opt-in** — global `npm install` no longer auto-links the Copilot CLI extension; run `copilot-insights link` to opt in
-
-### Added
-
 - **Practice Lab** dashboard page with two modes:
   - Sandbox mode for instant prompt analysis (score 0-100, pattern detection, rewrite suggestions)
   - Rewrite Challenge mode that pulls real poorly-scored prompts for gamified improvement practice
@@ -51,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **OSS cleanup** — removed dead exports (`searchTurns`, `PATTERNS`, `scoreClarity`), consolidated port default into `src/defaults.mjs`, added structured logger (`src/log.mjs`), standardized route error handling, added input validation for `repo` and `timeframe` query parameters, added CLI port validation, added React `ErrorBoundary`, added `safeFetch` wrapper for frontend API resilience
+- **Extension linking is now opt-in** — global `npm install` no longer auto-links the Copilot CLI extension; run `copilot-insights link` to opt in
+- SECURITY.md updated to reflect stricter input validation
+- Added `.eslintcache` to `.gitignore`
+- README now notes Copilot CLI-only scope
 - Scoring algorithm rewritten: starts at a baseline determined by prompt substance (20-55), earns points via quality signals (file paths, constraints, criteria, context, examples, output format, steps, technical specifics)
 - Grade thresholds tightened: Excellent ≥85, Good ≥65, Needs Work ≥45, Poor <45
 - ESLint config now ignores `_`-prefixed destructured variables (`varsIgnorePattern`)

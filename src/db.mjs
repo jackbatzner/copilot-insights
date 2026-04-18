@@ -100,24 +100,6 @@ export function getSessionFiles(sessionId) {
     )
     .all(sessionId);
 }
-
-/**
- * Search turns across sessions for a text pattern.
- */
-export function searchTurns(searchText, limit = 50) {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT t.session_id, t.turn_index, t.user_message, t.timestamp,
-              s.repository, s.branch
-       FROM turns t
-       JOIN sessions s ON t.session_id = s.id
-       WHERE t.user_message LIKE ?
-       ORDER BY t.timestamp DESC LIMIT ?`
-    )
-    .all(`%${searchText}%`, limit);
-}
-
 /**
  * Count edits per file within a session (detects file thrashing).
  */
