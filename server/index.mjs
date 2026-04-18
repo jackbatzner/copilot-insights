@@ -674,11 +674,11 @@ app.use((err, _req, res, _next) => {
 
 // ── SPA fallback ────────────────────────────────────────────────
 
-app.get("*", (req, res) => {
+app.get("/{*path}", (req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ error: "Not found" });
   }
-  res.sendFile(resolve(uiDist, "index.html"));
+  res.sendFile("index.html", { root: uiDist });
 });
 
 // ── Start ───────────────────────────────────────────────────────
