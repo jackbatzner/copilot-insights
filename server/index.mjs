@@ -34,6 +34,8 @@ import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDivers
 
 import { listSessions, getSession, getSessionTurns, getSessionRefs } from "../src/db.mjs";
 
+import { analyzePrompt } from "../src/practice.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -574,6 +576,75 @@ app.get("/api/analytics/file-types", (req, res) => {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
     res.json(computeFileTypeDiversity({ repo, since }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// ── Practice Lab endpoints ───────────────────────────────────────
+
+/**
+ * POST /api/practice/analyze
+ * Analyze a prompt text for quality and redirection patterns.
+ * No DB access — pure pattern matching + heuristics.
+ */
+app.post("/api/practice/analyze", (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "Missing 'text' in request body" });
+    }
+    const result = analyzePrompt(text);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/challenge
+ * Fetch a random past prompt that scored poorly for the rewrite challenge.
+ */
+app.get("/api/practice/challenge", (req, res) => {
+  try {
+    const since = parseSince(req.query.timeframe || "90d");
+    const result = analyzeRecent({ since, limit: 200 });
+
+    // Collect user turns that had redirection patterns
+    const candidates = [];
+    for (const s of result.sessions) {
+      for (const r of s.redirections) {
+        if (r.weight >= 2 && r.message && r.message.length >= 20) {
+          const analysis = analyzePrompt(r.message);
+          if (analysis.score < 70) {
+            candidates.push({
+              originalPrompt: r.message,
+              score: analysis.score,
+              grade: analysis.grade,
+              patterns: analysis.patterns,
+              categories: analysis.categories,
+              suggestions: analysis.suggestions,
+              sessionId: s.session.id,
+              turnIndex: r.turnIndex,
+            });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      return res.json({
+        challenge: null,
+        message: "No low-scoring prompts found — your prompting is already strong! Try the sandbox instead.",
+      });
+    }
+
+    // Pick a random candidate
+    const challenge = candidates[Math.floor(Math.random() * candidates.length)];
+    res.json({ challenge });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

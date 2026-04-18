@@ -162,3 +162,21 @@ export async function fetchFileTypes(timeframe, repo) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function analyzePracticePrompt(text) {
+  const res = await fetch(`${API_BASE}/practice/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPracticeChallenge(timeframe) {
+  const params = new URLSearchParams();
+  if (timeframe) params.set("timeframe", timeframe);
+  const res = await fetch(`${API_BASE}/practice/challenge?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

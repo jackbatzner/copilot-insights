@@ -7,6 +7,7 @@ import Coaching from "./pages/Coaching.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
+import Practice from "./pages/Practice.jsx";
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -52,6 +53,9 @@ function App() {
           <NavLink to="/sessions">
             <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
           </NavLink>
+          <NavLink to="/practice">
+            <span className="nav-icon">🧪</span><span className="nav-label">Practice</span>
+          </NavLink>
           <div className="refresh-section">
             <button className={`refresh-btn${spinning ? " spinning" : ""}`} onClick={refresh} title="Refresh data" aria-label="Refresh data">
               🔄
@@ -68,6 +72,7 @@ function App() {
             <Route path="/instructions" element={<Instructions />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/sessions/:id" element={<SessionDetail />} />
+            <Route path="/practice" element={<Practice />} />
           </Routes>
         </main>
       </div>
