@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { analyzePracticePrompt, fetchPracticeChallenge } from "../api";
+import { useState, useCallback, useEffect } from "react";
+import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -88,6 +88,15 @@ function Nudges({ result }) {
   }
   if (!h.hasContext && h.wordCount >= 12) {
     nudges.push("Try adding why — \"because the token is expiring too early\" or \"so that the redirect works for OAuth\"");
+  }
+  if (!h.hasExamples && h.wordCount >= 15) {
+    nudges.push("Try including an example — \"e.g. parseDate('11/14/2023') → Date\" helps clarify intent");
+  }
+  if (!h.hasOutputFormat && h.wordCount >= 15) {
+    nudges.push("What format do you want? Try \"respond as a markdown table\" or \"return JSON with fields…\"");
+  }
+  if (!h.hasSteps && h.wordCount >= 20) {
+    nudges.push("This seems complex — try breaking it into numbered steps: \"1. First... 2. Then...\"");
   }
   if (result.patterns.length > 0 && result.score < 45) {
     nudges.push("Try rephrasing without correction language — describe what you want, not what went wrong");
@@ -234,29 +243,36 @@ function SandboxMode() {
 
 /* ── Challenge Mode ────────────────────────────────────────── */
 
-const GENERIC_CHALLENGES = [
-  "fix the bug",
-  "make it work",
-  "the tests are failing, can you look at it?",
-  "do the auth thing",
-  "update the styles to look better",
-  "something is wrong with the API, investigate",
-  "refactor that file",
-  "add error handling",
-  "write tests",
-  "clean up the code and make it production ready",
-  "the page is slow, optimize it",
-  "implement the feature from the ticket",
-];
+const TAG_LABELS = {
+  "": "All Topics",
+  vague: "🔍 Vague / Too Short",
+  "no-files": "📁 Missing File References",
+  "no-context": "💭 Missing Context",
+  "no-constraints": "🚧 No Constraints",
+  "no-criteria": "✅ No Acceptance Criteria",
+  "no-examples": "📝 No Examples",
+  "no-format": "📊 No Output Format",
+  "no-steps": "📋 Not Broken Into Steps",
+  correction: "🚫 Correction Pattern",
+  frustration: "😤 Frustration Signal",
+  rollback: "⏪ Rollback Request",
+};
 
 function ChallengeMode() {
-  const [source, setSource] = useState(null); // null = picker, "mine" | "generic"
+  const [source, setSource] = useState(null); // null = picker, "mine" | "library"
+  const [tagFilter, setTagFilter] = useState("");
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [rewrite, setRewrite] = useState("");
   const [rewriteResult, setRewriteResult] = useState(null);
   const [analyzingRewrite, setAnalyzingRewrite] = useState(false);
+  const [weaknesses, setWeaknesses] = useState(null);
+
+  // Fetch user's weaknesses on mount for recommendations
+  useEffect(() => {
+    fetchWeaknesses("90d").then(setWeaknesses).catch(() => {});
+  }, []);
 
   const loadChallenge = async (src) => {
     const effectiveSource = src || source;
@@ -272,19 +288,17 @@ function ChallengeMode() {
           setError(data.message || "No challenges available.");
         }
       } else {
-        // Generic: pick a random curated bad prompt and analyze it
-        const prompt = GENERIC_CHALLENGES[Math.floor(Math.random() * GENERIC_CHALLENGES.length)];
-        const analysis = await analyzePracticePrompt(prompt);
-        setChallenge({
-          originalPrompt: prompt,
-          score: analysis.score,
-          grade: analysis.grade,
-          patterns: analysis.patterns,
-          categories: analysis.categories,
-          suggestions: analysis.suggestions,
-          sessionId: null,
-          turnIndex: null,
-        });
+        // Library: pick a random curated bad prompt, optionally filtered by tag
+        const data = await fetchLibraryChallenge(tagFilter || undefined);
+        if (!data.challenge) {
+          setError("No challenges match that filter.");
+        } else {
+          setChallenge({
+            ...data.challenge,
+            sessionId: null,
+            turnIndex: null,
+          });
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -313,8 +327,10 @@ function ChallengeMode() {
     setRewrite(e.target.value);
   };
 
-  // Source picker — choose between your own bad prompts or generic ones
+  // Source picker — choose between your own bad prompts or curated library
   if (!source) {
+    const topWeaknesses = weaknesses?.weaknesses?.slice(0, 3) || [];
+
     return (
       <div className="card" style={{ textAlign: "center", padding: "48px 24px" }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🏆</div>
@@ -326,12 +342,36 @@ function ChallengeMode() {
           <button className="practice-challenge-btn" onClick={() => { setSource("mine"); loadChallenge("mine"); }}>
             🔍 My Bad Prompts
           </button>
-          <button className="practice-challenge-btn" style={{ background: "var(--bg-card)", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { setSource("generic"); loadChallenge("generic"); }}>
-            📝 Generic Examples
+          <button className="practice-challenge-btn" style={{ background: "var(--bg-card)", color: "var(--text)", border: "1px solid var(--border)" }} onClick={() => { setSource("library"); loadChallenge("library"); }}>
+            📚 Prompt Library ({Object.keys(TAG_LABELS).length - 1} topics)
           </button>
         </div>
+
+        {topWeaknesses.length > 0 && (
+          <div className="practice-recommendations">
+            <div className="practice-recommendations-header">📊 Recommended for you</div>
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 12 }}>
+              Based on your recent sessions, practice these areas:
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+              {topWeaknesses.map((w) => (
+                <button
+                  key={w.tag}
+                  className="practice-rec-tag"
+                  onClick={() => { setTagFilter(w.tag); setSource("library"); loadChallenge("library"); }}
+                  title={`${w.pct}% of your prompts are missing this`}
+                >
+                  {TAG_LABELS[w.tag] || w.tag}
+                  <span className="practice-rec-pct">{w.pct}%</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 16 }}>
-          &ldquo;My Bad Prompts&rdquo; pulls real low-scoring prompts from your Copilot sessions.
+          &ldquo;My Bad Prompts&rdquo; pulls real low-scoring prompts from your sessions.<br/>
+          &ldquo;Prompt Library&rdquo; has 80+ curated bad prompts covering best practices from GitHub, Anthropic, Google &amp; OpenAI.
         </p>
       </div>
     );
@@ -369,22 +409,43 @@ function ChallengeMode() {
         <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>📝 Original Prompt</span>
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-            {source === "mine" ? "From your sessions" : "Generic example"}
+            {source === "mine" ? "From your sessions" : "Prompt Library"}
           </span>
         </div>
         <div className="practice-challenge-original">
           <q style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{challenge.originalPrompt}</q>
         </div>
-        <div style={{ display: "flex", gap: 16, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+        {challenge.hint && (
+          <div className="practice-challenge-hint">💡 {challenge.hint}</div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div className="practice-score-pill" style={{ background: SCORE_COLORS[challenge.grade?.color] + "22", color: SCORE_COLORS[challenge.grade?.color] }}>
             Score: {challenge.score}/100
           </div>
+          {challenge.tags && challenge.tags.map((t, i) => (
+            <span key={i} className="practice-tag-pill">{t}</span>
+          ))}
           {challenge.patterns.map((p, i) => (
-            <span key={i} className="practice-pattern-tag">
+            <span key={`p${i}`} className="practice-pattern-tag">
               {challenge.categories[p.category]?.emoji} {p.label}
             </span>
           ))}
         </div>
+        {/* Tag filter for library source */}
+        {source === "library" && (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Filter:</span>
+            <select
+              className="practice-tag-select"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+            >
+              {Object.entries(TAG_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Rewrite area */}

@@ -181,6 +181,29 @@ function evaluateHeuristics(text) {
     details.push({ id: "has-context", label: "Provides reasoning", severity: "ok", tip: "Explaining why helps the agent make better decisions." });
   }
 
+  // Examples provided — "for example", "e.g.", "such as", "like this:", sample input/output
+  // Recommended by: GitHub, Anthropic, Google, OpenAI
+  const hasExamples = /\b(for example|e\.g\.|such as|like this|sample|input.*output|example:?)\b/i.test(text);
+  if (hasExamples) {
+    details.push({ id: "has-examples", label: "Includes examples", severity: "ok", tip: "Examples help the agent understand the expected format and behavior. (GitHub, Anthropic, Google, OpenAI)" });
+  } else if (words > 20) {
+    details.push({ id: "no-examples", label: "No examples provided", severity: "info", tip: "Try adding an example: 'e.g., findDates(\"11/14/2023\") → [\"11/14/2023\"]'." });
+  }
+
+  // Output format specified — "in JSON", "as markdown", "return a table", "bullet points"
+  // Recommended by: Anthropic, Google, OpenAI
+  const hasOutputFormat = /\b(in json|as (?:a )?(?:json|markdown|csv|xml|html|table|bullet)|(?:markdown|json|csv|xml) (?:table|format|output)|format(?:ted)? as|respond (?:in|with)|output (?:as|in|format)|return (?:as|in) \w+|bullet points?|numbered list)\b/i.test(text);
+  if (hasOutputFormat) {
+    details.push({ id: "has-format", label: "Specifies output format", severity: "ok", tip: "Defining the output format (JSON, table, bullets) reduces ambiguity. (Anthropic, Google, OpenAI)" });
+  }
+
+  // Step structure — numbered steps, "first...then", "step 1", sequential instructions
+  // Recommended by: GitHub, Google, OpenAI
+  const hasSteps = /\b(step\s*\d|first[,.]?\s+(?:then|next|after)|1\.\s+\w|then\s+\w+[,.]?\s+(?:then|next|finally))\b/i.test(text) || /^\s*\d+\.\s+/m.test(text);
+  if (hasSteps) {
+    details.push({ id: "has-steps", label: "Uses step structure", severity: "ok", tip: "Breaking tasks into numbered steps improves clarity. (GitHub, Google, OpenAI)" });
+  }
+
   return {
     wordCount: words,
     charCount: chars,
@@ -189,6 +212,9 @@ function evaluateHeuristics(text) {
     hasConstraints,
     hasCriteria,
     hasContext,
+    hasExamples,
+    hasOutputFormat,
+    hasSteps,
     details,
   };
 }
@@ -229,6 +255,9 @@ function computeScore(matches, heuristics) {
   if (heuristics.hasConstraints) score += 10;
   if (heuristics.hasCriteria) score += 10;
   if (heuristics.hasContext) score += 8;
+  if (heuristics.hasExamples) score += 6;
+  if (heuristics.hasOutputFormat) score += 5;
+  if (heuristics.hasSteps) score += 5;
 
   // Bonus for technical specificity (error codes, HTTP methods, line numbers, etc.)
   const hasSpecifics = /\b(line\s+\d+|status\s+\d{3}|port\s+\d+|GET|POST|PUT|DELETE|PATCH|404|500|401|403|200|null|undefined|TypeError|Error)\b/i.test(heuristics.rawText || "");

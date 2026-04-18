@@ -163,7 +163,9 @@ The Practice Lab is an interactive sandbox for improving your prompting skills:
 
 **🧪 Sandbox Mode** — Type any prompt and click **Analyze** to get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions. Coaching nudges help you improve — "try mentioning the specific file" or "what should the result look like?"
 
-**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or curated generic examples. Rewrite the prompt, click Analyze, and see your score improve in a side-by-side comparison with the original.
+**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve.
+
+Scoring is based on heuristics derived from published prompting guides — see [docs/prompting-resources.md](docs/prompting-resources.md) for the full list of sources.
 
 ## CLI Tools
 

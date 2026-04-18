@@ -1901,6 +1901,79 @@ a:hover {
   border-radius: 4px;
 }
 
+.practice-tag-pill {
+  font-size: 11px;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(88, 166, 255, 0.25);
+}
+
+.practice-challenge-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.08);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border-left: 3px solid #d29922;
+}
+
+.practice-tag-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.practice-tag-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.practice-recommendations {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: rgba(88, 166, 255, 0.05);
+  border: 1px solid rgba(88, 166, 255, 0.15);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.practice-recommendations-header {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+.practice-rec-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.practice-rec-tag:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+.practice-rec-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.12);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
 .practice-comparison {
   display: flex;
   align-items: center;

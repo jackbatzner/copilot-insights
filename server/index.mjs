@@ -35,6 +35,7 @@ import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDivers
 import { listSessions, getSessionTurns, getSessionRefs } from "../src/db.mjs";
 
 import { analyzePrompt } from "../src/practice.mjs";
+import CHALLENGE_LIBRARY from "../src/challenge-library.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -648,6 +649,103 @@ app.get("/api/practice/challenge", (req, res) => {
     // Pick a random candidate
     const challenge = candidates[Math.floor(Math.random() * candidates.length)];
     res.json({ challenge });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/weaknesses
+ * Analyze the user's recent prompts and return recommended challenge tags.
+ * Scans real session turns, runs heuristics, and counts which quality signals
+ * are most frequently missing — then maps those to library tags.
+ */
+app.get("/api/practice/weaknesses", (req, res) => {
+  try {
+    const since = parseSince(req.query.timeframe || "90d");
+    const result = analyzeRecent({ since, limit: 200 });
+
+    // Aggregate heuristic gaps across all user turns
+    const gaps = {
+      "no-files": 0, "no-constraints": 0, "no-criteria": 0,
+      "no-context": 0, "no-examples": 0, "no-format": 0,
+      "no-steps": 0, vague: 0, correction: 0, frustration: 0, rollback: 0,
+    };
+    let totalTurns = 0;
+
+    for (const s of result.sessions) {
+      for (const r of s.redirections) {
+        if (!r.message || r.message.length < 10) continue;
+        totalTurns++;
+        const analysis = analyzePrompt(r.message);
+        const h = analysis.heuristics;
+
+        // Count missing quality signals
+        if (!h.hasFilePaths && h.wordCount >= 5) gaps["no-files"]++;
+        if (!h.hasConstraints && h.wordCount >= 8) gaps["no-constraints"]++;
+        if (!h.hasCriteria && h.wordCount >= 10) gaps["no-criteria"]++;
+        if (!h.hasContext && h.wordCount >= 10) gaps["no-context"]++;
+        if (!h.hasExamples && h.wordCount >= 12) gaps["no-examples"]++;
+        if (!h.hasOutputFormat && h.wordCount >= 12) gaps["no-format"]++;
+        if (!h.hasSteps && h.wordCount >= 15) gaps["no-steps"]++;
+        if (h.charCount < 30) gaps.vague++;
+
+        // Count redirection categories
+        for (const p of analysis.patterns) {
+          if (p.category === "explicit_correction") gaps.correction++;
+          else if (p.category === "frustration") gaps.frustration++;
+          else if (p.category === "rollback") gaps.rollback++;
+        }
+      }
+    }
+
+    // Rank by frequency, return top tags with counts
+    const ranked = Object.entries(gaps)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count, pct: totalTurns ? Math.round((count / totalTurns) * 100) : 0 }));
+
+    res.json({ weaknesses: ranked, totalTurns });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/library
+ * Return the curated challenge library with optional tag filtering.
+ * Query params:
+ *   tag — filter to prompts matching this tag (can repeat: ?tag=vague&tag=no-files)
+ *   random — if "1", return a single random prompt instead of the full list
+ */
+app.get("/api/practice/library", (req, res) => {
+  try {
+    const tags = [].concat(req.query.tag || []).filter(Boolean);
+    let pool = CHALLENGE_LIBRARY;
+    if (tags.length > 0) {
+      pool = pool.filter((c) => tags.some((t) => c.tags.includes(t)));
+    }
+    if (req.query.random === "1") {
+      if (pool.length === 0) return res.json({ challenge: null, total: 0 });
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const analysis = analyzePrompt(pick.prompt);
+      return res.json({
+        challenge: {
+          originalPrompt: pick.prompt,
+          tags: pick.tags,
+          hint: pick.hint,
+          score: analysis.score,
+          grade: analysis.grade,
+          patterns: analysis.patterns,
+          categories: analysis.categories,
+          suggestions: analysis.suggestions,
+        },
+        total: pool.length,
+      });
+    }
+    res.json({ challenges: pool, total: pool.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
