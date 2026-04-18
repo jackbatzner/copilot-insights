@@ -6,8 +6,10 @@
 
 <p align="center">
   <strong>Understand how you prompt. Get better at it.</strong><br/>
-  A dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you communicate more effectively with AI agents.
+  A community-built dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you communicate more effectively with AI agents.
 </p>
+
+> **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -227,12 +229,16 @@ copilot-insights/
 │   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching
 │   └── components/        # Charts, badges, timeline, insights
 ├── scripts/               # Mock data seeder + screenshot capture
-└── .github/workflows/     # CI + Release (npm publish)
+└── .github/workflows/     # CI + Release (GitHub Releases)
 ```
 
 ## License
 
 [MIT](LICENSE)
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" and "Copilot" are trademarks of GitHub, Inc. This project uses the name "Copilot Insights" solely to describe its function as a tool that works with GitHub Copilot CLI session data.
 
 ## Troubleshooting
 
