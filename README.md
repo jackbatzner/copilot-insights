@@ -12,6 +12,7 @@
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
 <p align="center">
+  <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/jackbatzner/copilot-insights/releases/latest"><img src="https://img.shields.io/github/v/release/jackbatzner/copilot-insights" alt="GitHub release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
 </p>
@@ -30,10 +31,10 @@
 Every time you say "no, not that" or "go back to the previous approach," that's signal. It means there's a gap between what you asked for and what the agent did. **Copilot Insights** surfaces those moments so you can learn from them.
 
 - 📊 **See your patterns** — Which corrections do you make most often?
-- 🤖 **Real-time coaching** — Get instant feedback on your prompts as you work in Copilot CLI
 - 💡 **Get coaching** — Personalized dev plans, daily check-ins, and retros
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
+- 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 
@@ -87,25 +88,20 @@ Open [http://localhost:3002](http://localhost:3002) to see your dashboard.
 
 ### 3. Use as a Copilot CLI Extension (optional)
 
-To get insights directly inside Copilot CLI chat, install it as an extension.
-
-**If you installed globally** (`npm i -g`), the extension is linked automatically — no extra steps needed.
-
-You can also manage the link manually:
+To get insights directly inside Copilot CLI chat, install it as an extension:
 
 ```bash
-copilot-insights link     # create the symlink
-copilot-insights unlink   # remove the symlink
+# Symlink into your Copilot extensions directory
+ln -s "$(pwd)" ~/.copilot/extensions/copilot-insights
 ```
 
-Then restart Copilot CLI. The extension registers 8 tools that the agent can invoke:
+Then restart Copilot CLI. The extension registers 7 tools that the agent can invoke:
 
 ```
 > How am I doing with my prompting?          → insights_summary
 > Scan my recent sessions                    → insights_analyze
 > What are my most common correction patterns? → insights_patterns
 > Compare sessions abc123 and def456         → insights_compare
-> Coach me on my recent prompts              → insights_coach
 > Launch the insights dashboard              → insights_dashboard
 ```
 
@@ -136,6 +132,10 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/learn.png" alt="Learn and grow" width="800" />
 
+**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges
+
+<img src="docs/screenshots/practice.png" alt="Practice Lab" width="800" />
+
 **Session Detail** — turn-by-turn replay with annotations
 
 <img src="docs/screenshots/session-detail.png" alt="Session detail" width="800" />
@@ -150,9 +150,23 @@ The web dashboard gives you a full view of your prompting habits:
 - **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
-- **Instructions** — Custom instruction effectiveness analysis
+- **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
+
+### Practice Lab
+
+The Practice Lab is an interactive sandbox for improving your prompting skills:
+
+<p align="center">
+  <img src="docs/screenshots/practice-demo.gif" alt="Practice Lab demo" width="800" />
+</p>
+
+**🧪 Sandbox Mode** — Type any prompt and click **Analyze** to get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions. Coaching nudges help you improve — "try mentioning the specific file" or "what should the result look like?"
+
+**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve. Personalized recommendations highlight which categories need the most work based on your real session patterns.
+
+Scoring is based on heuristics derived from published prompting guides — see [docs/prompting-resources.md](docs/prompting-resources.md) for the full list of sources.
 
 ## CLI Tools
 
@@ -163,86 +177,8 @@ All pages include a **timeframe selector** (7d / 30d / 90d / All time).
 | `insights_patterns` | Most common correction patterns with real examples |
 | `insights_summary` | Quick snapshot: tier badge, pillar scores, coaching tip |
 | `insights_compare` | Compare two sessions side-by-side |
-| `insights_coach` | Real-time prompt coaching — immediate feedback, periodic review, or progress tracking |
 | `insights_dashboard` | Launch the web dashboard from the CLI |
 | `insights_stop` | Stop the dashboard server |
-
-<details>
-<summary>🎓 <strong>insights_coach</strong> — example output for each mode</summary>
-
-**Immediate mode** — the agent passes the user's message for real-time feedback:
-
-```markdown
-## 🎓 Prompt Coach — 🟠 52/100 (C)
-
-**Detected:**
-- 😤 **Frustration Signal**: Persistent failure
-- 🚫 **Explicit Correction**: Direct rejection
-
-### 💡 Coaching
-**Diagnose, don't repeat** — Describe what you see vs. what you expected, and share error messages.
-> ✏️ *Instead of 'still broken', try: 'The server returns 200 but the UI shows empty — check the response parsing.'*
-
-**Be specific upfront** — Include the exact tool, file, or approach you want from the start.
-> ✏️ *State your preferred approach in the first message: 'Use X (not Y) because…'*
-```
-
-**Periodic mode** — reviews the last N turns across recent sessions:
-
-```markdown
-## 🎓 Periodic Coaching Review (last 10 turns)
-
-**Average score:** 71/100
-**Turns with issues:** 4/10
-
-### Top Issues
-
-| Category | Count |
-|----------|------:|
-| ↩️ Course Change | 3 |
-| 😤 Frustration Signal | 2 |
-
-### Turns Needing Attention
-
-🔴 **Score 44** — Turn 3
-> Actually, scratch that. Use a different approach entirely…
-> 💡 *Plan before you prompt: Use plan mode for complex tasks — outline the approach first.*
-
-🟡 **Score 68** — Turn 7
-> That didn't work, the tests are still failing…
-> 💡 *Diagnose, don't repeat: Describe what you see vs. what you expected, and share error messages.*
-```
-
-**Progress mode** — tracks score trends over time:
-
-```markdown
-## 🎓 Progress Report (30d)
-
-**Current tier:** ⚡ Flow State — **62/100**
-**Trend:** 📈 Improving
-
-### Score Trend
-2026-W14  ████████████░░░░░░░░  55
-2026-W15  ████████████░░░░░░░░  58
-2026-W16  ████████████░░░░░░░░  60
-2026-W17  █████████████░░░░░░░  62
-
-### Pillar Scores
-
-| Pillar | Score | Trend |
-|--------|------:|:-----:|
-| ⚖️ Judgment | 71/100 | 📈 improving |
-| 🎯 Delegation | 63/100 | ➡️ stable |
-| 💬 Feedback | 52/100 | 📈 improving |
-
-**💪 Strongest:** ⚖️ Judgment (71/100)
-**🎯 Focus area:** 💬 Feedback (52/100)
-
-💡 **Next step:** When you need to correct the agent, explain *why* the output
-was wrong, not just *what* to change. This reduces repeat corrections.
-```
-
-</details>
 
 ## How It Works
 
@@ -295,48 +231,41 @@ graph LR
         Analyzer --> Patterns[30+ regex patterns]
         Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
-        Analyzer --> Practice[practice.mjs]
+        Patterns --> Practice[practice.mjs]
     end
 
     subgraph "Delivery"
         Analyzer --> API[Express API :3002]
+        Practice --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
-        Practice --> CLI
-        CLI --> Tools[8 insights_* tools]
+        CLI --> Tools[7 insights_* tools]
     end
 ```
 
 ```
 copilot-insights/
-├── extension.mjs          # Copilot CLI extension entry point (8 tools)
+├── extension.mjs          # Copilot CLI extension entry point (7 tools)
 ├── src/
 │   ├── db.mjs             # SQLite read-only access
 │   ├── patterns.mjs       # 30+ regex patterns, 5 categories
 │   ├── analyzer.mjs       # Core analysis engine
-│   ├── practice.mjs       # Shared prompt analyzer (pure function, no DB)
+│   ├── practice.mjs       # Prompt analysis for Practice Lab (no DB dependency)
+│   ├── challenge-library.mjs  # 83 curated bad prompts with tags and hints
 │   ├── tiers.mjs          # Tier badge system (shared UI + CLI)
-│   ├── trends.mjs         # Weekly pillar-score trend computation
 │   ├── suggestions.mjs    # Prompt rewrite engine
-│   ├── analytics.mjs      # Session analytics (hourly, depth, tools)
-│   ├── clarity.mjs        # Prompt clarity scoring
-│   ├── efficiency.mjs     # Efficiency metrics
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
-│   ├── sprawl.mjs         # Scope sprawl detection
-│   ├── dev-plan.mjs       # Personalized coaching & dev plans
-│   ├── replay.mjs         # Turn-by-turn session replay
-│   ├── work-style.mjs     # Work style analysis
-│   ├── session-insights.mjs # Per-session insight computation
-│   ├── instructions.mjs   # Custom instruction analysis
-│   ├── instruction-failures.mjs # Instruction failure detection
+│   ├── dev-plan.mjs       # Personalized coaching
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Instructions
+│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice
 │   └── components/        # Charts, badges, timeline, insights
-├── scripts/               # Mock data seeder + screenshot capture
+├── docs/
+│   └── prompting-resources.md  # Official guides, academic papers, scoring reference
+├── scripts/               # Mock data seeder + screenshot/GIF capture
 └── .github/workflows/     # CI + Release (GitHub Releases)
 ```
 
@@ -367,6 +296,6 @@ This project is not affiliated with, endorsed by, or sponsored by GitHub or Micr
 ## Future Ideas
 
 - **Gamification** — Scoring, XP, levels, achievements, and goals to encourage improvement
-- **Live monitoring** — Flag corrections as they happen in real-time
+- **Team leaderboards** — Anonymous comparison across teams
 - **Custom instruction generation** — Auto-generate `.github/copilot-instructions.md` from common patterns
 - **OpenTelemetry tracing** — Opt-in distributed tracing via `@github/copilot-sdk` for debugging

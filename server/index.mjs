@@ -32,7 +32,10 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
-import { listSessions, getSession, getSessionTurns, getSessionRefs } from "../src/db.mjs";
+import { listSessions, getSessionTurns, getSessionRefs } from "../src/db.mjs";
+
+import { analyzePrompt } from "../src/practice.mjs";
+import CHALLENGE_LIBRARY from "../src/challenge-library.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -574,6 +577,192 @@ app.get("/api/analytics/file-types", (req, res) => {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
     res.json(computeFileTypeDiversity({ repo, since }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// ── Practice Lab endpoints ───────────────────────────────────────
+
+/** Valid tag values for the challenge library. */
+const VALID_LIBRARY_TAGS = new Set([
+  "vague", "no-files", "no-context", "no-constraints", "no-criteria",
+  "no-examples", "no-format", "no-steps", "correction", "frustration", "rollback",
+]);
+
+/** Accepted timeframe patterns: digits + d/w/m/y, or "all". */
+const TIMEFRAME_RE = /^(?:\d{1,4}[dwmy]|all)$/;
+
+/**
+ * POST /api/practice/analyze
+ * Analyze a prompt text for quality and redirection patterns.
+ * No DB access — pure pattern matching + heuristics.
+ */
+app.post("/api/practice/analyze", (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "Missing 'text' in request body" });
+    }
+    if (text.length > 10000) {
+      return res.status(400).json({ error: "Text too long (max 10,000 characters)" });
+    }
+    const result = analyzePrompt(text);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/challenge
+ * Fetch a random past prompt that scored poorly for the rewrite challenge.
+ */
+app.get("/api/practice/challenge", (req, res) => {
+  try {
+    const tf = req.query.timeframe || "90d";
+    if (typeof tf !== "string" || !TIMEFRAME_RE.test(tf)) {
+      return res.status(400).json({ error: "Invalid timeframe parameter" });
+    }
+    const since = parseSince(tf);
+    const result = analyzeRecent({ since, limit: 200 });
+
+    // Collect user turns that had redirection patterns
+    const candidates = [];
+    for (const s of result.sessions) {
+      for (const r of s.redirections) {
+        if (r.weight >= 2 && r.message && r.message.length >= 20) {
+          const analysis = analyzePrompt(r.message);
+          if (analysis.score < 70) {
+            candidates.push({
+              originalPrompt: r.message,
+              score: analysis.score,
+              grade: analysis.grade,
+              patterns: analysis.patterns,
+              categories: analysis.categories,
+              suggestions: analysis.suggestions,
+              sessionId: s.session.id,
+              turnIndex: r.turnIndex,
+            });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      return res.json({
+        challenge: null,
+        message: "No low-scoring prompts found — your prompting is already strong! Try the sandbox instead.",
+      });
+    }
+
+    // Pick a random candidate
+    const challenge = candidates[Math.floor(Math.random() * candidates.length)];
+    res.json({ challenge });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/weaknesses
+ * Analyze the user's recent prompts and return recommended challenge tags.
+ * Scans real session turns, runs heuristics, and counts which quality signals
+ * are most frequently missing — then maps those to library tags.
+ */
+app.get("/api/practice/weaknesses", (req, res) => {
+  try {
+    const tf = req.query.timeframe || "90d";
+    if (typeof tf !== "string" || !TIMEFRAME_RE.test(tf)) {
+      return res.status(400).json({ error: "Invalid timeframe parameter" });
+    }
+    const since = parseSince(tf);
+    const result = analyzeRecent({ since, limit: 200 });
+
+    // Aggregate heuristic gaps across all user turns
+    const gaps = {
+      "no-files": 0, "no-constraints": 0, "no-criteria": 0,
+      "no-context": 0, "no-examples": 0, "no-format": 0,
+      "no-steps": 0, vague: 0, correction: 0, frustration: 0, rollback: 0,
+    };
+    let totalTurns = 0;
+
+    for (const s of result.sessions) {
+      for (const r of s.redirections) {
+        if (!r.message || r.message.length < 10) continue;
+        totalTurns++;
+        const analysis = analyzePrompt(r.message);
+        const h = analysis.heuristics;
+
+        // Count missing quality signals
+        if (!h.hasFilePaths && h.wordCount >= 5) gaps["no-files"]++;
+        if (!h.hasConstraints && h.wordCount >= 8) gaps["no-constraints"]++;
+        if (!h.hasCriteria && h.wordCount >= 10) gaps["no-criteria"]++;
+        if (!h.hasContext && h.wordCount >= 10) gaps["no-context"]++;
+        if (!h.hasExamples && h.wordCount >= 12) gaps["no-examples"]++;
+        if (!h.hasOutputFormat && h.wordCount >= 12) gaps["no-format"]++;
+        if (!h.hasSteps && h.wordCount >= 15) gaps["no-steps"]++;
+        if (h.charCount < 30) gaps.vague++;
+
+        // Count redirection categories
+        for (const p of analysis.patterns) {
+          if (p.category === "explicit_correction") gaps.correction++;
+          else if (p.category === "frustration") gaps.frustration++;
+          else if (p.category === "rollback") gaps.rollback++;
+        }
+      }
+    }
+
+    // Rank by frequency, return top tags with counts
+    const ranked = Object.entries(gaps)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count, pct: totalTurns ? Math.round((count / totalTurns) * 100) : 0 }));
+
+    res.json({ weaknesses: ranked, totalTurns });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * GET /api/practice/library
+ * Return the curated challenge library with optional tag filtering.
+ * Query params:
+ *   tag — filter to prompts matching this tag (can repeat: ?tag=vague&tag=no-files)
+ *   random — if "1", return a single random prompt instead of the full list
+ */
+app.get("/api/practice/library", (req, res) => {
+  try {
+    const tags = [].concat(req.query.tag || []).filter((t) => typeof t === "string" && VALID_LIBRARY_TAGS.has(t));
+    let pool = CHALLENGE_LIBRARY;
+    if (tags.length > 0) {
+      pool = pool.filter((c) => tags.some((t) => c.tags.includes(t)));
+    }
+    if (req.query.random === "1") {
+      if (pool.length === 0) return res.json({ challenge: null, total: 0 });
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const analysis = analyzePrompt(pick.prompt);
+      return res.json({
+        challenge: {
+          originalPrompt: pick.prompt,
+          tags: pick.tags,
+          hint: pick.hint,
+          score: analysis.score,
+          grade: analysis.grade,
+          patterns: analysis.patterns,
+          categories: analysis.categories,
+          suggestions: analysis.suggestions,
+        },
+        total: pool.length,
+      });
+    }
+    res.json({ challenges: pool, total: pool.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

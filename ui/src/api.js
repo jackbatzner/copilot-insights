@@ -162,3 +162,43 @@ export async function fetchFileTypes(timeframe, repo) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function analyzePracticePrompt(text) {
+  const res = await fetch(`${API_BASE}/practice/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPracticeChallenge(timeframe) {
+  const params = new URLSearchParams();
+  if (timeframe) params.set("timeframe", timeframe);
+  const res = await fetch(`${API_BASE}/practice/challenge?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLibraryChallenge(tag) {
+  const params = new URLSearchParams({ random: "1" });
+  if (tag) params.set("tag", tag);
+  const res = await fetch(`${API_BASE}/practice/library?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLibraryTags() {
+  const res = await fetch(`${API_BASE}/practice/library`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchWeaknesses(timeframe) {
+  const params = new URLSearchParams();
+  if (timeframe) params.set("timeframe", timeframe);
+  const res = await fetch(`${API_BASE}/practice/weaknesses?${params}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

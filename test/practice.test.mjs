@@ -1,0 +1,141 @@
+// Tests for src/practice.mjs — prompt analyzer
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { analyzePrompt } from "../src/practice.mjs";
+
+describe("analyzePrompt", () => {
+  describe("empty / invalid input", () => {
+    it("returns score 0 for empty string", () => {
+      const r = analyzePrompt("");
+      assert.equal(r.score, 0);
+      assert.equal(r.grade.label, "Empty");
+    });
+
+    it("returns score 0 for null", () => {
+      const r = analyzePrompt(null);
+      assert.equal(r.score, 0);
+    });
+
+    it("returns score 0 for non-string", () => {
+      const r = analyzePrompt(42);
+      assert.equal(r.score, 0);
+    });
+
+    it("returns score 0 for very short string", () => {
+      const r = analyzePrompt("hi");
+      assert.equal(r.score, 0);
+    });
+  });
+
+  describe("scoring accuracy", () => {
+    it("scores vague prompts as Poor (<45)", () => {
+      const prompts = ["fix the bug", "make it work", "help", "do the auth thing"];
+      for (const p of prompts) {
+        const r = analyzePrompt(p);
+        assert.ok(r.score < 45, `"${p}" scored ${r.score}, expected < 45`);
+        assert.equal(r.grade.label, "Poor");
+      }
+    });
+
+    it("scores detailed prompts as Good or Excellent (≥65)", () => {
+      const r = analyzePrompt(
+        "The login endpoint POST /api/auth/login in src/auth.ts returns 401 even with valid credentials. " +
+        "I think the JWT verification is comparing expiry in seconds instead of milliseconds. " +
+        "The fix should ensure tokens with future expiry timestamps pass validation. " +
+        "Don't change the token generation logic, only the verification step."
+      );
+      assert.ok(r.score >= 65, `Detailed prompt scored ${r.score}, expected ≥ 65`);
+    });
+
+    it("gives higher scores to prompts with more quality signals", () => {
+      const vague = analyzePrompt("add error handling");
+      const better = analyzePrompt(
+        "Add error handling to the /api/users endpoint in src/routes/users.ts. " +
+        "It should return 400 for invalid input and 500 for database errors. " +
+        "Don't modify the existing validation middleware."
+      );
+      assert.ok(better.score > vague.score, `Better (${better.score}) should beat vague (${vague.score})`);
+    });
+  });
+
+  describe("grade thresholds", () => {
+    it("assigns Excellent for score ≥ 85", () => {
+      // Craft a prompt that hits many signals
+      const r = analyzePrompt(
+        "Refactor the authentication middleware in src/middleware/auth.ts to use refresh tokens. " +
+        "Step 1: Add a POST /api/auth/refresh endpoint. Step 2: Store refresh tokens in the sessions table. " +
+        "The endpoint should return JSON with { accessToken, expiresIn }. " +
+        "For example, a valid refresh request returns 200 with a new token. " +
+        "Don't modify the existing login flow. Ensure all existing tests pass. " +
+        "Because we're moving to short-lived access tokens, this reduces the blast radius of token theft."
+      );
+      assert.ok(r.score >= 85, `Expected ≥ 85, got ${r.score}`);
+      assert.equal(r.grade.label, "Excellent");
+    });
+  });
+
+  describe("heuristic detection", () => {
+    it("detects file paths", () => {
+      const r = analyzePrompt("Fix the bug in src/auth/login.ts where the token expires too early");
+      assert.equal(r.heuristics.hasFilePaths, true);
+    });
+
+    it("detects constraints", () => {
+      const r = analyzePrompt("Add validation to the form but don't modify the existing submit handler, only add input checks");
+      assert.equal(r.heuristics.hasConstraints, true);
+    });
+
+    it("detects acceptance criteria", () => {
+      const r = analyzePrompt("Update the API so it should return a 200 with the user object when credentials are valid");
+      assert.equal(r.heuristics.hasCriteria, true);
+    });
+
+    it("detects context/reasoning", () => {
+      const r = analyzePrompt("Add rate limiting to the login endpoint because we're seeing brute force attempts in production logs");
+      assert.equal(r.heuristics.hasContext, true);
+    });
+
+    it("detects examples", () => {
+      const r = analyzePrompt("Parse date strings into Date objects, for example '2024-01-15' should become a valid Date");
+      assert.equal(r.heuristics.hasExamples, true);
+    });
+
+    it("detects output format", () => {
+      const r = analyzePrompt("List all the API endpoints in this project and format the output as a markdown table with columns for method, path, and description");
+      assert.equal(r.heuristics.hasOutputFormat, true);
+    });
+
+    it("detects step structure", () => {
+      const r = analyzePrompt("1. Read the config file\n2. Validate all required fields\n3. Initialize the database connection");
+      assert.equal(r.heuristics.hasSteps, true);
+    });
+  });
+
+  describe("pattern detection", () => {
+    it("detects explicit correction patterns", () => {
+      const r = analyzePrompt("No, that's wrong. Use the REST API not GraphQL for this endpoint");
+      assert.ok(r.patterns.length > 0, "Should detect patterns");
+      assert.ok(r.patterns.some((p) => p.category === "explicit_correction"), "Should detect explicit correction");
+    });
+
+    it("detects frustration patterns", () => {
+      const r = analyzePrompt("It's still broken after all those changes, why does this keep failing");
+      assert.ok(r.patterns.some((p) => p.category === "frustration"), "Should detect frustration");
+    });
+  });
+
+  describe("security", () => {
+    it("does not leak rawText in heuristics", () => {
+      const r = analyzePrompt("This is a test prompt with some content that should not be exposed");
+      assert.equal(r.heuristics.rawText, undefined, "rawText should be stripped");
+    });
+
+    it("handles extremely long input without hanging (ReDoS check)", () => {
+      const start = Date.now();
+      const longInput = "input " + "a ".repeat(5000) + " output";
+      analyzePrompt(longInput);
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < 2000, `Took ${elapsed}ms, expected < 2000ms`);
+    });
+  });
+});
