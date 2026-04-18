@@ -27,7 +27,7 @@
     "seed": "node scripts/seed-mock-db.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "prepack": "cd ui && npm install && npm run build",
-    "postinstall": "cd server && npm install --omit=dev"
+    "postinstall": "cd server && npm install --omit=dev && cd ../ui && npm install && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
