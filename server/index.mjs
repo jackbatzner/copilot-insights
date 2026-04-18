@@ -49,7 +49,7 @@ app.use(express.json({ limit: "50kb" }));
 
 // Serve static UI build in production
 const uiDist = resolve(__dirname, "..", "ui", "dist");
-app.use(express.static(uiDist));
+app.use(express.static(uiDist, { etag: false, lastModified: false, setHeaders(res) { res.set("Cache-Control", "no-store"); } }));
 
 // ΓöÇΓöÇ API Routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
