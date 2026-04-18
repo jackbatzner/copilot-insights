@@ -25,7 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/practice/challenge` endpoint to fetch random low-scoring prompts from user sessions
 - `GET /api/practice/library` endpoint with tag filtering and random pick
 - `GET /api/practice/weaknesses` endpoint for personalized category recommendations
+- **Live Monitor** page — real-time feed of session turns with pattern badges and coaching alerts
+- `GET /api/live/feed?since=<ISO>` endpoint for polling recent annotated turns
 - Screenshot capture script now supports `--gif` flag for animated demo GIF generation
+- `--pages` flag for screenshot capture script to filter which pages to capture
 - `ffmpeg-static` dev dependency for GIF creation from Playwright recordings
 
 ### Changed
