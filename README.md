@@ -6,12 +6,14 @@
 
 <p align="center">
   <strong>Understand how you prompt. Get better at it.</strong><br/>
-  A dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you communicate more effectively with AI agents.
+  A community-built dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you communicate more effectively with AI agents.
 </p>
+
+> **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://www.npmjs.com/package/copilot-insights"><img src="https://img.shields.io/npm/v/copilot-insights" alt="npm version" /></a>
+  <a href="https://github.com/jackbatzner/copilot-insights/releases/latest"><img src="https://img.shields.io/github/v/release/jackbatzner/copilot-insights" alt="GitHub release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
   <img src="https://img.shields.io/node/v/copilot-insights" alt="Node version" />
 </p>
@@ -58,18 +60,12 @@ It also detects **file thrashing** — when the same file is edited 3+ times in 
 
 ### 1. Install
 
-**Option A: npm (recommended)**
+**Option A: Install from GitHub**
 
 ```bash
-npx copilot-insights
-# → http://localhost:3002
-```
-
-Or install globally:
-
-```bash
-npm i -g copilot-insights
+npm i -g jackbatzner/copilot-insights
 copilot-insights
+# → http://localhost:3002
 ```
 
 **Option B: From source**
@@ -83,8 +79,8 @@ npm run setup
 ### 2. Launch the Dashboard
 
 ```bash
+copilot-insights   # if installed from GitHub
 npm start          # if installed from source
-copilot-insights   # if installed globally via npm
 # → http://localhost:3002
 ```
 
@@ -191,6 +187,18 @@ cd server && npm run dev
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
+### Releasing
+
+```bash
+npm run release patch         # 0.1.0 → 0.1.1
+npm run release minor         # 0.1.0 → 0.2.0
+npm run release major         # 0.1.0 → 1.0.0
+npm run release 0.2.0-beta.1  # explicit version
+npm run release patch --dry-run  # preview without changes
+```
+
+This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then creates the release automatically.
+
 ## Architecture
 
 ```mermaid
@@ -233,12 +241,16 @@ copilot-insights/
 │   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching
 │   └── components/        # Charts, badges, timeline, insights
 ├── scripts/               # Mock data seeder + screenshot capture
-└── .github/workflows/     # CI + Release (npm publish)
+└── .github/workflows/     # CI + Release (GitHub Releases)
 ```
 
 ## License
 
 [MIT](LICENSE)
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" and "Copilot" are trademarks of GitHub, Inc. This project uses the name "Copilot Insights" solely to describe its function as a tool that works with GitHub Copilot CLI session data.
 
 ## Troubleshooting
 

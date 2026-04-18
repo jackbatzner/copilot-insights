@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // CLI entry point — starts the Copilot Insights dashboard server.
-// Usage: npx copilot-insights [--port 3002]
+// Usage: copilot-insights [--port 3002]
 
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
