@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://www.npmjs.com/package/copilot-insights"><img src="https://img.shields.io/npm/v/copilot-insights" alt="npm version" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/jackbatzner/copilot-insights" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
   <img src="https://img.shields.io/node/v/copilot-insights" alt="Node version" />
 </p>
 
