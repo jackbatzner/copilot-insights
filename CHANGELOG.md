@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-04-18
 
 ### Added
 
@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OSS cleanup** — removed dead exports (`searchTurns`, `PATTERNS`, `scoreClarity`), consolidated port default into `src/defaults.mjs`, added structured logger (`src/log.mjs`), standardized route error handling, added input validation for `repo` and `timeframe` query parameters, added CLI port validation, added React `ErrorBoundary`, added `safeFetch` wrapper for frontend API resilience
 - **Extension linking is now opt-in** — global `npm install` no longer auto-links the Copilot CLI extension; run `copilot-insights link` to opt in
+- **Auto-generated prompt detection** — sessions with auto-generated prompts (e.g., automated agent loops) are cleaned from analysis and hard-filtered from replay
 - SECURITY.md updated to reflect stricter input validation
 - Added `.eslintcache` to `.gitignore`
 - README now notes Copilot CLI-only scope
@@ -56,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bounded `hasExamples` regex (`input.{0,200}?output` instead of greedy `input.*output`)
 - Library tag filter now validates against a whitelist of known tags
 - Timeframe query parameters validated with a strict pattern before processing
+- Normalized all line endings to LF via `.gitattributes`
 
 ### Fixed
 
@@ -65,9 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added accessible labels (`<label>`, ARIA attributes) to all Practice Lab and Live Monitor form controls
 - SVG score gauge now has `role="img"` and `aria-label` for screen readers
 - Validate `since` query parameter on `/api/live/feed` — returns 400 for invalid dates
+- Create/Edit ratio and File Type Diversity charts rendering correctly
+- Mobile responsive overlap of tables and graphs on tablet/mobile
 
 ### Improved
 
+- **Test suite** — 270 tests across 34 suites covering all modules (patterns, tiers, clarity, formatter, analyzer, replay, server, analytics, trends, delegation, judgment, work-style, and more)
 - Added `aria-label` to Live Monitor pause/resume button
 - Added `<label>` with `htmlFor` to Sessions page repository filter input
 - Added `.sr-only` CSS utility class for visually hidden, screen-reader accessible elements
@@ -75,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README file tree updated to list all `src/` modules
 - README pages section updated to include all pages
 - README badges cleaned up (removed CI and Node version badges)
+- Full demo GIF and refreshed screenshots with mock data
 
 ## [0.1.0-alpha.1] - 2026-04-18
 
