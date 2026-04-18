@@ -1,14 +1,35 @@
 #!/usr/bin/env node
 
 // CLI entry point — starts the Copilot Insights dashboard server.
-// Usage: copilot-insights [--port 3002]
+// Usage: copilot-insights [link | unlink | --port 3002]
 
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SERVER_DIR = resolve(__dirname, "..", "server");
+const ROOT = resolve(__dirname, "..");
+const SERVER_DIR = resolve(ROOT, "server");
+
+// --- Subcommands: link / unlink ---
+
+const subcommand = process.argv[2];
+
+if (subcommand === "link") {
+  const { linkExtension } = await import("../src/link.mjs");
+  const { message } = linkExtension(ROOT);
+  console.log(`🔗 ${message}`);
+  process.exit(0);
+}
+
+if (subcommand === "unlink") {
+  const { unlinkExtension } = await import("../src/link.mjs");
+  const { message } = unlinkExtension();
+  console.log(`🔗 ${message}`);
+  process.exit(0);
+}
+
+// --- Default: start the dashboard server ---
 
 const portArg = process.argv.indexOf("--port");
 const port = portArg !== -1 ? process.argv[portArg + 1] : process.env.PORT || "3002";
