@@ -128,7 +128,7 @@ The web dashboard gives you a full view of your prompting habits:
 <details>
 <summary>📸 More screenshots</summary>
 
-**Sessions list** — sortable, filterable by repo
+**Sessions list** — sortable, filterable by repo, hide noisy sessions from analysis
 
 <img src="docs/screenshots/sessions.png" alt="Sessions list" width="800" />
 
@@ -162,8 +162,8 @@ The web dashboard gives you a full view of your prompting habits:
 
 - **Overview** — Stats cards, trend chart, category donut, pillar trends, work-style analysis
 - **Learn & Grow** — Personalized dev plan, daily check-in, retros, resources
-- **Sessions** — Sortable table of all sessions with redirections, filterable by repo
-- **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened
+- **Sessions** — Sortable table of all sessions with redirections, filterable by repo; hide noisy sessions from analysis
+- **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened; hide/unhide from detail view
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples

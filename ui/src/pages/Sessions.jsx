@@ -34,16 +34,17 @@ export default function Sessions() {
 
   const toggleHide = useCallback(async (id, e) => {
     e.stopPropagation();
-    const isHidden = hiddenIds.has(id);
     try {
-      if (isHidden) {
+      if (hiddenIds.has(id)) {
         await unhideSession(id);
         setHiddenIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       } else {
         await hideSession(id);
         setHiddenIds((prev) => new Set(prev).add(id));
       }
-    } catch { /* ignore — toggle is best-effort */ }
+    } catch (err) {
+      console.warn("Failed to toggle session visibility:", err.message);
+    }
   }, [hiddenIds]);
 
   const handleSort = (field) => {

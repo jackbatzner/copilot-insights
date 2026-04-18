@@ -66,21 +66,40 @@ function parseSince(timeframe) {
 // ── Session Hiding (in-memory) ──────────────────────────────────
 
 const hiddenSessions = new Set();
+const MAX_HIDDEN = 5000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * GET /api/hidden-sessions
+ * Return list of session IDs currently hidden from analysis.
+ * Hidden sessions are stored in-memory only — cleared on server restart.
+ */
 app.get("/api/hidden-sessions", (_req, res) => {
   res.json({ sessionIds: [...hiddenSessions] });
 });
 
+/**
+ * POST /api/sessions/:id/hide
+ * Add a session ID to the hidden set (in-memory only).
+ * Returns 400 if ID is not a valid UUID v4, 429 if cap reached.
+ */
 app.post("/api/sessions/:id/hide", (req, res) => {
   const { id } = req.params;
   if (!UUID_RE.test(id)) {
     return res.status(400).json({ error: "Invalid session ID format" });
   }
+  if (hiddenSessions.size >= MAX_HIDDEN && !hiddenSessions.has(id)) {
+    return res.status(429).json({ error: "Hidden sessions limit reached" });
+  }
   hiddenSessions.add(id);
   res.json({ ok: true });
 });
 
+/**
+ * DELETE /api/sessions/:id/hide
+ * Remove a session ID from the hidden set.
+ * Returns 400 if ID is not a valid UUID v4.
+ */
 app.delete("/api/sessions/:id/hide", (req, res) => {
   const { id } = req.params;
   if (!UUID_RE.test(id)) {
@@ -241,7 +260,7 @@ app.get("/api/suggestions", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const data = generateSuggestions({ repo, since });
+    const data = generateSuggestions({ repo, since, excludeIds: hiddenSessions });
     res.json({ suggestions: data });
   } catch (err) {
     console.error(err);
@@ -291,7 +310,7 @@ app.get("/api/clarity", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const sessions = listSessions({ repo, since });
+    const sessions = listSessions({ repo, since, excludeIds: hiddenSessions });
     const result = analyzeFirstTurnClarity(
       sessions.filter((s) => s.turn_count >= 2),
       getSessionTurns
@@ -311,7 +330,7 @@ app.get("/api/efficiency", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    const sessions = listSessions({ repo, since });
+    const sessions = listSessions({ repo, since, excludeIds: hiddenSessions });
     const sessionsData = sessions
       .filter((s) => s.turn_count >= 2)
       .map((s) => ({
@@ -381,7 +400,7 @@ app.get("/api/analytics/hot-files", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(hotFiles({ repo, since }));
+    res.json(hotFiles({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -411,7 +430,7 @@ app.get("/api/analytics/tools", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(toolUsage({ repo, since }));
+    res.json(toolUsage({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -588,7 +607,7 @@ app.get("/api/analytics/create-edit-ratio", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(computeCreateEditRatio({ repo, since }));
+    res.json(computeCreateEditRatio({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -603,7 +622,7 @@ app.get("/api/analytics/file-types", (req, res) => {
   try {
     const repo = req.query.repo || undefined;
     const since = parseSince(req.query.timeframe);
-    res.json(computeFileTypeDiversity({ repo, since }));
+    res.json(computeFileTypeDiversity({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

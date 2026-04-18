@@ -35,7 +35,9 @@ export default function SessionDetail() {
     try {
       if (isHidden) { await unhideSession(id); setIsHidden(false); }
       else { await hideSession(id); setIsHidden(true); }
-    } catch { /* best-effort */ }
+    } catch (err) {
+      console.warn("Failed to toggle session visibility:", err.message);
+    }
   }, [id, isHidden]);
 
   if (loading) return <div className="loading">Loading session…</div>;

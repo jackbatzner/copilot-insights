@@ -69,7 +69,7 @@ export function computeSessionComplexity(sessionId) {
  * @param {string} [opts.repo]  - Filter by repository (partial match)
  * @param {string} [opts.since] - ISO date string lower bound
  */
-export function computeCreateEditRatio({ repo, since } = {}) {
+export function computeCreateEditRatio({ repo, since, excludeIds } = {}) {
   const db = getDb();
 
   const conditions = [];
@@ -81,6 +81,11 @@ export function computeCreateEditRatio({ repo, since } = {}) {
   if (since) {
     conditions.push("s.created_at >= ?");
     params.push(since);
+  }
+  if (excludeIds && excludeIds.size > 0) {
+    const placeholders = [...excludeIds].map(() => "?").join(", ");
+    conditions.push(`s.id NOT IN (${placeholders})`);
+    params.push(...excludeIds);
   }
   const where =
     conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
@@ -141,7 +146,7 @@ export function computeCreateEditRatio({ repo, since } = {}) {
  * @param {string} [opts.repo]  - Filter by repository (partial match)
  * @param {string} [opts.since] - ISO date string lower bound
  */
-export function computeFileTypeDiversity({ repo, since } = {}) {
+export function computeFileTypeDiversity({ repo, since, excludeIds } = {}) {
   const db = getDb();
 
   const conditions = [];
@@ -153,6 +158,11 @@ export function computeFileTypeDiversity({ repo, since } = {}) {
   if (since) {
     conditions.push("s.created_at >= ?");
     params.push(since);
+  }
+  if (excludeIds && excludeIds.size > 0) {
+    const placeholders = [...excludeIds].map(() => "?").join(", ");
+    conditions.push(`s.id NOT IN (${placeholders})`);
+    params.push(...excludeIds);
   }
   const where =
     conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";

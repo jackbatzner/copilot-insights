@@ -121,7 +121,7 @@ export function repoHealth({ since, excludeIds } = {}) {
 /**
  * Hot files — files touched across multiple sessions.
  */
-export function hotFiles({ repo, since } = {}) {
+export function hotFiles({ repo, since, excludeIds } = {}) {
   const db = getDb();
   const conditions = [];
   const params = [];
@@ -133,6 +133,11 @@ export function hotFiles({ repo, since } = {}) {
   if (since) {
     conditions.push("s.created_at >= ?");
     params.push(since);
+  }
+  if (excludeIds && excludeIds.size > 0) {
+    const placeholders = [...excludeIds].map(() => "?").join(", ");
+    conditions.push(`s.id NOT IN (${placeholders})`);
+    params.push(...excludeIds);
   }
 
   const where = conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
@@ -192,7 +197,7 @@ export function sessionDepth({ repo, since, excludeIds } = {}) {
 /**
  * Tool usage — create vs edit breakdown.
  */
-export function toolUsage({ repo, since } = {}) {
+export function toolUsage({ repo, since, excludeIds } = {}) {
   const db = getDb();
   const conditions = [];
   const params = [];
@@ -204,6 +209,11 @@ export function toolUsage({ repo, since } = {}) {
   if (since) {
     conditions.push("s.created_at >= ?");
     params.push(since);
+  }
+  if (excludeIds && excludeIds.size > 0) {
+    const placeholders = [...excludeIds].map(() => "?").join(", ");
+    conditions.push(`s.id NOT IN (${placeholders})`);
+    params.push(...excludeIds);
   }
 
   const where = conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
