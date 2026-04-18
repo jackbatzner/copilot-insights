@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/practice.mjs` shared prompt analysis module — pure `analyzePrompt()` function with quality heuristics and 0-100 scoring
 - Proactive coaching triggered by correction patterns, frustration signals, and direction changes
 - Example coaching output in README for all 3 modes
+- **Practice Lab** dashboard page with two modes:
+  - Sandbox mode for instant prompt analysis (score 0-100, pattern detection, rewrite suggestions)
+  - Rewrite Challenge mode that pulls real poorly-scored prompts for gamified improvement practice
+- `POST /api/practice/analyze` endpoint for instant prompt scoring
+- `GET /api/practice/challenge` endpoint to fetch random low-scoring prompts
+- Screenshot capture script now supports `--gif` flag for animated demo GIF generation
 
 ### Fixed
 

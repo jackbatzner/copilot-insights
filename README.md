@@ -34,6 +34,7 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 💡 **Get coaching** — Personalized dev plans, daily check-ins, and retros
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
+- 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges from your real sessions
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 
@@ -136,6 +137,10 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/learn.png" alt="Learn and grow" width="800" />
 
+**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges
+
+<img src="docs/screenshots/practice.png" alt="Practice Lab" width="800" />
+
 **Session Detail** — turn-by-turn replay with annotations
 
 <img src="docs/screenshots/session-detail.png" alt="Session detail" width="800" />
@@ -151,8 +156,21 @@ The web dashboard gives you a full view of your prompting habits:
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Instructions** — Custom instruction effectiveness analysis
+- **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, rewrite tips) + rewrite challenges using real poorly-scored prompts from your sessions
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
+
+### Practice Lab
+
+The Practice Lab is an interactive sandbox for improving your prompting skills:
+
+<p align="center">
+  <img src="docs/screenshots/practice-demo.gif" alt="Practice Lab demo" width="800" />
+</p>
+
+**🧪 Sandbox Mode** — Type any prompt and get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions.
+
+**🏆 Rewrite Challenge** — The lab pulls real low-scoring prompts from your past sessions and challenges you to rewrite them. See your score improve in a side-by-side comparison with the original.
 
 ## CLI Tools
 
@@ -300,6 +318,7 @@ graph LR
 
     subgraph "Delivery"
         Analyzer --> API[Express API :3002]
+        Practice --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
         Practice --> CLI
@@ -334,9 +353,9 @@ copilot-insights/
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Instructions
+│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Instructions, Practice
 │   └── components/        # Charts, badges, timeline, insights
-├── scripts/               # Mock data seeder + screenshot capture
+├── scripts/               # Mock data seeder + screenshot/GIF capture
 └── .github/workflows/     # CI + Release (GitHub Releases)
 ```
 
