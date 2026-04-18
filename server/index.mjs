@@ -596,6 +596,9 @@ app.post("/api/practice/analyze", (req, res) => {
     if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "Missing 'text' in request body" });
     }
+    if (text.length > 10000) {
+      return res.status(400).json({ error: "Text too long (max 10,000 characters)" });
+    }
     const result = analyzePrompt(text);
     res.json(result);
   } catch (err) {

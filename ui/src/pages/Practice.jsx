@@ -314,7 +314,7 @@ function ChallengeMode() {
             <ScoreGauge score={challenge.score} grade={challenge.grade} />
           </div>
           <div className="practice-comparison-arrow">
-            {improved ? "→" : "→"}
+            →
           </div>
           <div className="practice-comparison-side">
             <h3>Your Rewrite</h3>
