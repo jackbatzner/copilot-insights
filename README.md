@@ -272,6 +272,5 @@ This project is not affiliated with, endorsed by, or sponsored by GitHub or Micr
 
 - **Gamification** — Scoring, XP, levels, achievements, and goals to encourage improvement
 - **Live monitoring** — Flag corrections as they happen in real-time
-- **Team leaderboards** — Anonymous comparison across teams
 - **Custom instruction generation** — Auto-generate `.github/copilot-instructions.md` from common patterns
 - **OpenTelemetry tracing** — Opt-in distributed tracing via `@github/copilot-sdk` for debugging
