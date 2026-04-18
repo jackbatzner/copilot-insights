@@ -25,5 +25,6 @@ npm-debug.log*
 
 # Mock data
 mock-session-store.db
+*.db-journal
 
 .vid-test/
