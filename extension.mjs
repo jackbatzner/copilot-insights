@@ -32,11 +32,11 @@ import { getTier } from "./src/tiers.mjs";
 import { analyzePrompt } from "./src/practice.mjs";
 import { listSessions, getSessionTurns } from "./src/db.mjs";
 import { REDIRECTION_CATEGORIES } from "./src/patterns.mjs";
+import { DEFAULT_PORT } from "./src/defaults.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = resolve(__dirname, "server");
 
-const PORT = 3002;
 let serverProcess = null;
 let dashboardRunning = false;
 
@@ -65,7 +65,7 @@ api.registerTool({
       content: { type: "string" },
     },
   },
-  run: async ({ port = PORT }) => {
+  run: async ({ port = DEFAULT_PORT }) => {
     const p = Number(port);
     if (!Number.isInteger(p) || p < 1024 || p > 65535) {
       return { content: "❌ Invalid port. Must be an integer between 1024 and 65535." };

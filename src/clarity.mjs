@@ -25,7 +25,7 @@ const CLARITY_SIGNALS = {
  * Analyze the clarity of a single message.
  * Returns a score (0-100) and breakdown of signals found.
  */
-export function scoreClarity(message) {
+function scoreClarity(message) {
   if (!message || typeof message !== "string") {
     return { score: 0, signals: [], tips: ["Start with a clear, detailed prompt."] };
   }

@@ -104,7 +104,7 @@ export function getSessionFiles(sessionId) {
 /**
  * Search turns across sessions for a text pattern.
  */
-export function searchTurns(searchText, limit = 50) {
+function searchTurns(searchText, limit = 50) {
   const db = getDb();
   return db
     .prepare(

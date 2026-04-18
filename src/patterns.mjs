@@ -47,7 +47,7 @@ export const REDIRECTION_CATEGORIES = {
  * Patterns are tested against the user message (case-insensitive).
  * We use word boundaries (\b) to avoid false positives inside longer words.
  */
-export const PATTERNS = [
+const PATTERNS = [
   // ── Explicit corrections ──────────────────────────────────────
   {
     pattern: /\bno[,.]?\s+(don'?t|do not|stop|that'?s not|that is not|wrong)/i,

@@ -6,6 +6,7 @@
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_PORT } from "../src/defaults.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -32,7 +33,13 @@ if (subcommand === "unlink") {
 // --- Default: start the dashboard server ---
 
 const portArg = process.argv.indexOf("--port");
-const port = portArg !== -1 ? process.argv[portArg + 1] : process.env.PORT || "3002";
+const port = portArg !== -1 ? process.argv[portArg + 1] : process.env.PORT || String(DEFAULT_PORT);
+
+const portNum = Number(port);
+if (!Number.isInteger(portNum) || portNum < 1024 || portNum > 65535) {
+  console.error("❌ Invalid port. Must be an integer between 1024 and 65535.");
+  process.exit(1);
+}
 
 console.log(`\n💡 Copilot Insights — starting dashboard on http://localhost:${port}\n`);
 

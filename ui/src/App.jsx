@@ -1,5 +1,6 @@
 import { useState, createContext, useContext, useCallback } from "react";
 import { Routes, Route, NavLink } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import Overview from "./pages/Overview.jsx";
 import Sessions from "./pages/Sessions.jsx";
 import SessionDetail from "./pages/SessionDetail.jsx";
@@ -68,6 +69,7 @@ function App() {
           </div>
         </nav>
         <main className="main-content">
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/coaching" element={<Coaching />} />
@@ -79,6 +81,7 @@ function App() {
             <Route path="/sessions/:id" element={<SessionDetail />} />
             <Route path="/practice" element={<Practice />} />
           </Routes>
+          </ErrorBoundary>
         </main>
       </div>
     </RefreshContext.Provider>
