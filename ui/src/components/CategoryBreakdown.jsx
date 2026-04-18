@@ -48,7 +48,7 @@ export function CategoryBreakdown({ categoryTotals }) {
   );
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "12px 0" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "12px 0", flexWrap: "wrap" }}>
       <PieChart width={200} height={200}>
         <Pie
           data={data}
@@ -76,7 +76,7 @@ export function CategoryBreakdown({ categoryTotals }) {
           formatter={(value, name) => [`${value} (${total > 0 ? ((value / total) * 100).toFixed(0) : 0}%)`, name]}
         />
       </PieChart>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 160 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {data.map((d) => {
           const pct = total > 0 ? ((d.value / total) * 100).toFixed(0) : 0;
           return (

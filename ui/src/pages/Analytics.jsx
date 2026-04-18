@@ -308,7 +308,7 @@ function ToolChart({ data }) {
   if (!data || data.length === 0) return <p className="card-subtitle">No file operations recorded.</p>;
   const total = data.reduce((s, d) => s + d.cnt, 0);
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, padding: "12px 0" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, padding: "12px 0", flexWrap: "wrap" }}>
       <PieChart width={160} height={160}>
         <Pie data={data.map(d => ({ name: d.tool_name, value: d.cnt }))}
           cx={80} cy={80} innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
@@ -389,7 +389,7 @@ function CreateEditChart({ data }) {
   const editPct = total > 0 ? (edits / total) * 100 : 0;
   return (
     <div style={{ padding: "8px 0" }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 24, marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 24, marginBottom: 16, flexWrap: "wrap" }}>
         <PieChart width={140} height={140}>
           <Pie data={[{ name: "Create", value: creates }, { name: "Edit", value: edits }]}
             cx={70} cy={70} innerRadius={35} outerRadius={60} paddingAngle={3} dataKey="value">

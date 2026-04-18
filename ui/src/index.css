@@ -162,6 +162,7 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
+  overflow: hidden;
 }
 
 .card-header {
@@ -225,7 +226,7 @@ a:hover {
   margin-bottom: 24px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .charts-grid {
     grid-template-columns: 1fr;
   }
@@ -233,10 +234,20 @@ a:hover {
 
 /* ── Session table ──────────────────────────────────────────── */
 
+.data-table,
 .session-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table thead, .data-table tbody,
+.session-table thead, .session-table tbody {
+  display: table;
+  width: 100%;
 }
 
 .session-table th {
@@ -696,11 +707,13 @@ a:hover {
 
 .card-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
 .card-row .card {
   flex: 1;
+  min-width: 0;
 }
 
 .coaching-tip {
@@ -1609,6 +1622,12 @@ a:hover {
 
 /*  Responsive Design ─ */
 
+/* Mid-width: stats grids to 2 columns before tablet collapse */
+@media (max-width: 1200px) {
+  .stats-grid-4,
+  .stats-grid-overview { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
 /* Tablet: collapse sidebar to icons, stack grids */
 @media (max-width: 1024px) {
   :root { --sidebar-width: 60px; }
@@ -1638,11 +1657,6 @@ a:hover {
 
   /* Delegation chart stacks */
   .delegation-chart-row { flex-direction: column; align-items: flex-start; }
-
-  /* Tables get horizontal scroll wrapper */
-  .data-table, .session-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .data-table thead, .data-table tbody,
-  .session-table thead, .session-table tbody { display: table; width: 100%; }
 }
 
 /* Mobile: sidebar becomes bottom tab bar */
@@ -1762,6 +1776,10 @@ a:hover {
 
   /* ── Work-style legend wraps ── */
   .style-legend { flex-wrap: wrap; gap: 6px; }
+
+  /* ── Bar chart labels ── */
+  .failure-type-label { min-width: 120px; }
+  .score-bucket-label { min-width: 100px; }
 }
 
 /* Small mobile */
@@ -1793,4 +1811,8 @@ a:hover {
 
   /* Heatmap grid adapts */
   .heatmap-grid { grid-template-columns: repeat(6, 1fr); }
+
+  /* Bar chart labels even smaller */
+  .failure-type-label { min-width: 80px; }
+  .score-bucket-label { min-width: 80px; }
 }
