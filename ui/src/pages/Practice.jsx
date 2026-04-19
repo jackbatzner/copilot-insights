@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
+import { PageBanner } from "../components/PageBanner.jsx";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -12,6 +13,9 @@ export default function Practice() {
       <div className="page-header">
         <h1>🧪 Practice Lab</h1>
       </div>
+      <PageBanner pageId="practice">
+        Practice prompting in a sandbox with instant feedback, or try rewriting real prompts from your sessions to improve your score.
+      </PageBanner>
       <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
       </p>
@@ -435,8 +439,20 @@ function ChallengeMode() {
         <div className="practice-challenge-original">
           <q style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{challenge.originalPrompt}</q>
         </div>
-        {challenge.hint && (
-          <div className="practice-challenge-hint">💡 {challenge.hint}</div>
+        {challenge && (challenge.tags || challenge.hint || challenge.category) && (
+          <div style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 4, fontSize: 13 }}>
+              🔍 What's wrong with this prompt?
+            </div>
+            {challenge.tags && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                {(Array.isArray(challenge.tags) ? challenge.tags : [challenge.tags]).map((tag, i) => (
+                  <span key={i} style={{ background: "rgba(248, 81, 73, 0.15)", color: "#f85149", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500 }}>{tag}</span>
+                ))}
+              </div>
+            )}
+            {challenge.hint && <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>💡 <em>{challenge.hint}</em></p>}
+          </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div className="practice-score-pill" style={{ background: SCORE_COLORS[challenge.grade?.color] + "22", color: SCORE_COLORS[challenge.grade?.color] }}>

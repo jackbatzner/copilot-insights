@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { MetricHelp } from "../components/MetricHelp.jsx";
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
@@ -38,6 +42,9 @@ export default function Coaching() {
         <h1>🎓 Agent Coaching</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="coaching">
+        Detailed analysis of your three core skills — how you delegate work, review agent output, and communicate requirements.
+      </PageBanner>
 
       {/* Three pillars hero */}
       <div className="stats-grid stats-grid-3">
@@ -45,16 +52,25 @@ export default function Coaching() {
           <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
           <div className="stat-label">🤝 Delegation</div>
           <div className="stat-sub">work handed off to agent</div>
+          <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {delegation?.overallDelegationRatio >= 60 ? "✅ Good delegation" : delegation?.overallDelegationRatio >= 30 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60%+
+          </div>
         </div>
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
           <div className="stat-label">🧠 Judgment</div>
           <div className="stat-sub">review quality / 100</div>
+          <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {judgment?.avgScore >= 80 ? "✅ Excellent" : judgment?.avgScore >= 70 ? "✅ Good" : judgment?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          </div>
         </div>
         <div className={`stat-card pillar-card ${tab === "feedback" ? "pillar-active" : ""}`} onClick={() => setTab("feedback")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
           <div className="stat-label">💬 Feedback</div>
           <div className="stat-sub">clarity score / 100</div>
+          <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {clarity?.avgScore >= 80 ? "✅ Excellent" : clarity?.avgScore >= 70 ? "✅ Good" : clarity?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          </div>
         </div>
       </div>
 
@@ -70,6 +86,12 @@ export default function Coaching() {
       {tab === "delegation" && <DelegationTab data={delegation} />}
       {tab === "judgment" && <JudgmentTab data={judgment} />}
       {tab === "feedback" && <FeedbackTab clarity={clarity} efficiency={efficiency} />}
+      <SuggestedNext
+        to="/learn"
+        icon="📚"
+        label="Learn & Grow"
+        description="Your personalized improvement plan with goals, retros, and learning resources"
+      />
     </div>
   );
 }
@@ -98,10 +120,10 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
       <div className="card">
         <div className="card-header">🎯 Key Metrics</div>
         <div className="stats-grid stats-grid-4">
-          <MiniStat label="Agent Leverage" value={`${delegation?.overallLeverage ?? 0}x`} sub="output/input ratio" />
+          <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters. Higher means the agent is doing more of the work." target="2x+ is good, 3x+ is excellent." action="Delegate higher-level tasks instead of giving step-by-step instructions." />} value={`${delegation?.overallLeverage ?? 0}x`} sub="output/input ratio" />
           <MiniStat label="File Operations" value={delegation?.totalFileOps ?? 0} sub="agent-created files" />
-          <MiniStat label="Rubber-Stamp Rate" value={`${judgment?.rubberStampRate ?? 0}%`} sub="approvals before fix" />
-          <MiniStat label="Turn Efficiency" value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
+          <MiniStat label={<MetricHelp label="Rubber-Stamp Rate" definition="How often you approved agent work and then had to correct it — approving without properly reviewing." target="0% is ideal. Over 30% is heavily penalized." action="Read agent output carefully before approving. Check that it actually does what you asked." />} value={`${judgment?.rubberStampRate ?? 0}%`} sub="approvals before fix" />
+          <MiniStat label={<MetricHelp label="Turn Efficiency" definition="Percentage of your turns that are productive (not corrections or redirections)." target="90%+ excellent, 75%+ good, below 60% needs work." action="Provide clearer upfront context to reduce back-and-forth corrections." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
         </div>
       </div>
 
@@ -128,8 +150,8 @@ function DelegationTab({ data }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Delegation Ratio" value={`${data.overallDelegationRatio}%`} sub="autonomous turns" />
-        <MiniStat label="Agent Leverage" value={`${data.overallLeverage}x`} sub="output per input char" />
+        <MiniStat label={<MetricHelp label="Delegation Ratio" definition="Percentage of your turns that hand off work to the agent (delegations + approvals) vs. micro-managing step-by-step." target="Over 60% means good delegation. Under 30% means you're micro-managing." action="Try single-prompt kickoffs — describe the goal, not the steps." />} value={`${data.overallDelegationRatio}%`} sub="autonomous turns" />
+        <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters." target="2x+ good, 3x+ excellent — agent writing much more than you type." action="Delegate bigger tasks to increase the agent's output per your input." />} value={`${data.overallLeverage}x`} sub="output per input char" />
         <MiniStat label="File Operations" value={data.totalFileOps} sub="agent-touched files" />
         <MiniStat label="Your Input" value={`${data.userInputKB}KB`} sub={`→ ${data.agentOutputKB}KB output`} />
       </div>
@@ -191,7 +213,7 @@ function DelegationTab({ data }) {
                 <tr key={i}>
                   <td><span className="clarity-badge" style={{ background: "#3fb950" }}>{s.productivity}</span> files/turn</td>
                   <td style={{ fontSize: 12 }}>{s.filesCreated + s.filesEdited} files · {s.turnCount} turns</td>
-                  <td className="truncate" style={{ maxWidth: 250 }}>{s.summary || s.repo}</td>
+                  <td className="truncate" style={{ maxWidth: 250 }}><Link to={`/sessions/${s.sessionId || s.id}`}>{s.summary || s.repo || "View session"}</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -215,10 +237,10 @@ function JudgmentTab({ data }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Judgment Score" value={data.avgScore} sub="/100 average" />
+        <MiniStat label={<MetricHelp label="Judgment Score" definition="How well you evaluate agent output. Based on catching issues early, avoiding rubber-stamps, and not needing costly late-stage rollbacks. Baseline starts at 70." target="70+ is good, 80+ is excellent." action="Review each agent change before approving. Catch issues early — late catches cost 10 points each." />} value={data.avgScore} sub="/100 average" />
         <MiniStat label="Issues Caught" value={data.totalCatches} sub="problems spotted" />
-        <MiniStat label="Late Catches" value={data.totalLateCatches} sub="costly rollbacks" />
-        <MiniStat label="Rubber-Stamp" value={`${data.rubberStampRate}%`} sub="approve → correct" />
+        <MiniStat label={<MetricHelp label="Late Catches" definition="Issues you caught many turns after they were introduced — costly rollbacks that waste work." target="0 is ideal. Each late catch costs -10 points on your judgment score." action="Review agent output at each step, not just at the end." />} value={data.totalLateCatches} sub="costly rollbacks" />
+        <MiniStat label={<MetricHelp label="Rubber-Stamp Rate" definition="How often you approved work then immediately corrected it — a sign of not reviewing carefully." target="0% ideal. Over 30% gets a -15 point penalty." action="Actually check agent output matches your request before saying 'looks good'." />} value={`${data.rubberStampRate}%`} sub="approve → correct" />
       </div>
 
       {/* Score distribution */}
@@ -279,7 +301,7 @@ function JudgmentTab({ data }) {
                 <tr key={i}>
                   <td><span className="clarity-badge" style={{ background: s.score < 40 ? "#f85149" : "#d29922" }}>{s.score}</span></td>
                   <td style={{ fontSize: 12 }}>{s.catches} catches · {s.lateCatches} late</td>
-                  <td className="truncate" style={{ maxWidth: 300 }}>{s.summary || s.repo}</td>
+                  <td className="truncate" style={{ maxWidth: 300 }}><Link to={`/sessions/${s.sessionId || s.id}`}>{s.summary || s.repo || "View session"}</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -301,10 +323,10 @@ function FeedbackTab({ clarity, efficiency }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Clarity Score" value={clarity?.avgScore ?? "—"} sub="/100 avg first-turn" />
-        <MiniStat label="Turn Efficiency" value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
-        <MiniStat label="Recovery Speed" value={efficiency?.aggregate?.avgRecoveryTurns ?? "—"} sub="turns after redirect" />
-        <MiniStat label="Context Drips" value={efficiency?.aggregate?.totalDripFeeds ?? 0} sub="piecemeal info adds" />
+        <MiniStat label={<MetricHelp label="Clarity Score" definition="Quality of your first message in each session. Checks for file paths, constraints, acceptance criteria, context, and examples." target="70+ is clear communication. Under 50 needs work." action="Include specific files, constraints, and what success looks like in your opening prompt." />} value={clarity?.avgScore ?? "—"} sub="/100 avg first-turn" />
+        <MiniStat label={<MetricHelp label="Turn Efficiency" definition="Percentage of turns that are productive vs. corrections/redirections." target="90%+ excellent, 75%+ good." action="Front-load requirements to avoid back-and-forth." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
+        <MiniStat label={<MetricHelp label="Recovery Speed" definition="Average number of turns to get back on track after a redirection." target="Under 1.5 turns is good — quick recoveries." action="When correcting the agent, be specific about what went wrong and what you want instead." />} value={efficiency?.aggregate?.avgRecoveryTurns ?? "—"} sub="turns after redirect" />
+        <MiniStat label={<MetricHelp label="Context Drips" definition="Times you added context piecemeal after your first message — 'oh and...', 'I forgot to mention...', 'also...'." target="0 is ideal. Each drip-feed costs 5 points on your feedback score." action="Write down everything the agent needs before sending your first message." />} value={efficiency?.aggregate?.totalDripFeeds ?? 0} sub="piecemeal info adds" />
       </div>
 
       {clarity && (
@@ -369,7 +391,7 @@ function FeedbackTab({ clarity, efficiency }) {
               {clarity.sessions.slice(0, 8).map((s) => (
                 <tr key={s.sessionId}>
                   <td><span className="clarity-badge" style={{ background: clarityColor(s.clarity.score) }}>{s.clarity.score}</span></td>
-                  <td className="truncate" title={s.firstMessage}>{s.summary || s.firstMessage?.substring(0, 80) || s.sessionId.slice(0, 8)}</td>
+                  <td className="truncate" title={s.firstMessage}><Link to={`/sessions/${s.sessionId}`}>{s.summary || s.firstMessage?.substring(0, 80) || s.sessionId.slice(0, 8)}</Link></td>
                   <td className="tip-cell">{s.clarity.tips[0] || "—"}</td>
                 </tr>
               ))}

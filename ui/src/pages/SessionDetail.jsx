@@ -47,6 +47,8 @@ export default function SessionDetail() {
   const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
     data;
 
+  const isLearningSession = complexity && complexity.fileOps === 0 && complexity.uniqueFiles === 0;
+
   return (
     <>
       <Link to="/sessions" className="back-link">
@@ -122,6 +124,14 @@ export default function SessionDetail() {
             <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
           </div>
         )}
+        {isLearningSession && (
+          <div className="card" style={{ textAlign: "center", background: "rgba(88, 166, 255, 0.08)", borderColor: "var(--accent)" }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>📚</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>Learning Session</div>
+            <div className="stat-sub">Q&A / exploration — no files changed</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Delegation and file metrics don't apply to this session type.</div>
+          </div>
+        )}
       </div>
 
       {session.summary && (
@@ -142,6 +152,7 @@ export default function SessionDetail() {
         const gradeColors = { A: "#3fb950", B: "#58a6ff", C: "#d29922", D: "#f85149" };
         const grade = replay.summary.overallGrade;
         return (
+          <>
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card">
               <div className="stat-value" style={{ color: gradeColors[grade] || "#e6edf3", fontSize: 36 }}>
@@ -165,6 +176,38 @@ export default function SessionDetail() {
               <div className="stat-sub">{replay.summary.redirectionCount} redirections · {replay.summary.dripFeedCount} drip-feeds · {replay.summary.rubberStampCount} rubber stamps</div>
             </div>
           </div>
+          <div className="card" style={{ marginBottom: 24, borderLeft: `3px solid ${gradeColors[grade] || "#8b949e"}` }}>
+            <div className="card-header">📐 How This Grade Was Calculated</div>
+            {isLearningSession && (
+              <div style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid rgba(88, 166, 255, 0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "var(--accent)" }}>
+                📚 This was a learning/exploration session with no file operations. Delegation and file-based metrics are scored lower because no code work was done — this doesn't reflect poor prompting.
+              </div>
+            )}
+            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0 12px" }}>
+              Your session score is the average of three pillars (delegation + judgment + feedback), each scored 0-100.
+              <strong style={{ color: "var(--text)" }}> A</strong> ≥ 80 · <strong style={{ color: "var(--text)" }}>B</strong> ≥ 65 · <strong style={{ color: "var(--text)" }}>C</strong> ≥ 50 · <strong style={{ color: "var(--text)" }}>D</strong> &lt; 50
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
+              <div>
+                <div style={{ color: "var(--green)", fontWeight: 600, marginBottom: 4 }}>✅ Positive signals</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: "var(--text-muted)" }}>
+                  <li>Good delegations boost your score</li>
+                  <li>Quality catches (spotting issues early): +10 each</li>
+                  <li>Clear first-turn context improves clarity</li>
+                </ul>
+              </div>
+              <div>
+                <div style={{ color: "var(--red)", fontWeight: 600, marginBottom: 4 }}>❌ Negative signals</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: "var(--text-muted)" }}>
+                  <li>Redirections increase your redirection rate</li>
+                  <li>Drip-feeds: -5 points each on feedback</li>
+                  <li>Rubber stamps: -15 if rate exceeds 30%</li>
+                  <li>Late catches: -10 points each on judgment</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          </>
         );
       })()}
 

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { fetchDevPlan, fetchProgressCheck, fetchRetro } from "../api.js";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 export default function Learn() {
   const { key: refreshKey } = useRefresh();
@@ -41,6 +43,9 @@ export default function Learn() {
         <h1>📚 Learn & Grow</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="learn">
+        Your personalized improvement plan — set goals, track progress, and build better prompting habits week by week.
+      </PageBanner>
 
       {/* Pillar score hero */}
       {plan && (
@@ -64,6 +69,12 @@ export default function Learn() {
       {tab === "check" && progress && <DailyCheckTab progress={progress} />}
       {tab === "retro" && retro && <RetroTab retro={retro} />}
       {tab === "learn" && plan && <ResourcesTab plan={plan} />}
+      <SuggestedNext
+        to="/sessions"
+        icon="📋"
+        label="Sessions"
+        description="Browse your individual sessions and click any to see the turn-by-turn detail"
+      />
     </>
   );
 }
@@ -75,6 +86,8 @@ function ScoreCard({ emoji, label, score, highlight }) {
       <div style={{ fontSize: 28 }}>{emoji}</div>
       <div className="stat-value" style={{ color, fontSize: 36 }}>{score}</div>
       <div className="stat-label">{label}</div>
+      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Current Score</div>
+      {score < 80 && <div style={{ fontSize: 10, color: "var(--yellow)" }}>→ Target: 80</div>}
     </div>
   );
 }
@@ -100,27 +113,8 @@ function DevPlanTab({ plan }) {
         </div>
       )}
 
-      {/* Weekly goals */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">🎯 Weekly Goals</div>
-        {plan.weeklyGoals.map((g, i) => (
-          <div key={i} className="goal-item">
-            <div className="goal-header">
-              <span className="goal-emoji">{g.emoji}</span>
-              <div>
-                <strong>{g.goal}</strong>
-                <p className="goal-desc">{g.description}</p>
-              </div>
-            </div>
-            <div className="goal-progress-row">
-              <div className="goal-progress-bar">
-                <div className="goal-progress-fill" style={{ width: `${g.progress}%` }} />
-              </div>
-              <span className="goal-target">{g.target}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Weekly goals with habit stacking */}
+      <WeeklyGoals goals={plan.weeklyGoals} />
 
       {/* High impact opportunities */}
       {plan.opportunities.filter((o) => o.type === "high_impact").length > 0 && (
@@ -320,6 +314,83 @@ function ResourcesTab({ plan }) {
         </div>
       )}
     </>
+  );
+}
+
+/* ── Weekly Goals with Habit Stacking ──────────────────────────── */
+function WeeklyGoals({ goals }) {
+  const storageKey = "insights-focus-goals";
+  const [focused, setFocused] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey)) || []; } catch { return []; }
+  });
+  const [showAll, setShowAll] = useState(false);
+
+  const toggleFocus = (idx) => {
+    setFocused((prev) => {
+      let next;
+      if (prev.includes(idx)) {
+        next = prev.filter((i) => i !== idx);
+      } else if (prev.length < 2) {
+        next = [...prev, idx];
+      } else {
+        return prev;
+      }
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const hasFocused = focused.length > 0;
+  const displayGoals = hasFocused && !showAll
+    ? goals.map((g, i) => ({ ...g, _idx: i })).filter((_, i) => focused.includes(i))
+    : goals.map((g, i) => ({ ...g, _idx: i }));
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>🎯 Weekly Goals</span>
+        {hasFocused && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "3px 8px", cursor: "pointer" }}
+          >
+            {showAll ? "Show focused only" : `Show all ${goals.length}`}
+          </button>
+        )}
+      </div>
+
+      {!hasFocused && (
+        <div style={{ background: "rgba(88, 166, 255, 0.06)", border: "1px solid rgba(88, 166, 255, 0.15)", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "var(--accent)" }}>
+          💡 <strong>Habit stacking tip:</strong> Pick 1-2 goals to focus on this week instead of tackling all {goals.length}. Click the ⭐ to mark your focus goals.
+        </div>
+      )}
+
+      {displayGoals.map((g) => (
+        <div key={g._idx} className="goal-item" style={{ opacity: hasFocused && !focused.includes(g._idx) && showAll ? 0.5 : 1 }}>
+          <div className="goal-header">
+            <button
+              onClick={() => toggleFocus(g._idx)}
+              title={focused.includes(g._idx) ? "Remove focus" : focused.length >= 2 ? "Max 2 focus goals" : "Set as focus goal"}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 0, marginRight: 6, filter: focused.includes(g._idx) ? "none" : "grayscale(1) opacity(0.4)" }}
+            >
+              ⭐
+            </button>
+            <span className="goal-emoji">{g.emoji}</span>
+            <div>
+              <strong>{g.goal}</strong>
+              {focused.includes(g._idx) && <span style={{ fontSize: 10, color: "var(--accent)", marginLeft: 6, fontWeight: 600 }}>FOCUS</span>}
+              <p className="goal-desc">{g.description}</p>
+            </div>
+          </div>
+          <div className="goal-progress-row">
+            <div className="goal-progress-bar">
+              <div className="goal-progress-fill" style={{ width: `${g.progress}%` }} />
+            </div>
+            <span className="goal-target">{g.target}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

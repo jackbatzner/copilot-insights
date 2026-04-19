@@ -4,6 +4,7 @@ import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
 
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
@@ -74,6 +75,9 @@ export default function Sessions() {
         <h1>📋 Sessions</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="sessions">
+        Browse and filter your sessions — click any to see the turn-by-turn detail with annotations showing where redirections happened.
+      </PageBanner>
 
       <div className="filter-bar">
         <label htmlFor="repo-filter" className="sr-only">Filter by repository</label>
@@ -118,13 +122,13 @@ export default function Sessions() {
             <thead>
               <tr>
                 <th>Session</th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", minWidth: 60 }}>
                   Turns{arrow("turnCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", minWidth: 60 }}>
                   Redirections{arrow("redirectionCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", minWidth: 80 }}>
                   Rate{arrow("redirectionRate")}
                 </th>
                 <th>Top Issue</th>
@@ -153,9 +157,9 @@ export default function Sessions() {
                         </div>
                       )}
                     </td>
-                    <td>{s.turnCount}</td>
-                    <td>{s.redirectionCount}</td>
-                    <td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.turnCount}</td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.redirectionCount}</td>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                       <ScoreBadge rate={s.redirectionRate} />
                     </td>
                     <td>

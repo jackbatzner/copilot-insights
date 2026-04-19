@@ -8,6 +8,9 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { rateColor } from "../components/ScoreBadge.jsx";
 import { useRefresh } from "../App.jsx";
 import { TIERS, getTier } from "@shared/tiers.mjs";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { MetricHelp } from "../components/MetricHelp.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
@@ -59,6 +62,9 @@ export default function Overview() {
         <h1>📊 Overview</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="overview">
+        Your snapshot — how your prompting is trending and where you stand across delegation, judgment, and feedback.
+      </PageBanner>
 
       {/* Hero stats */}
       <div className="stats-grid stats-grid-overview">
@@ -100,7 +106,12 @@ export default function Overview() {
           <div className="stat-value">{aggregate.totalRedirections}</div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Avg Redirection Rate</div>
+          <div className="card-header"><MetricHelp
+            label="Avg Redirection Rate"
+            definition="Percentage of your turns that correct or redirect the agent."
+            target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
+            action="Provide more context upfront — include file paths, constraints, and acceptance criteria in your first message."
+          /></div>
           <div className={`stat-value ${rateColor(avgRate)}`}>
             {(avgRate * 100).toFixed(1)}%
           </div>
@@ -219,15 +230,15 @@ export default function Overview() {
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{(workStyle.summary.vibeRate * 100).toFixed(0)}%</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}>Vibe Rate</div>
+                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{(workStyle.summary.structuredRate * 100).toFixed(0)}%</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}>Structured Rate</div>
+                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#d29922" }}>{workStyle.summary.avgFirstFileTurn.toFixed(1)}</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}>Avg First File Turn</div>
+                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Avg First File Turn" definition="Average turn number when the first file is created or edited in your sessions. Lower means you start coding sooner." target="Not a target per se — turn 0-1 is vibe coding, turn 3+ means you planned first. Match to your task complexity." /></div>
                 </div>
               </div>
               {workStyle.coachingTip && (
@@ -281,6 +292,12 @@ export default function Overview() {
         </>
       )}
 
+      <SuggestedNext
+        to="/coaching"
+        icon="🎓"
+        label="Coaching"
+        description="Detailed analysis of your delegation, judgment, and feedback scores"
+      />
     </>
   );
 }

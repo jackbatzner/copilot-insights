@@ -15,6 +15,8 @@ import {
   PieChart, Pie,
 } from "recharts";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { MetricHelp } from "../components/MetricHelp";
 
 const TT_STYLE = {
   background: "#161b22",
@@ -74,6 +76,9 @@ export default function Analytics() {
         <h1>📈 Analytics</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="analytics">
+        Patterns in your prompting style — when you're most productive, how prompt length affects outcomes, and repository health.
+      </PageBanner>
 
       {/* Hero stats */}
       <div className="stats-grid stats-grid-4">
@@ -83,7 +88,7 @@ export default function Analytics() {
           sub="in timeframe"
         />
         <StatCard
-          label="Avg Depth"
+          label={<MetricHelp label="Avg Depth" definition="Average number of conversation turns per session." target="Depends on task complexity. Look at redirection rate rather than raw depth." />}
           value={depth?.avgTurns ? `${depth.avgTurns} turns` : "—"}
           sub="per session"
         />
@@ -115,17 +120,33 @@ export default function Analytics() {
               {workStyle && <WorkStyleChart data={workStyle} />}
             </div>
             <div className="card" style={{ flex: 1 }}>
-              <div className="card-header">📏 Prompt Length vs Redirections</div>
+              <div className="card-header"><MetricHelp label="📏 Prompt Length vs Redirections" definition="Shows how your prompt length correlates with redirection rate. Redirections occur when the agent needs to change direction due to unclear instructions." target="Aim for medium-length prompts (100-500 chars) with redirection rates below 20%." /></div>
               <p className="card-subtitle">Shorter prompts → more redirections?</p>
               {promptLen && <PromptLengthChart data={promptLen} />}
+              <div style={{ background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", marginTop: 12, fontSize: 13 }}>
+                <strong style={{ color: "var(--accent)" }}>📊 Reading this chart:</strong>
+                <ul style={{ margin: "8px 0 0 0", paddingLeft: 20, color: "var(--text-muted)" }}>
+                  <li><strong>Short prompts (&lt;100 chars)</strong> often lack context, leading to more redirections — you'll need follow-up turns to clarify.</li>
+                  <li><strong>Medium prompts (100-500 chars)</strong> are the sweet spot — enough context for the agent to act without ambiguity.</li>
+                  <li><strong>Long prompts (500-1000 chars)</strong> give detailed context — lower redirection is expected.</li>
+                  <li><strong>Very long prompts (1000+ chars)</strong> may include too much information, sometimes causing confusion.</li>
+                </ul>
+                <div style={{ marginTop: 8, color: "var(--text-muted)" }}>💡 <em>The color indicates redirection rate: green = low (&lt;20%), yellow = moderate (20-40%), red = high (&gt;40%).</em></div>
+              </div>
             </div>
           </div>
 
           {/* Session depth */}
           <div className="card">
-            <div className="card-header">📊 Session Depth</div>
+            <div className="card-header"><MetricHelp label="📊 Session Depth" definition="Distribution of how many turns (back-and-forth exchanges) your sessions contain." target="No fixed target — focus on redirection rate within sessions rather than raw turn count." /></div>
             <p className="card-subtitle">Turn count distribution</p>
             {depth && <DepthChart data={depth.buckets} />}
+            <div style={{ background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", marginTop: 12, fontSize: 13 }}>
+              <strong style={{ color: "var(--accent)" }}>📊 Understanding session depth:</strong>
+              <div style={{ marginTop: 8, color: "var(--text-muted)" }}>
+                More turns isn't inherently bad — it depends on what those turns are. A 30-turn session with 0 redirections is a productive deep-dive. A 10-turn session with 5 redirections needs work. Focus on the <strong>redirection rate</strong> (redirections ÷ total turns) rather than raw turn count.
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -162,20 +183,20 @@ export default function Analytics() {
             <thead>
               <tr>
                 <th>Repository</th>
-                <th>Sessions</th>
-                <th>Turns</th>
-                <th>Redirections</th>
-                <th>Rate</th>
+                <th style={{ textAlign: "right", minWidth: 60 }}>Sessions</th>
+                <th style={{ textAlign: "right", minWidth: 60 }}>Turns</th>
+                <th style={{ textAlign: "right", minWidth: 60 }}>Redirections</th>
+                <th style={{ textAlign: "center", minWidth: 80 }}><MetricHelp label="Rate" definition="Percentage of turns that resulted in the agent changing direction. Lower is better." target="Below 20% is excellent. Above 40% suggests prompts need more upfront context." /></th>
               </tr>
             </thead>
             <tbody>
               {repos.map((r) => (
                 <tr key={r.name}>
                   <td className="truncate" style={{ maxWidth: 300 }}>{r.name}</td>
-                  <td>{r.sessions}</td>
-                  <td>{r.totalTurns}</td>
-                  <td>{r.redirectionTurns}</td>
-                  <td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{r.sessions}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{r.totalTurns}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{r.redirectionTurns}</td>
+                  <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                     <span className="clarity-badge" style={{
                       background: r.rate > 20 ? "#f85149" : r.rate > 10 ? "#d29922" : "#3fb950"
                     }}>
