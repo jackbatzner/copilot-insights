@@ -146,9 +146,13 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/learn.png" alt="Learn and grow" width="800" />
 
-**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges
+**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges with coaching panel
 
 <img src="docs/screenshots/practice.png" alt="Practice Lab" width="800" />
+
+**Instructions** — convention gap analysis with copy-paste snippets
+
+<img src="docs/screenshots/instructions.png" alt="Instructions" width="800" />
 
 **Session Detail** — turn-by-turn replay with annotations
 
