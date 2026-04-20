@@ -217,10 +217,10 @@ export default function TokenEfficiency() {
           aria-label="Select time period for token efficiency data"
           style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}
         >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-          <option value="all">All time</option>
+          <option value="7d" style={{ background: "var(--card-bg)", color: "var(--text)" }}>Last 7 days</option>
+          <option value="30d" style={{ background: "var(--card-bg)", color: "var(--text)" }}>Last 30 days</option>
+          <option value="90d" style={{ background: "var(--card-bg)", color: "var(--text)" }}>Last 90 days</option>
+          <option value="all" style={{ background: "var(--card-bg)", color: "var(--text)" }}>All time</option>
         </select>
       </div>
 
@@ -437,8 +437,8 @@ export default function TokenEfficiency() {
                     border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)",
                   }}
                 >
-                  <option value="all">All grades</option>
-                  {grades.map((g) => <option key={g} value={g}>{g}</option>)}
+                  <option value="all" style={{ background: "var(--card-bg)", color: "var(--text)" }}>All grades</option>
+                  {grades.map((g) => <option key={g} value={g} style={{ background: "var(--card-bg)", color: "var(--text)" }}>{g}</option>)}
                 </select>
               </div>
             )}
