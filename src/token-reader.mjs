@@ -75,7 +75,7 @@ function turnFromObject(obj, index) {
     totalTokens,
     model: obj.model ?? null,
     thinkingTokens: obj.thinking_tokens ?? null,
-    toolCalls: obj.tool_calls != null ? Number(obj.tool_calls) : null,
+    toolCalls: obj.tool_calls !== null && obj.tool_calls !== undefined ? Number(obj.tool_calls) : null,
   };
 }
 

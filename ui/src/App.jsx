@@ -10,6 +10,7 @@ import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
+import TokenEfficiency from "./pages/TokenEfficiency.jsx";
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -61,6 +62,9 @@ function App() {
           <NavLink to="/practice">
             <span className="nav-icon">🧪</span><span className="nav-label">Practice</span>
           </NavLink>
+          <NavLink to="/tokens">
+            <span className="nav-icon">⚡</span><span className="nav-label">Tokens</span>
+          </NavLink>
           <div className="refresh-section">
             <button className={`refresh-btn${spinning ? " spinning" : ""}`} onClick={refresh} title="Refresh data" aria-label="Refresh data">
               🔄
@@ -80,6 +84,7 @@ function App() {
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/sessions/:id" element={<SessionDetail />} />
             <Route path="/practice" element={<Practice />} />
+            <Route path="/tokens" element={<TokenEfficiency />} />
           </Routes>
           </ErrorBoundary>
         </main>

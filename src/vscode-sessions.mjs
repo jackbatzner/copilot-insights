@@ -342,7 +342,7 @@ function getSessionIndex() {
 export function listVscodeSessions({ limit = 500, since } = {}) {
   const index = getSessionIndex();
 
-  let sessions = [];
+  const sessions = [];
   for (const raw of index.values()) {
     const norm = normalizeSession(raw);
 

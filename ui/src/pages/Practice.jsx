@@ -204,6 +204,57 @@ function SandboxMode() {
 
           <Nudges result={result} />
 
+          {result.tokenEfficiency && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <div className="card-header">⚡ Token Efficiency</div>
+              <div style={{ padding: "12px 16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)" }}>
+                      ~{result.tokenEfficiency.estimatedInputTokens}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Input Tokens</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: result.tokenEfficiency.estimatedRetryProbability > 0.5 ? "var(--red)" : "var(--green)" }}>
+                      {Math.round(result.tokenEfficiency.estimatedRetryProbability * 100)}%
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Retry Probability</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--orange)" }}>
+                      ~{result.tokenEfficiency.estimatedTotalTokens}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Est. Total Cost</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>
+                      ~{result.tokenEfficiency.optimizedEstimate}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Optimized Cost</div>
+                  </div>
+                </div>
+                {result.tokenEfficiency.savingsPercent > 0 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 12px", borderRadius: 6,
+                    background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.2)",
+                    fontSize: 13,
+                  }}>
+                    <span>💰</span>
+                    <span>
+                      With improvements, this prompt could save <strong>{result.tokenEfficiency.savingsPercent}%</strong> of tokens
+                      ({result.tokenEfficiency.estimatedTotalTokens - result.tokenEfficiency.optimizedEstimate} tokens)
+                    </span>
+                  </div>
+                )}
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+                  Grade: <strong>{result.tokenEfficiency.grade}</strong> · High retry probability means prompts that need follow-ups cost 3-5× more.
+                </div>
+              </div>
+            </div>
+          )}
+
           {result.patterns.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
               <div className="card-header">⚠️ Detected Patterns</div>
