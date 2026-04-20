@@ -5,6 +5,8 @@ import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { InsightCard } from "../components/InsightCard.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
+import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
+import { SinceLastVisit } from "../components/SinceLastVisit.jsx";
 import { rateColor } from "../components/ScoreBadge.jsx";
 import { useRefresh } from "../App.jsx";
 import { TIERS, getTier } from "@shared/tiers.mjs";
@@ -56,6 +58,9 @@ export default function Overview() {
     : 0;
   const tier = getTier(overallScore);
 
+  // Detect if user is likely new (for default collapse state)
+  localStorage.setItem("overview-visited", "true");
+
   return (
     <>
       <div className="page-header">
@@ -66,57 +71,65 @@ export default function Overview() {
         Your snapshot of how you lead AI — tracking your growth across the skills that matter: framing problems clearly (Create Clarity), reviewing output critically (Deliver Success), and iterating intentionally (Generate Energy).
       </PageBanner>
 
-      {/* Hero stats */}
-      <div className="overview-hero">
-        {pillarTrends && (
-          <div className="card" style={{ textAlign: "center", padding: "12px 16px" }}>
-            <div className="card-header">Your Tier</div>
-            <div style={{ fontSize: 36, margin: "4px 0" }}>{tier.emoji} {tier.name}</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
-            Score: {overallScore}/100</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {[...TIERS].reverse().map((t) => {
-                const isCurrent = t.name === tier.name;
-                const isPast = t.min < tier.min;
-                return (
-                  <div key={t.name} style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
-                    borderRadius: 6, fontSize: 12,
-                    background: isCurrent ? "rgba(88, 166, 255, 0.12)" : "transparent",
-                    border: isCurrent ? "1px solid var(--accent)" : "1px solid transparent",
-                    opacity: isPast ? 0.4 : 1,
-                  }}>
-                    <span style={{ width: 24 }}>{t.emoji}</span>
-                    <span style={{ flex: 1, textAlign: "left", fontWeight: isCurrent ? 700 : 400, color: isCurrent ? "var(--accent)" : "var(--text)" }}>{t.name}</span>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t.min}+</span>
-                    {isCurrent && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>← YOU</span>}
-                  </div>
-                );
-              })}
-            </div>
-            {tier.next && (
-              <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
-                {tier.next.min - overallScore} points to reach {tier.next.emoji} {tier.next.name}
+      {/* Since Last Visit — shown for returning users */}
+      <SinceLastVisit refreshKey={refreshKey} />
+
+      {/* Tier Hero — always visible, never collapsed */}
+      {pillarTrends && (
+        <div className="tier-hero-card card">
+          <div className="tier-hero-content">
+            <div style={{ fontSize: 48 }}>{tier.emoji}</div>
+            <div className="tier-hero-info">
+              <div style={{ fontSize: 18, fontWeight: 600 }}>{tier.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Score: {overallScore}/100</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 8 }}>
+                {[...TIERS].reverse().map((t) => {
+                  const isCurrent = t.name === tier.name;
+                  const isPast = t.min < tier.min;
+                  return (
+                    <div key={t.name} style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
+                      borderRadius: 6, fontSize: 12,
+                      background: isCurrent ? "rgba(88, 166, 255, 0.12)" : "transparent",
+                      border: isCurrent ? "1px solid var(--accent)" : "1px solid transparent",
+                      opacity: isPast ? 0.4 : 1,
+                    }}>
+                      <span style={{ width: 24 }}>{t.emoji}</span>
+                      <span style={{ flex: 1, textAlign: "left", fontWeight: isCurrent ? 700 : 400, color: isCurrent ? "var(--accent)" : "var(--text)" }}>{t.name}</span>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t.min}+</span>
+                      {isCurrent && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>← YOU</span>}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+              {tier.next && (
+                <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                  {tier.next.min - overallScore} points to reach {tier.next.emoji} {tier.next.name}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-        <div className="overview-stats-2x2">
-          <div className="card overview-stat-card">
+        </div>
+      )}
+
+      {/* Stats — open by default */}
+      <CollapsibleSection title="Key Stats" id="overview-stats" defaultOpen={true}>
+        <div className="stats-grid stats-grid-overview">
+          <div className="card" style={{ textAlign: "center" }}>
             <div className="card-header">Sessions Analyzed</div>
             <div className="stat-value">{aggregate.sessionsAnalyzed}</div>
           </div>
-          <div className="card overview-stat-card">
+          <div className="card" style={{ textAlign: "center" }}>
             <div className="card-header">With Redirections</div>
             <div className={`stat-value ${rateColor(aggregate.sessionsWithRedirections / Math.max(aggregate.sessionsAnalyzed, 1))}`}>
               {aggregate.sessionsWithRedirections}
             </div>
           </div>
-          <div className="card overview-stat-card">
+          <div className="card" style={{ textAlign: "center" }}>
             <div className="card-header">Total Redirections</div>
             <div className="stat-value">{aggregate.totalRedirections}</div>
           </div>
-          <div className="card overview-stat-card">
+          <div className="card" style={{ textAlign: "center" }}>
             <div className="card-header"><MetricHelp
               label="Avg Redirection Rate"
               definition="Percentage of your turns that correct or redirect the agent."
@@ -129,72 +142,62 @@ export default function Overview() {
             <div className="stat-label">of user turns are corrections</div>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Charts */}
-      <div style={{ background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13 }}>
-        <strong style={{ color: "var(--accent)" }}>💡 What is a "redirection"?</strong>
-        <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
-          Any turn where you correct, redirect, or have to repeat yourself to the agent. A lower redirection rate means you provided better clarity upfront. Under 10% is smooth sailing; over 25% means your prompts need more context.
-        </span>
-        <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
-          <strong style={{ color: "var(--yellow)" }}>🧪 Note:</strong> Sessions with heavy testing/feedback (e.g., reviewing someone else's work, doing comprehensive QA, or providing multiple rounds of iterative feedback) will naturally show higher redirection rates. These corrections are <em>intentional feedback</em>, not poor prompting — the tool flags these as "Testing & Feedback" sessions.
+      <CollapsibleSection title="Trends" id="overview-trends" defaultOpen={false}>
+        <div style={{ background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13 }}>
+          <strong style={{ color: "var(--accent)" }}>What is a "redirection"?</strong>
+          <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
+            Any turn where you correct, redirect, or have to repeat yourself to the agent. A lower rate means better clarity upfront.
+          </span>
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+            <strong style={{ color: "var(--yellow)" }}>Note:</strong> Sessions with heavy testing/feedback will naturally show higher rates. These are <em>intentional feedback</em>, not poor prompting.
+          </div>
         </div>
-      </div>
-      <div className="charts-grid">
-        <div className="card">
-          <div className="card-header">Redirection Rate Over Time</div>
-          <TrendChart trends={trends} />
-        </div>
-        <div className="card">
-          <div className="card-header">By Category</div>
-          <CategoryBreakdown categoryTotals={aggregate.categoryTotals} />
-          <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
-            <strong style={{ color: "var(--text)", fontSize: 13 }}>What each category means:</strong>
-            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-              <div><strong style={{ color: "#f85149" }}>Explicit Correction</strong> — You directly told the agent it was wrong ("no", "that's not right"). <em>Reduce by providing clearer acceptance criteria upfront.</em></div>
-              <div><strong style={{ color: "#58a6ff" }}>Course Change</strong> — You changed direction mid-task. <em>Some is natural as you learn; frequent changes suggest the goal wasn't clear at the start.</em></div>
-              <div><strong style={{ color: "#bc8cff" }}>Repetition</strong> — You had to restate the same instruction. <em>The agent didn't "get it" — try rephrasing with examples or constraints.</em></div>
-              <div><strong style={{ color: "#db6d28" }}>Rollback</strong> — You asked the agent to undo or revert changes. <em>Review agent output more carefully before approving, or add tests to catch issues early.</em></div>
-              <div><strong style={{ color: "#d29922" }}>Frustration</strong> — Emotional signals or repeated failures. <em>If this is high, step back and re-scope the task into smaller, clearer chunks.</em></div>
+        <div className="charts-grid">
+          <div className="card">
+            <div className="card-header">Redirection Rate Over Time</div>
+            <TrendChart trends={trends} />
+          </div>
+          <div className="card">
+            <div className="card-header">By Category</div>
+            <CategoryBreakdown categoryTotals={aggregate.categoryTotals} />
+            <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
+              <strong style={{ color: "var(--text)", fontSize: 13 }}>What each category means:</strong>
+              <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                <div><strong style={{ color: "#f85149" }}>Explicit Correction</strong> — You directly told the agent it was wrong. <em>Reduce by providing clearer acceptance criteria.</em></div>
+                <div><strong style={{ color: "#58a6ff" }}>Course Change</strong> — You changed direction mid-task. <em>Frequent changes suggest unclear goals at the start.</em></div>
+                <div><strong style={{ color: "#bc8cff" }}>Repetition</strong> — You had to restate the same instruction. <em>Try rephrasing with examples or constraints.</em></div>
+                <div><strong style={{ color: "#db6d28" }}>Rollback</strong> — You asked the agent to undo changes. <em>Review output more carefully before approving.</em></div>
+                <div><strong style={{ color: "#d29922" }}>Frustration</strong> — Emotional signals or repeated failures. <em>Step back and re-scope into smaller chunks.</em></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Pillar Trends */}
-      {pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0 && (() => {
-        // Build callouts only for noteworthy trends
-        const PILLAR_META = {
-          delegation: { label: "Delegation", color: "#58a6ff" },
-          judgment: { label: "Judgment", color: "#3fb950" },
-          feedback: { label: "Feedback", color: "#d29922" },
-          tokenEfficiency: { label: "Token Efficiency", color: "#bc8cff" },
-        };
-        const callouts = [];
-        if (pillarTrends.trend && pillarTrends.weeks.length >= 2) {
-          const latest = pillarTrends.weeks[pillarTrends.weeks.length - 1];
-          const previous = pillarTrends.weeks[pillarTrends.weeks.length - 2];
-          for (const [key, meta] of Object.entries(PILLAR_META)) {
-            const dir = pillarTrends.trend[key];
-            const diff = (latest[key] ?? 0) - (previous[key] ?? 0);
-            if (dir === "declining") {
-              callouts.push({ key, ...meta, icon: "⬇️", diff, type: "declining",
-                msg: `dropped ${Math.abs(diff)} pts this week — check the ${meta.label} coaching tab for tips.` });
-            } else if (dir === "improving" && diff >= 10) {
-              callouts.push({ key, ...meta, icon: "🎉", diff, type: "improving",
-                msg: `jumped +${diff} pts — nice progress!` });
-            }
-          }
-        }
-        return (
-        <>
-          <div className="page-header">
-            <h2>📈 Skill Growth Over Time</h2>
-            <p>Delegation, judgment, feedback, and token efficiency scores week-over-week</p>
-          </div>
+      {pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0 && (
+        <CollapsibleSection title="📈 Skill Growth Over Time" id="overview-pillars" defaultOpen={false}>
           <div className="card">
-            <div className="card-header">Pillar Scores by Week</div>
+            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <span>Pillar Scores by Week</span>
+              {pillarTrends.trendDirection && (
+                <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+                  {["delegation", "judgment", "feedback"].map((pillar) => {
+                    const dir = pillarTrends.trendDirection[pillar];
+                    const badge = dir === "improving" ? "⬆️ Improving" : dir === "declining" ? "⬇️ Declining" : "➡️ Stable";
+                    const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
+                    return (
+                      <span key={pillar} style={{ color, fontWeight: 500 }}>
+                        {pillar.charAt(0).toUpperCase() + pillar.slice(1)}: {badge}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={pillarTrends.weeks} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
                 <XAxis dataKey="week" tick={{ fill: "#8b949e", fontSize: 11 }} axisLine={{ stroke: "#30363d" }} tickLine={false} />
@@ -202,56 +205,25 @@ export default function Overview() {
                 <Tooltip
                   contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, color: "#e6edf3" }}
                   labelStyle={{ color: "#8b949e" }}
-                  formatter={(value, name) => {
-                    const label = name === "tokenEfficiency" ? "Token Efficiency" : name.charAt(0).toUpperCase() + name.slice(1);
-                    return [`${value}`, label];
-                  }}
+                  formatter={(value, name) => [`${value}`, name.charAt(0).toUpperCase() + name.slice(1)]}
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="feedback" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="tokenEfficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
             <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "#8b949e" }}>
               <span><span style={{ color: "#58a6ff" }}>●</span> Delegation</span>
               <span><span style={{ color: "#3fb950" }}>●</span> Judgment</span>
               <span><span style={{ color: "#d29922" }}>●</span> Feedback</span>
-              <span><span style={{ color: "#bc8cff" }}>●</span> Token Efficiency</span>
             </div>
           </div>
-          {callouts.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-              {callouts.map((c) => (
-                <div key={c.key} style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 14px", borderRadius: 8,
-                  background: c.type === "declining"
-                    ? "rgba(248, 81, 73, 0.08)" : "rgba(63, 185, 80, 0.08)",
-                  border: `1px solid ${c.type === "declining"
-                    ? "rgba(248, 81, 73, 0.25)" : "rgba(63, 185, 80, 0.25)"}`,
-                  fontSize: 13,
-                }}>
-                  <span style={{ fontSize: 18 }}>{c.icon}</span>
-                  <span>
-                    <strong style={{ color: c.color }}>{c.label}</strong>{" "}
-                    {c.msg}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-        );
-      })()}
+        </CollapsibleSection>
+      )}
 
       {/* Work Style */}
       {workStyle && workStyle.summary && (
-        <>
-          <div className="page-header">
-            <h2>🌊 Work Style</h2>
-            <p>How you approach tasks across sessions</p>
-          </div>
+        <CollapsibleSection title="🌊 Work Style" id="overview-workstyle" defaultOpen={false}>
           <div className="charts-grid">
             <div className="card">
               <div className="card-header">Style Distribution</div>
@@ -342,51 +314,47 @@ export default function Overview() {
           )}
 
           <div className="card" style={{ marginTop: 12 }}>
-            <div className="card-header">📖 Understanding Your Work Styles</div>
+            <div className="card-header">Understanding Your Work Styles</div>
             <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "0 4px" }}>
               <div style={{ display: "grid", gap: 12, marginTop: 8 }}>
                 <div style={{ borderLeft: "3px solid #3fb950", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>📋 Structured</strong>
-                  <div style={{ marginTop: 4 }}>You planned first — defined the problem, constraints, and approach before writing code. Maps to <em>Create Clarity</em>.</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> New features, architecture changes, multi-file tasks. Plan first, then delegate.</div>
+                  <strong style={{ color: "var(--text)" }}>Structured</strong>
+                  <div style={{ marginTop: 4 }}>You planned first \u2014 defined the problem, constraints, and approach before writing code.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>Best task fit: New features, architecture changes, multi-file tasks.</div>
                 </div>
                 <div style={{ borderLeft: "3px solid #58a6ff", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>🌊 Vibe Coding</strong>
-                  <div style={{ marginTop: 4 }}>You jumped straight to code (first file edit on turn 0-1). Great for quick fixes and small tasks. Risk: more redirections on complex work.</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Quick fixes, typos, simple refactors. Low risk, you know the codebase well.</div>
+                  <strong style={{ color: "var(--text)" }}>Vibe Coding</strong>
+                  <div style={{ marginTop: 4 }}>You jumped straight to code. Great for quick fixes and small tasks. Risk: more redirections on complex work.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>Best task fit: Quick fixes, typos, simple refactors.</div>
                 </div>
                 <div style={{ borderLeft: "3px solid #d29922", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>🔄 Iterative</strong>
-                  <div style={{ marginTop: 4 }}>You alternated between planning and coding. Good for exploration where requirements evolve, but watch for excessive back-and-forth.</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Debugging, exploration, learning new APIs. Back-and-forth is expected.</div>
+                  <strong style={{ color: "var(--text)" }}>Iterative</strong>
+                  <div style={{ marginTop: 4 }}>You alternated between planning and coding. Good for exploration where requirements evolve.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>Best task fit: Debugging, exploration, learning new APIs.</div>
                 </div>
                 <div style={{ borderLeft: "3px solid #8b949e", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>🔀 Mixed</strong>
-                  <div style={{ marginTop: 4 }}>A blend of styles within a session. This is natural — the key is matching your style to the task complexity.</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Tasks that evolve. Fine if intentional, but frequent mixing may mean unclear goals upfront.</div>
+                  <strong style={{ color: "var(--text)" }}>Mixed</strong>
+                  <div style={{ marginTop: 4 }}>A blend of styles within a session. The key is matching your style to the task complexity.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>Best task fit: Tasks that evolve. Fine if intentional.</div>
                 </div>
               </div>
               <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(88, 166, 255, 0.06)", borderRadius: 6, fontSize: 12 }}>
-                💡 <strong>Key insight:</strong> Match your style to your task. Structured for complex, vibe for simple. Structured sessions have the lowest redirection rates — planning first saves turns and frustration.
+                <strong>Key insight:</strong> Match your style to your task. Structured for complex, vibe for simple. Structured sessions have the lowest redirection rates.
               </div>
             </div>
           </div>
-        </>
+        </CollapsibleSection>
       )}
 
       {/* Insights */}
       {insights && insights.length > 0 && (
-        <>
-          <div className="page-header">
-            <h2>💡 Prompting Insights</h2>
-            <p>Actionable tips based on your redirection patterns</p>
-          </div>
+        <CollapsibleSection title="💡 Prompting Insights" id="overview-insights" defaultOpen={true}>
           <div className="insights-grid">
             {insights.map((insight, i) => (
               <InsightCard key={i} insight={insight} />
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       )}
 
       <SuggestedNext

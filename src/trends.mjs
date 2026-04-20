@@ -40,7 +40,6 @@ const STEP_BY_STEP_RE = /\b(step\s+1|first[,.]|then[,.]|after\s+that)\b/i;
 const CATCH_RE =
   /\b(wait|hold\s+on|actually|that'?s\s+wrong|not\s+right|broken|fix|bug|issue|error)\b/i;
 const SPECIFIC_RE = /(\b\w+\.\w{1,5}\b|function\s+\w|\/[\w/]+\.\w+|line\s+\d)/i;
-const REDIRECTION_RE = /\b(no|wrong|not\s+what|try\s+again|instead|undo|revert|go\s+back)\b/i;
 
 function scoreDelegation(userMessages) {
   if (userMessages.length === 0) return 0;
@@ -62,15 +61,6 @@ function scoreFeedback(firstMessage) {
   const long = firstMessage.length > 50;
   const specific = SPECIFIC_RE.test(firstMessage);
   return long && specific ? 100 : long || specific ? 50 : 0;
-}
-
-/** Score token efficiency (0-100). High = fewer wasted turns (redirections). */
-function scoreTokenEfficiency(userMessages) {
-  if (userMessages.length <= 1) return 100; // single-turn = no waste
-  const redirections = userMessages.filter((m) => REDIRECTION_RE.test(m)).length;
-  const wasteRatio = redirections / userMessages.length;
-  // 0 redirections = 100, all redirections = 0
-  return Math.round(Math.max(0, (1 - wasteRatio * 2) * 100));
 }
 
 /**
@@ -102,7 +92,6 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
     let delegationSum = 0;
     let judgmentSum = 0;
     let feedbackSum = 0;
-    let tokenEfficiencySum = 0;
     const sessionCount = entry.sessions.length;
 
     for (const session of entry.sessions) {
@@ -114,7 +103,6 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
       delegationSum += scoreDelegation(userMessages);
       judgmentSum += scoreJudgment(userMessages);
       feedbackSum += scoreFeedback(userMessages[0]);
-      tokenEfficiencySum += scoreTokenEfficiency(userMessages);
     }
 
     const delegation = sessionCount
@@ -126,10 +114,7 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
     const feedback = sessionCount
       ? Math.round(feedbackSum / sessionCount)
       : 0;
-    const tokenEfficiency = sessionCount
-      ? Math.round(tokenEfficiencySum / sessionCount)
-      : 0;
-    const overall = Math.round((delegation + judgment + feedback + tokenEfficiency) / 4);
+    const overall = Math.round((delegation + judgment + feedback) / 3);
 
     weeks.push({
       week: entry.week,
@@ -138,7 +123,6 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
       delegation,
       judgment,
       feedback,
-      tokenEfficiency,
       overall,
       sessionCount,
     });
@@ -160,7 +144,6 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
       delegation: determineTrend("delegation"),
       judgment: determineTrend("judgment"),
       feedback: determineTrend("feedback"),
-      tokenEfficiency: determineTrend("tokenEfficiency"),
     },
   };
 }

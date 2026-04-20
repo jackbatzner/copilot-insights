@@ -83,29 +83,21 @@ try {
   const page = await context.newPage();
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
-  // Dismiss the welcome modal so it doesn't block interactions
-  await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
-  await page.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
-
   const allPages = [
-    { path: "/",                  name: "overview" },
-    { path: "/learn",             name: "learn" },
-    { path: "/sessions",          name: "sessions" },
-    { path: "/analytics",         name: "analytics" },
-    { path: "/coaching",          name: "coaching" },
-    { path: "/practice",          name: "practice" },
-    { path: "/instructions",      name: "instructions" },
-    { path: "/tokens",            name: "token-efficiency" },
-    { path: "/live",              name: "live" },
+    { path: "/welcome",   name: "welcome" },
+    { path: "/",          name: "overview" },
+    { path: "/learn",     name: "learn" },
+    { path: "/sessions",  name: "sessions" },
+    { path: "/analytics", name: "analytics" },
+    { path: "/coaching",      name: "coaching" },
+    { path: "/practice",      name: "practice" },
+    { path: "/instructions",  name: "instructions" },
+    { path: "/live",          name: "live" },
   ];
 
   const filtered = pageFilter
     ? allPages.filter((p) => pageFilter.includes(p.name))
     : allPages;
-
-  // Dismiss the WelcomeModal so it doesn't block interactions
-  await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
-  await page.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
 
   for (const p of filtered) {
     // Practice page: navigate to Rewrite Challenge with a loaded challenge
@@ -201,12 +193,22 @@ async function recordFullDemoGif(browser, baseUrl) {
   });
   const gifPage = await gifContext.newPage();
 
-  // Dismiss the welcome modal then load the overview
-  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
-  await gifPage.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
+  // ── Scene 0: Welcome — show onboarding flow ────────────────────
+  await gifPage.goto(`${baseUrl}/welcome`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2500);
+
+  // Click through the 3 steps
+  for (let i = 0; i < 2; i++) {
+    const nextBtn = gifPage.locator("button", { hasText: "Next" }).first();
+    if (await nextBtn.count()) {
+      await nextBtn.click();
+      await gifPage.waitForTimeout(1500);
+    }
+  }
+  await gifPage.waitForTimeout(1000);
 
   // ── Scene 1: Overview — show the main dashboard ───────────────
-  await gifPage.reload({ waitUntil: "networkidle" });
+  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 
   // ── Scene 2: Sessions list ────────────────────────────────────
