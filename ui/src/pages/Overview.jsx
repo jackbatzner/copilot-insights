@@ -134,6 +134,9 @@ export default function Overview() {
         <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
           Any turn where you correct, redirect, or have to repeat yourself to the agent. A lower redirection rate means you provided better clarity upfront. Under 10% is smooth sailing; over 25% means your prompts need more context.
         </span>
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+          <strong style={{ color: "var(--yellow)" }}>🧪 Note:</strong> Sessions with heavy testing/feedback (e.g., reviewing someone else's work, doing comprehensive QA, or providing multiple rounds of iterative feedback) will naturally show higher redirection rates. These corrections are <em>intentional feedback</em>, not poor prompting — the tool flags these as "Testing & Feedback" sessions.
+        </div>
       </div>
       <div className="charts-grid">
         <div className="card">

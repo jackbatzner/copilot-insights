@@ -50,6 +50,12 @@ export default function SessionDetail() {
 
   const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
 
+  // Testing/feedback session: high turns + high redirections + still producing file changes
+  const isTestingSession = !isLearningSession &&
+    session.turnCount >= 25 &&
+    stats.redirectionRate >= 0.2 &&
+    complexity?.breakdown?.fileOps > 5;
+
   return (
     <>
       <Link to="/sessions" className="back-link">
@@ -136,6 +142,14 @@ export default function SessionDetail() {
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>Learning Session</div>
             <div className="stat-sub">Q&A / exploration — no files changed</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Delegation and file metrics don't apply to this session type.</div>
+          </div>
+        )}
+        {isTestingSession && (
+          <div className="card" style={{ textAlign: "center", background: "rgba(210, 153, 34, 0.08)", borderColor: "var(--yellow)" }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>🧪</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--yellow)" }}>Testing & Feedback Session</div>
+            <div className="stat-sub">High turns + many corrections, but still producing output</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>This looks like comprehensive testing/iteration — redirections here are intentional feedback, not poor prompting. Expect higher redirection rates for these sessions.</div>
           </div>
         )}
       </div>

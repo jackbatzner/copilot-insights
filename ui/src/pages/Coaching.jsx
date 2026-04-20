@@ -177,7 +177,7 @@ function DelegationTab({ data }) {
               {data.turnTypeBreakdown.map((t, i) => (
                 <div key={i} className="delegation-legend-row">
                   <span className="dot" style={{ background: t.color }} />
-                  <span className="delegation-legend-label">{t.type}</span>
+                  <span className="delegation-legend-label" style={{ color: t.color }}>{t.type}</span>
                   <span className="delegation-legend-count">{t.count}</span>
                   <span className="delegation-legend-desc">{t.description}</span>
                 </div>
@@ -187,13 +187,13 @@ function DelegationTab({ data }) {
           <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
             <strong style={{ color: "var(--accent)" }}>📖 What each interaction style means:</strong>
             <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
-              <div><strong style={{ color: "var(--text)" }}>✅ Approval</strong> — Short confirmations ("yes", "looks good", "ship it"). You're trusting the agent's output. <em>Good when output is genuinely correct.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>🤝 Delegation</strong> — High-level task descriptions. You define WHAT to do, the agent decides HOW. <em>This is the goal for most tasks.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>💬 Collaborative</strong> — Conversational back-and-forth where you and the agent work through the problem together. <em>Good for exploring options, but may be less efficient than clear delegation.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>📑 Detailed Spec</strong> — Long, structured prompts with specific requirements, constraints, and acceptance criteria. <em>Excellent for complex tasks — this IS good delegation when done upfront.</em></div>
+              <div><strong style={{ color: "#58a6ff" }}>✅ Approval</strong> — Short confirmations ("yes", "looks good", "ship it"). You're trusting the agent's output. <em>Good when output is genuinely correct.</em></div>
+              <div><strong style={{ color: "#3fb950" }}>🤝 Delegation</strong> — High-level task descriptions. You define WHAT to do, the agent decides HOW. <em>This is the goal for most tasks.</em></div>
+              <div><strong style={{ color: "#db6d28" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
+              <div><strong style={{ color: "#f85149" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
+              <div><strong style={{ color: "#8b949e" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
+              <div><strong style={{ color: "#d29922" }}>💬 Collaborative</strong> — Conversational back-and-forth where you and the agent work through the problem together. <em>Good for exploring options, but may be less efficient than clear delegation.</em></div>
+              <div><strong style={{ color: "#bc8cff" }}>📑 Detailed Spec</strong> — Long, structured prompts with specific requirements, constraints, and acceptance criteria. <em>Excellent for complex tasks — this IS good delegation when done upfront.</em></div>
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
               💡 <strong>Ideal distribution:</strong> High delegation + some approval, low guided + low correction. The shift from Guided→Delegation means you're trusting the agent with HOW, while you focus on WHAT and WHY — that's Create Clarity.
@@ -424,7 +424,7 @@ function FeedbackTab({ clarity, efficiency }) {
         <div className="card">
           <div className="card-header">🔍 Weakest Opening Prompts</div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
-            Sessions with the lowest first-turn clarity scores. Some may be <strong style={{ color: "var(--accent)" }}>learning/Q&A sessions</strong> (no file edits) — these naturally score lower since they don't include file paths or acceptance criteria. Click into the session to see if it's flagged as 📚 Learning.
+            Sessions with the lowest first-turn clarity scores. Some may be <strong style={{ color: "var(--accent)" }}>📚 learning sessions</strong> (no file edits) or <strong style={{ color: "var(--yellow)" }}>🧪 testing/feedback sessions</strong> (long iterative reviews with intentional corrections). These naturally score differently — click into the session to see context.
           </div>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ textAlign: "left" }}>Session</th><th style={{ width: 220, textAlign: "left" }}>Missing</th></tr></thead>

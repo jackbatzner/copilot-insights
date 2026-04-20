@@ -125,6 +125,8 @@ function QuickWinsCard({ wins }) {
 
 /* ── Dev Plan Tab ──────────────────────────────────────────────── */
 function DevPlanTab({ plan, gaps }) {
+  const highImpact = plan.opportunities.filter((o) => o.type === "high_impact");
+
   return (
     <>
       {/* Quick wins */}
@@ -132,28 +134,42 @@ function DevPlanTab({ plan, gaps }) {
         <QuickWinsCard wins={plan.quickWins} />
       )}
 
-      {/* High impact opportunities — right after quick wins */}
-      {plan.opportunities.filter((o) => o.type === "high_impact").length > 0 && (
+      {/* High impact opportunities with mapped weekly goals */}
+      {highImpact.length > 0 && (
         <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--yellow)" }}>
-          <div className="card-header">🚀 High-Impact Opportunities</div>
-          {plan.opportunities.filter((o) => o.type === "high_impact").map((o, i) => (
-            <div key={i} className="opportunity-item">
-              <div className="opp-header">
-                <span className="pillar-pill" data-pillar={o.pillar}>{o.pillar}</span>
-                <strong>{o.title}</strong>
-                <span className="impact-badge">Impact: {o.impact}/10</span>
+          <div className="card-header">🚀 High-Impact Opportunities & Weekly Goals</div>
+          {highImpact.map((o, i) => {
+            const relatedGoals = plan.weeklyGoals.filter((g) => g.pillar === o.pillar);
+            return (
+              <div key={i} className="opportunity-item">
+                <div className="opp-header">
+                  <span className="pillar-pill" data-pillar={o.pillar}>{o.pillar}</span>
+                  <strong>{o.title}</strong>
+                  <span className="impact-badge">Impact: {o.impact}/10</span>
+                </div>
+                <p className="opp-desc">{o.description}</p>
+                <div className="opp-metric">{o.metric}</div>
+                <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
+                  🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
+                </div>
+                {relatedGoals.length > 0 && (
+                  <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "2px solid var(--border)" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 600 }}>Related weekly goals:</div>
+                    {relatedGoals.map((g, gi) => (
+                      <div key={gi} style={{ fontSize: 12, color: "var(--text-muted)", padding: "4px 0" }}>
+                        {g.emoji} <strong style={{ color: "var(--text)" }}>{g.goal}</strong>
+                        <span style={{ marginLeft: 8, fontSize: 11 }}>{g.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="opp-desc">{o.description}</p>
-              <div className="opp-metric">{o.metric}</div>
-              <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
-                🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Weekly goals with habit stacking */}
+      {/* Weekly goals — full list with starring */}
       <WeeklyGoals goals={plan.weeklyGoals} />
 
       {/* Instruction gaps — stop repeating yourself */}
