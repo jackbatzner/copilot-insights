@@ -223,15 +223,15 @@ function SandboxMode() {
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 22, fontWeight: 700, color: "var(--orange)" }}>
-                      ~{result.tokenEfficiency.estimatedTotalTokens}
+                      ~{result.tokenEfficiency.estimatedTotalTokens.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Est. Total Cost</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Est. Total Tokens</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>
-                      ~{result.tokenEfficiency.optimizedEstimate}
+                      ~{result.tokenEfficiency.optimizedEstimate.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Optimized Cost</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Optimized Tokens</div>
                   </div>
                 </div>
                 {result.tokenEfficiency.savingsPercent > 0 && (

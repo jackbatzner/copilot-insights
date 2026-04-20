@@ -84,13 +84,14 @@ try {
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
   const allPages = [
-    { path: "/",          name: "overview" },
-    { path: "/learn",     name: "learn" },
-    { path: "/sessions",  name: "sessions" },
-    { path: "/analytics", name: "analytics" },
-    { path: "/coaching",  name: "coaching" },
-    { path: "/practice",  name: "practice" },
-    { path: "/live",      name: "live" },
+    { path: "/",                  name: "overview" },
+    { path: "/learn",             name: "learn" },
+    { path: "/sessions",          name: "sessions" },
+    { path: "/analytics",         name: "analytics" },
+    { path: "/coaching",          name: "coaching" },
+    { path: "/practice",          name: "practice" },
+    { path: "/token-efficiency",  name: "token-efficiency" },
+    { path: "/live",              name: "live" },
   ];
 
   const filtered = pageFilter

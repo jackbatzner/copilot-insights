@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **VSCode Copilot Chat session support** (experimental) — Discovers and normalizes sessions from VSCode, Code Insiders, VSCodium, and Cursor `workspaceStorage` directories
+  - `src/vscode-sessions.mjs` — cross-platform session discovery with cached path lookups
+  - `src/token-reader.mjs` — reads real token usage from JSONL session-state files with BPE-style fallback estimator
+  - Sessions appear in the dashboard alongside CLI sessions with a source badge
+- **Token Efficiency page** — Coaching-first token waste analysis
+  - Hero "#1 Opportunity" card highlighting the biggest waste category
+  - Personalized quick wins adapted to user level (beginner / intermediate / expert)
+  - Compact score summary with overall grade
+  - Waste category coaching with icons, tips, and "Try this" examples for all 5 categories
+  - Sortable, filterable session table with progressive loading (sort by tokens, waste, efficiency; filter by grade)
+- **Token Efficiency as 4th pillar** — Added to Overview pillar trend chart (purple line) alongside delegation, judgment, and feedback
+- **Conditional pillar callouts** — Overview no longer shows always-visible trend badges; instead surfaces callout cards only for declining trends (with coaching direction) or big improvements (≥10 pts)
+- `GET /api/token-efficiency` endpoint for token waste analysis per session
+- `CATEGORY_COACHING` map with icon, label, tip, and example for each waste category
+
+### Changed
+
+- **Token efficiency grading** — Combined ratio-based score with absolute waste penalties: ≥50k wasted → max "Needs Work", ≥20k → max "Fair", ≥10k → max "Good"
+- **Practice Lab labels** — Renamed "Est. Total Cost" → "Est. Total Tokens" and "Optimized Cost" → "Optimized Tokens" with `.toLocaleString()` formatting
+- User level detection in `deriveInsights()`: expert (≥20 sessions, <5% waste), intermediate (≥10 sessions, <15% waste), beginner (default)
+- Mock data seeder generates VSCode sessions alongside CLI sessions for realistic demos
+- Screenshot capture script includes Token Efficiency page
+
+### Fixed
+
+- Overview pillar trend chart reading `pillarTrends.trendDirection` instead of `pillarTrends.trend` — trend badges never rendered (pre-existing bug)
+- `SortHeader` React component defined inside IIFE render block caused DOM remounting every render — converted to plain `sortTh()` helper function
+- Token Efficiency session table uses plain `<table>` instead of `.session-table` CSS class to avoid column misalignment from `display: block`
+
 ## [0.2.0] - 2026-04-18
 
 ### Added

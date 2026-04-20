@@ -95,12 +95,27 @@ export function analyzeTokenEfficiency(sessionId, tokenData, turns) {
 
   const tokenBudgetUsage = Math.round((totalTokens / contextWindowSize) * 100) / 100;
 
-  // Grade
-  let grade;
-  if (efficiencyRatio >= 0.9) grade = { label: "Excellent", emoji: "🌟", color: "#3fb950" };
-  else if (efficiencyRatio >= 0.75) grade = { label: "Good", emoji: "👍", color: "#58a6ff" };
-  else if (efficiencyRatio >= 0.6) grade = { label: "Fair", emoji: "📐", color: "#d29922" };
-  else grade = { label: "Needs Work", emoji: "🔧", color: "#f85149" };
+  // Grade: combine ratio with absolute waste penalty.
+  // A high ratio with large absolute waste should still downgrade.
+  let ratioScore;
+  if (efficiencyRatio >= 0.9) ratioScore = 4;      // Excellent
+  else if (efficiencyRatio >= 0.75) ratioScore = 3; // Good
+  else if (efficiencyRatio >= 0.6) ratioScore = 2;  // Fair
+  else ratioScore = 1;                               // Needs Work
+
+  // Penalize high absolute waste regardless of ratio
+  if (wastedTokens >= 50000) ratioScore = Math.min(ratioScore, 1);
+  else if (wastedTokens >= 20000) ratioScore = Math.min(ratioScore, 2);
+  else if (wastedTokens >= 10000) ratioScore = Math.min(ratioScore, 3);
+
+  const GRADES = [
+    null,
+    { label: "Needs Work", emoji: "🔧", color: "#f85149" },
+    { label: "Fair", emoji: "📐", color: "#d29922" },
+    { label: "Good", emoji: "👍", color: "#58a6ff" },
+    { label: "Excellent", emoji: "🌟", color: "#3fb950" },
+  ];
+  const grade = GRADES[ratioScore];
 
   return {
     grade,

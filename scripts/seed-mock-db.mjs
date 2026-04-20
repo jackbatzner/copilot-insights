@@ -254,30 +254,38 @@ const insertRef = db.prepare(
 );
 
 const sessionCount = 25;
+const vscodeSessionCount = 8;  // ~25% VSCode sessions for realistic mix
 const sessionIds = [];
 
 const seedAll = db.transaction(() => {
-  for (let i = 0; i < sessionCount; i++) {
+  const totalSessions = sessionCount + vscodeSessionCount;
+
+  for (let i = 0; i < totalSessions; i++) {
     const sid = randomUUID();
     sessionIds.push(sid);
 
+    const isVscode = i >= sessionCount; // last batch are VSCode sessions
     const repo = pick(repos);
     const branch = pick(branches);
     const summary = pick(summaries);
     const startDay = randInt(1, 30);
     const created = daysAgo(startDay);
     const updated = new Date(created.getTime() + randInt(10, 120) * 60000);
-    const cwd = `/home/dev/projects/${repo.split("/")[1]}`;
+    const hostType = isVscode ? "vscode" : "cli";
+    const cwd = isVscode
+      ? `/home/dev/projects/${repo.split("/")[1]}`
+      : `/home/dev/projects/${repo.split("/")[1]}`;
 
     insertSession.run(
       sid, repo, branch, summary,
       isoDate(created), isoDate(updated),
-      "cli", cwd
+      hostType, cwd
     );
 
     // Determine session quality: ~40% will be "bad" (lots of redirections)
+    // VSCode sessions tend to have longer assistant responses (more tokens)
     const isBadSession = Math.random() < 0.4;
-    const turnCount = randInt(5, 15);
+    const turnCount = isVscode ? randInt(3, 10) : randInt(5, 15);
     const redirectionRate = isBadSession ? 0.5 : 0.1;
 
     const sessionFiles = [];
@@ -285,7 +293,11 @@ const seedAll = db.transaction(() => {
     for (let t = 0; t < turnCount; t++) {
       const isRedirection = Math.random() < redirectionRate;
       const userMsg = isRedirection ? pick(redirectionMessages) : pick(goodUserMessages);
-      const assistantMsg = pick(assistantResponses);
+      // VSCode responses tend to be longer (include code blocks, explanations)
+      let assistantMsg = pick(assistantResponses);
+      if (isVscode && Math.random() < 0.6) {
+        assistantMsg += "\n\n```typescript\n// Additional implementation detail\nexport function handle() {\n  return { status: 'ok' };\n}\n```\n\nI've also updated the related tests.";
+      }
       const turnTime = new Date(created.getTime() + t * randInt(30, 300) * 1000);
 
       insertTurn.run(sid, t, userMsg, assistantMsg, isoDate(turnTime));
@@ -353,4 +365,4 @@ const seedAll = db.transaction(() => {
 seedAll();
 db.close();
 
-console.log(`✅ Seeded ${sessionCount} sessions → ${DB_PATH}`);
+console.log(`✅ Seeded ${sessionCount + vscodeSessionCount} sessions (${sessionCount} CLI + ${vscodeSessionCount} VSCode) → ${DB_PATH}`);

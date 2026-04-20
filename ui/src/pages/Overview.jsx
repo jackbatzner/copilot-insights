@@ -121,30 +121,38 @@ export default function Overview() {
       </div>
 
       {/* Pillar Trends */}
-      {pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0 && (
+      {pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0 && (() => {
+        // Build callouts only for noteworthy trends
+        const PILLAR_META = {
+          delegation: { label: "Delegation", color: "#58a6ff" },
+          judgment: { label: "Judgment", color: "#3fb950" },
+          feedback: { label: "Feedback", color: "#d29922" },
+          tokenEfficiency: { label: "Token Efficiency", color: "#bc8cff" },
+        };
+        const callouts = [];
+        if (pillarTrends.trend && pillarTrends.weeks.length >= 2) {
+          const latest = pillarTrends.weeks[pillarTrends.weeks.length - 1];
+          const previous = pillarTrends.weeks[pillarTrends.weeks.length - 2];
+          for (const [key, meta] of Object.entries(PILLAR_META)) {
+            const dir = pillarTrends.trend[key];
+            const diff = (latest[key] ?? 0) - (previous[key] ?? 0);
+            if (dir === "declining") {
+              callouts.push({ key, ...meta, icon: "⬇️", diff, type: "declining",
+                msg: `dropped ${Math.abs(diff)} pts this week — check the ${meta.label} coaching tab for tips.` });
+            } else if (dir === "improving" && diff >= 10) {
+              callouts.push({ key, ...meta, icon: "🎉", diff, type: "improving",
+                msg: `jumped +${diff} pts — nice progress!` });
+            }
+          }
+        }
+        return (
         <>
           <div className="page-header">
             <h2>📈 Skill Growth Over Time</h2>
-            <p>Delegation, judgment, and feedback scores week-over-week</p>
+            <p>Delegation, judgment, feedback, and token efficiency scores week-over-week</p>
           </div>
           <div className="card">
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-              <span>Pillar Scores by Week</span>
-              {pillarTrends.trendDirection && (
-                <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-                  {["delegation", "judgment", "feedback"].map((pillar) => {
-                    const dir = pillarTrends.trendDirection[pillar];
-                    const badge = dir === "improving" ? "⬆️ Improving" : dir === "declining" ? "⬇️ Declining" : "➡️ Stable";
-                    const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
-                    return (
-                      <span key={pillar} style={{ color, fontWeight: 500 }}>
-                        {pillar.charAt(0).toUpperCase() + pillar.slice(1)}: {badge}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <div className="card-header">Pillar Scores by Week</div>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={pillarTrends.weeks} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
                 <XAxis dataKey="week" tick={{ fill: "#8b949e", fontSize: 11 }} axisLine={{ stroke: "#30363d" }} tickLine={false} />
@@ -152,21 +160,48 @@ export default function Overview() {
                 <Tooltip
                   contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, color: "#e6edf3" }}
                   labelStyle={{ color: "#8b949e" }}
-                  formatter={(value, name) => [`${value}`, name.charAt(0).toUpperCase() + name.slice(1)]}
+                  formatter={(value, name) => {
+                    const label = name === "tokenEfficiency" ? "Token Efficiency" : name.charAt(0).toUpperCase() + name.slice(1);
+                    return [`${value}`, label];
+                  }}
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="feedback" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="tokenEfficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
             <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "#8b949e" }}>
               <span><span style={{ color: "#58a6ff" }}>●</span> Delegation</span>
               <span><span style={{ color: "#3fb950" }}>●</span> Judgment</span>
               <span><span style={{ color: "#d29922" }}>●</span> Feedback</span>
+              <span><span style={{ color: "#bc8cff" }}>●</span> Token Efficiency</span>
             </div>
           </div>
+          {callouts.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+              {callouts.map((c) => (
+                <div key={c.key} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 14px", borderRadius: 8,
+                  background: c.type === "declining"
+                    ? "rgba(248, 81, 73, 0.08)" : "rgba(63, 185, 80, 0.08)",
+                  border: `1px solid ${c.type === "declining"
+                    ? "rgba(248, 81, 73, 0.25)" : "rgba(63, 185, 80, 0.25)"}`,
+                  fontSize: 13,
+                }}>
+                  <span style={{ fontSize: 18 }}>{c.icon}</span>
+                  <span>
+                    <strong style={{ color: c.color }}>{c.label}</strong>{" "}
+                    {c.msg}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </>
-      )}
+        );
+      })()}
 
       {/* Work Style */}
       {workStyle && workStyle.summary && (
