@@ -91,7 +91,7 @@ try {
     { path: "/coaching",          name: "coaching" },
     { path: "/practice",          name: "practice" },
     { path: "/instructions",      name: "instructions" },
-    { path: "/token-efficiency",  name: "token-efficiency" },
+    { path: "/tokens",            name: "token-efficiency" },
     { path: "/live",              name: "live" },
   ];
 
@@ -196,6 +196,10 @@ async function recordFullDemoGif(browser, baseUrl) {
     recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } },
   });
   const gifPage = await gifContext.newPage();
+
+  // Dismiss the WelcomeModal before recording
+  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await gifPage.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
 
   // ── Scene 1: Overview — show the main dashboard ───────────────
   await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
