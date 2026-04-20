@@ -50,11 +50,46 @@ export default function SessionDetail() {
 
   const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
 
-  // Testing/feedback session: high turns + high redirections + still producing file changes
-  const isTestingSession = !isLearningSession &&
-    session.turnCount >= 25 &&
-    stats.redirectionRate >= 0.2 &&
-    complexity?.breakdown?.fileOps > 5;
+  // Testing/feedback session detection:
+  // 1. Scan user messages for feedback-like language patterns
+  // 2. Also check structural signals: high turns, repeated file edits, plan mode usage
+  const isTestingSession = (() => {
+    if (isLearningSession) return false;
+    const FEEDBACK_PATTERNS = /\b(feedback|round of|another round|testing|let'?s fix|here'?s what|improvements?|issues?:|bugs?:|fix(es|ing)?:|update(s|d)?:|change(s|d)?:|should be|needs to|doesn'?t (work|look|line|align|match)|still (not|doesn'?t|broken|wrong|missing)|try again|one more)\b/i;
+    const PLAN_PATTERNS = /\[\[PLAN\]\]|plan mode/i;
+
+    let feedbackTurns = 0;
+    let planTurns = 0;
+    const userMessages = replay?.turns?.filter(t => t.speaker === "user") || [];
+
+    for (const turn of userMessages) {
+      const msg = turn.messagePreview || "";
+      if (FEEDBACK_PATTERNS.test(msg)) feedbackTurns++;
+      if (PLAN_PATTERNS.test(msg)) planTurns++;
+    }
+
+    // Auto-suggest if: multiple feedback-patterned turns, or plan mode + high corrections
+    const hasFeedbackLanguage = feedbackTurns >= 3;
+    const hasStructuralSignals = session.turnCount >= 20 && stats.redirectionRate >= 0.15 && complexity?.breakdown?.fileOps > 3;
+
+    return hasFeedbackLanguage || (planTurns >= 2 && hasStructuralSignals);
+  })();
+
+  // Manual session tagging (persisted in localStorage)
+  const tagKey = `session-tag-${id}`;
+  const [sessionTag, setSessionTag] = useState(() => {
+    try { return localStorage.getItem(tagKey) || ""; } catch { return ""; }
+  });
+  const setTag = (tag) => {
+    const newTag = sessionTag === tag ? "" : tag;
+    setSessionTag(newTag);
+    if (newTag) localStorage.setItem(tagKey, newTag);
+    else localStorage.removeItem(tagKey);
+  };
+  const isTaggedTesting = sessionTag === "testing";
+  const isTaggedLearning = sessionTag === "learning";
+  const showTestingBadge = isTaggedTesting || (isTestingSession && !isTaggedLearning);
+  const showLearningBadge = isTaggedLearning || (isLearningSession && !isTaggedTesting);
 
   return (
     <>
@@ -136,7 +171,7 @@ export default function SessionDetail() {
             <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
           </div>
         )}
-        {isLearningSession && (
+        {showLearningBadge && (
           <div className="card" style={{ textAlign: "center", background: "rgba(88, 166, 255, 0.08)", borderColor: "var(--accent)" }}>
             <div style={{ fontSize: 24, marginBottom: 4 }}>📚</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>Learning Session</div>
@@ -144,13 +179,45 @@ export default function SessionDetail() {
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Delegation and file metrics don't apply to this session type.</div>
           </div>
         )}
-        {isTestingSession && (
+        {showTestingBadge && (
           <div className="card" style={{ textAlign: "center", background: "rgba(210, 153, 34, 0.08)", borderColor: "var(--yellow)" }}>
             <div style={{ fontSize: 24, marginBottom: 4 }}>🧪</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--yellow)" }}>Testing & Feedback Session</div>
-            <div className="stat-sub">High turns + many corrections, but still producing output</div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>This looks like comprehensive testing/iteration — redirections here are intentional feedback, not poor prompting. Expect higher redirection rates for these sessions.</div>
+            <div className="stat-sub">{isTestingSession && !isTaggedTesting ? "Auto-detected:" : ""} Multiple rounds of feedback and iteration</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Redirections here are intentional feedback, not poor prompting. Expect higher redirection rates for comprehensive testing/review sessions.</div>
           </div>
+        )}
+      </div>
+
+      {/* Manual session type tag */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Tag this session:</span>
+        <button
+          onClick={() => setTag("testing")}
+          style={{
+            background: isTaggedTesting ? "rgba(210, 153, 34, 0.15)" : "var(--bg-card)",
+            border: `1px solid ${isTaggedTesting ? "var(--yellow)" : "var(--border)"}`,
+            color: isTaggedTesting ? "var(--yellow)" : "var(--text-muted)",
+            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
+          }}
+        >
+          🧪 Testing/Feedback
+        </button>
+        <button
+          onClick={() => setTag("learning")}
+          style={{
+            background: isTaggedLearning ? "rgba(88, 166, 255, 0.15)" : "var(--bg-card)",
+            border: `1px solid ${isTaggedLearning ? "var(--accent)" : "var(--border)"}`,
+            color: isTaggedLearning ? "var(--accent)" : "var(--text-muted)",
+            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
+          }}
+        >
+          📚 Learning/Q&A
+        </button>
+        {sessionTag && (
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            (click again to remove)
+          </span>
         )}
       </div>
 
