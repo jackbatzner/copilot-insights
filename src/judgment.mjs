@@ -243,7 +243,7 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
       priority: "high",
       emoji: "🔍",
       title: "Review Before Approving",
-      body: `${rubberStampRate}% of your approvals were followed by corrections — you're rubber-stamping agent work without checking it. Take a moment to review changes before saying "looks good".`,
+      body: `${rubberStampRate}% of your approvals were followed by corrections — you're rubber-stamping agent work without checking it. Take a moment to review changes before saying "looks good".\n\n💡 Example: Instead of immediately saying "looks good" after the agent generates 200 lines, try "Let me check the error handling — does the catch block in processOrder() log the error before rethrowing?"`,
     });
   }
 
@@ -252,7 +252,7 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
       priority: "high",
       emoji: "⏰",
       title: "Catch Issues Earlier",
-      body: `${totalLateCatches} late catches detected (going back to fix earlier mistakes). Review each step as it happens rather than building on top of unchecked work.`,
+      body: `${totalLateCatches} late catches detected (going back to fix earlier mistakes). Review each step as it happens rather than building on top of unchecked work.\n\n💡 Example: Instead of letting the agent build 5 components then realizing the data model is wrong, try reviewing after step 1: "Before you continue — does this schema handle the case where a user has multiple roles?"`,
     });
   }
 
@@ -261,7 +261,7 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
       priority: "medium",
       emoji: "📝",
       title: "Get It Right First Time",
-      body: `${totalThrashedFiles} files were edited 3+ times in single sessions. Give clearer requirements upfront so the agent doesn't have to keep revising the same file.`,
+      body: `${totalThrashedFiles} files were edited 3+ times in single sessions. Give clearer requirements upfront so the agent doesn't have to keep revising the same file.\n\n💡 Example: Instead of "Add a user table" → "Actually add an email column" → "Make email unique" → "Add created_at too", try "Create a users table with: id (uuid, pk), email (unique, not null), name, created_at (default now)."`,
     });
   }
 
@@ -271,7 +271,7 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
       priority: "medium",
       emoji: "🤖",
       title: "Don't Auto-Pilot",
-      body: `${streakSessions.length} sessions had 5+ consecutive approvals without review. Long approval streaks suggest you're trusting the agent blindly — spot-check intermediate results.`,
+      body: `${streakSessions.length} sessions had 5+ consecutive approvals without review. Long approval streaks suggest you're trusting the agent blindly — spot-check intermediate results.\n\n💡 Example: After 3 approvals in a row, pause and ask: "Show me the test coverage for the changes so far" or "Run the existing tests to make sure nothing broke."`,
     });
   }
 

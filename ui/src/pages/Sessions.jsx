@@ -118,20 +118,20 @@ export default function Sessions() {
             <p>No redirections found. Your prompting is on point!</p>
           </div>
         ) : (
-          <table className="session-table">
+          <table className="session-table" style={{ tableLayout: "fixed", width: "100%" }}>
             <thead>
               <tr>
-                <th>Session</th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", minWidth: 60 }}>
+                <th style={{ textAlign: "left" }}>Session</th>
+                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 80 }}>
                   Turns{arrow("turnCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", minWidth: 60 }}>
+                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 100 }}>
                   Redirections{arrow("redirectionCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", minWidth: 80 }}>
+                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 80 }}>
                   Rate{arrow("redirectionRate")}
                 </th>
-                <th>Top Issue</th>
+                <th style={{ width: 120 }}>Top Issue</th>
                 <th style={{ width: 40 }}></th>
               </tr>
             </thead>

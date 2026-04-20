@@ -469,6 +469,11 @@ function ChallengeMode() {
               </div>
             )}
             {challenge.hint && <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>💡 <em>{challenge.hint}</em></p>}
+            {challenge.hint && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#3fb950" }}>
+                ✅ <strong>How to improve:</strong> {challenge.suggestion || challenge.hint}
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>

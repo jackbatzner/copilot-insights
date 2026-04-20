@@ -129,6 +129,12 @@ export default function Overview() {
       </div>
 
       {/* Charts */}
+      <div style={{ background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13 }}>
+        <strong style={{ color: "var(--accent)" }}>💡 What is a "redirection"?</strong>
+        <span style={{ color: "var(--text-muted)", marginLeft: 8 }}>
+          Any turn where you correct, redirect, or have to repeat yourself to the agent. A lower redirection rate means you provided better clarity upfront. Under 10% is smooth sailing; over 25% means your prompts need more context.
+        </span>
+      </div>
       <div className="charts-grid">
         <div className="card">
           <div className="card-header">Redirection Rate Over Time</div>
@@ -137,6 +143,16 @@ export default function Overview() {
         <div className="card">
           <div className="card-header">By Category</div>
           <CategoryBreakdown categoryTotals={aggregate.categoryTotals} />
+          <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text-muted)" }}>
+            <strong style={{ color: "var(--text)", fontSize: 13 }}>What each category means:</strong>
+            <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+              <div><strong style={{ color: "#f85149" }}>Explicit Correction</strong> — You directly told the agent it was wrong ("no", "that's not right"). <em>Reduce by providing clearer acceptance criteria upfront.</em></div>
+              <div><strong style={{ color: "#d29922" }}>Course Change</strong> — You changed direction mid-task. <em>Some is natural as you learn; frequent changes suggest the goal wasn't clear at the start.</em></div>
+              <div><strong style={{ color: "#bc8cff" }}>Repetition</strong> — You had to restate the same instruction. <em>The agent didn't "get it" — try rephrasing with examples or constraints.</em></div>
+              <div><strong style={{ color: "#58a6ff" }}>Rollback</strong> — You asked the agent to undo or revert changes. <em>Review agent output more carefully before approving, or add tests to catch issues early.</em></div>
+              <div><strong style={{ color: "#8b949e" }}>Frustration</strong> — Emotional signals or repeated failures. <em>If this is high, step back and re-scope the task into smaller, clearer chunks.</em></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -238,11 +254,11 @@ export default function Overview() {
                   <div style={{ fontSize: 11, color: "#8b949e" }}>Total Sessions</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{(workStyle.summary.vibeRate * 100).toFixed(0)}%</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{workStyle.summary.vibeRate}%</div>
                   <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{(workStyle.summary.structuredRate * 100).toFixed(0)}%</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{workStyle.summary.structuredRate}%</div>
                   <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
@@ -255,6 +271,18 @@ export default function Overview() {
                   💡 <strong>Coaching Tip:</strong> {workStyle.coachingTip}
                 </div>
               )}
+              <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}>
+                <strong style={{ color: "var(--accent)", fontSize: 13 }}>🎯 Which style fits which task?</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#58a6ff" }}>🌊 Vibe</strong> — Quick fixes, typos, simple refactors. Low risk, you know the codebase well.</div>
+                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#3fb950" }}>📋 Structured</strong> — New features, architecture changes, multi-file tasks. Plan first, then delegate.</div>
+                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#d29922" }}>🔄 Iterative</strong> — Debugging, exploration, learning new APIs. Back-and-forth is expected.</div>
+                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#8b949e" }}>🔀 Mixed</strong> — Tasks that evolve. Fine if intentional, but frequent mixing may mean unclear goals upfront.</div>
+                </div>
+                <div style={{ marginTop: 8, color: "var(--text-muted)" }}>
+                  💡 <strong>Key insight:</strong> Match your style to your task. Structured for complex, vibe for simple. If you're iterating on something you already understand well, consider whether a clearer upfront spec could have saved turns.
+                </div>
+              </div>
             </div>
           </div>
 

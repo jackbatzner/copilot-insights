@@ -4,6 +4,7 @@ import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSe
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
+import { MetricHelp } from "../components/MetricHelp";
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -47,7 +48,7 @@ export default function SessionDetail() {
   const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
     data;
 
-  const isLearningSession = complexity && complexity.fileOps === 0 && complexity.uniqueFiles === 0;
+  const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
 
   return (
     <>
@@ -99,7 +100,12 @@ export default function SessionDetail() {
           <div className="stat-value">{session.turnCount}</div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Redirections</div>
+          <div className="card-header"><MetricHelp
+            label="Redirections"
+            definition="Turns where you corrected, redirected, or repeated yourself to the agent. Each one means the agent didn't do what you wanted on the first try."
+            target="Fewer is better. Under 10% of turns is smooth; over 25% means your opening prompt needed more context."
+            action="Add file paths, constraints, and acceptance criteria to your first message. The clearer your initial prompt, the fewer redirections you'll need."
+          /></div>
           <div className={`stat-value ${rateColor(stats.redirectionRate)}`}>
             {stats.totalRedirections}
           </div>

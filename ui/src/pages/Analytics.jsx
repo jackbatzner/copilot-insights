@@ -8,6 +8,7 @@ import {
   fetchCreateEditRatio,
   fetchFileTypes,
   fetchWorkStyle,
+  fetchSessions,
 } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import {
@@ -36,6 +37,7 @@ export default function Analytics() {
   const [files, setFiles] = useState(null);
   const [depth, setDepth] = useState(null);
   const [tools, setTools] = useState(null);
+  const [sessions, setSessions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("patterns");
@@ -52,8 +54,9 @@ export default function Analytics() {
       fetchWorkStyle(timeframe),
       fetchCreateEditRatio(timeframe),
       fetchFileTypes(timeframe),
+      fetchSessions(timeframe).catch(() => null),
     ])
-      .then(([p, r, f, d, t, ws, ce, ft]) => {
+      .then(([p, r, f, d, t, ws, ce, ft, sess]) => {
         setPromptLen(p);
         setRepos(r);
         setFiles(f);
@@ -62,10 +65,18 @@ export default function Analytics() {
         setWorkStyle(ws);
         setCreateEdit(ce);
         setFileTypes(ft);
+        setSessions(sess);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [timeframe, refreshKey]);
+
+  const avgRedirectionRate = (() => {
+    if (!sessions?.aggregate) return null;
+    const { sessionsAnalyzed, avgRedirectionRate } = sessions.aggregate;
+    if (avgRedirectionRate != null) return (avgRedirectionRate * 100).toFixed(1);
+    return null;
+  })();
 
   if (loading) return <div className="loading">Crunching analytics…</div>;
   if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
@@ -89,7 +100,7 @@ export default function Analytics() {
         />
         <StatCard
           label={<MetricHelp label="Avg Redirection Rate" definition="Average percentage of turns that are redirections (agent changing direction due to unclear instructions) across all sessions." target="Below 20% is good. High rates suggest prompts need more context or clearer framing." />}
-          value={depth?.avgRedirectionRate != null ? `${depth.avgRedirectionRate}%` : "—"}
+          value={avgRedirectionRate != null ? `${avgRedirectionRate}%` : "—"}
           sub="redirections / turns"
         />
         <StatCard

@@ -108,11 +108,11 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
     ...(delegation ? buildDelegationSuggestions(delegation) : []),
     ...(efficiency?.aggregate?.totalDripFeeds > 5 ? [{
       priority: "medium", emoji: "💧", title: "Reduce Drip-Feeding",
-      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load requirements in your first message.`,
+      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load requirements in your first message.\n\n💡 Example: Instead of "Add a button" → "Make it blue" → "Put it in the header" → "It should call /api/save", try "Add a blue 'Save' button in the header that calls POST /api/save on click."`,
     }] : []),
     ...(clarity?.avgScore < 50 ? [{
       priority: "high", emoji: "📝", title: "Improve Opening Prompts",
-      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior in your first message.`,
+      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior in your first message.\n\n💡 Example: Instead of "Fix the login bug", try "The POST /api/login endpoint returns 401 for valid credentials. Check JWT verification in src/auth.ts — I think token expiry uses seconds instead of milliseconds."`,
     }] : []),
   ].sort((a, b) => {
     const p = { high: 0, medium: 1, low: 2, info: 3 };
@@ -125,7 +125,7 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
         <div className="card-header">🎯 Key Metrics</div>
         <div className="stats-grid stats-grid-4">
           <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters. Higher means the agent is doing more of the work." target="2x+ is good, 3x+ is excellent." action="Delegate higher-level tasks instead of giving step-by-step instructions." />} value={`${delegation?.overallLeverage ?? 0}x`} sub="output/input ratio" />
-          <MiniStat label="File Operations" value={delegation?.totalFileOps ?? 0} sub="agent-created files" />
+          <MiniStat label={<MetricHelp label="File Operations" definition="Number of files the agent created or edited across your sessions. More file operations = agent doing more real work (not just chatting)." target="Higher is better — it means you're using the agent for actual coding tasks." action="When delegating, include specific files and paths. Agents perform best when they know exactly where to make changes." />} value={delegation?.totalFileOps ?? 0} sub="agent-created files" />
           <MiniStat label={<MetricHelp label="Rubber-Stamp Rate" definition="How often you approved agent work and then had to correct it — approving without properly reviewing." target="0% is ideal. Over 30% is heavily penalized." action="Read agent output carefully before approving. Check that it actually does what you asked." />} value={`${judgment?.rubberStampRate ?? 0}%`} sub="approvals before fix" />
           <MiniStat label={<MetricHelp label="Turn Efficiency" definition="Percentage of your turns that are productive (not corrections or redirections)." target="90%+ excellent, 75%+ good, below 60% needs work." action="Provide clearer upfront context to reduce back-and-forth corrections." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
         </div>
@@ -156,8 +156,8 @@ function DelegationTab({ data }) {
       <div className="stats-grid stats-grid-4">
         <MiniStat label={<MetricHelp label="Delegation Ratio" definition="Percentage of your turns that hand off work to the agent (delegations + approvals) vs. micro-managing step-by-step." target="Over 60% means good delegation. Under 30% means you're micro-managing." action="Try single-prompt kickoffs — describe the goal, not the steps." />} value={`${data.overallDelegationRatio}%`} sub="autonomous turns" />
         <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters." target="2x+ good, 3x+ excellent — agent writing much more than you type." action="Delegate bigger tasks to increase the agent's output per your input." />} value={`${data.overallLeverage}x`} sub="output per input char" />
-        <MiniStat label="File Operations" value={data.totalFileOps} sub="agent-touched files" />
-        <MiniStat label="Your Input" value={`${data.userInputKB}KB`} sub={`→ ${data.agentOutputKB}KB output`} />
+        <MiniStat label={<MetricHelp label="File Operations" definition="Number of files the agent created or edited. More file operations = agent doing more real work." target="Higher is better for coding tasks. Zero means no code was produced." />} value={data.totalFileOps} sub="agent-touched files" />
+        <MiniStat label={<MetricHelp label="Input → Output" definition="Total characters you typed (input) vs. total characters the agent produced (output). A higher ratio means the agent is generating more code per keystroke you invest." target="Higher output-to-input ratio = better delegation. You want the agent writing significantly more than you type." action="Delegate bigger tasks with clear specs instead of providing step-by-step instructions." />} value={`${data.userInputKB}KB`} sub={`→ ${data.agentOutputKB}KB output`} />
       </div>
 
       {/* Turn type breakdown */}
@@ -192,6 +192,8 @@ function DelegationTab({ data }) {
               <div><strong style={{ color: "var(--text)" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
               <div><strong style={{ color: "var(--text)" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
               <div><strong style={{ color: "var(--text)" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>💬 Collaborative</strong> — Conversational back-and-forth where you and the agent work through the problem together. <em>Good for exploring options, but may be less efficient than clear delegation.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>📑 Detailed Spec</strong> — Long, structured prompts with specific requirements, constraints, and acceptance criteria. <em>Excellent for complex tasks — this IS good delegation when done upfront.</em></div>
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
               💡 <strong>Ideal distribution:</strong> High delegation + some approval, low guided + low correction. The shift from Guided→Delegation means you're trusting the agent with HOW, while you focus on WHAT and WHY — that's Create Clarity.
@@ -212,6 +214,19 @@ function DelegationTab({ data }) {
                 <span className="pill-count" style={{ background: "#58a6ff" }}>{s.count}</span>
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
+            <strong style={{ color: "var(--accent)" }}>📖 What each session style means:</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
+              <div><strong style={{ color: "var(--text)" }}>🤝 Delegator</strong> — You defined the goal and let the agent handle execution. <em>Ideal for tasks where you trust the agent's judgment. Your delegation ratio was high ({'>'}60%).</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🛠️ Hands-on</strong> — You guided the agent step-by-step. <em>Fine for learning, but for tasks you've done before, try shifting to delegation — define WHAT, not HOW.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🔍 Exploratory</strong> — You asked lots of questions to understand something. <em>Great for learning! These are discovery sessions — don't judge them on delegation metrics.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🔄 Corrective</strong> — You spent a lot of turns fixing the agent's output. <em>Review your opening prompt — more context upfront usually prevents excessive corrections.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>💬 Collaborative</strong> — A balanced back-and-forth. <em>Default style — not bad, but consider whether a clearer initial spec could have been more efficient.</em></div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+              💡 <strong>Action:</strong> Aim for more Delegator sessions on tasks you understand well. Reserve Hands-on and Exploratory for genuinely new territory.
+            </div>
           </div>
         </div>
       )}
@@ -503,13 +518,13 @@ function buildDelegationSuggestions(data) {
   if (data.overallDelegationRatio < 20) {
     suggestions.push({
       priority: "medium", emoji: "🤝", title: "Delegate More",
-      body: `Only ${data.overallDelegationRatio}% delegation. Try giving high-level goals and letting the agent choose the approach.`,
+      body: `Only ${data.overallDelegationRatio}% delegation. Try giving high-level goals and letting the agent choose the approach.\n\n💡 Example: Instead of "Open src/auth.ts, find the verifyToken function, add a try/catch around line 42, and return null on error", try "Add error handling to the token verification in the auth module — if verification fails, return null gracefully."`,
     });
   }
   if (data.overallLeverage < 0.5) {
     suggestions.push({
       priority: "medium", emoji: "📈", title: "Low Agent Leverage",
-      body: `Agent output is only ${data.overallLeverage}x your input. You may be writing more than the agent — consider delegating larger chunks.`,
+      body: `Agent output is only ${data.overallLeverage}x your input. You may be writing more than the agent — consider delegating larger chunks.\n\n💡 Example: Instead of "Edit line 45 of auth.js to change the timeout from 30 to 60", try "Update the auth timeout to 60 seconds — the agent knows where to find it."`,
     });
   }
   return suggestions;

@@ -143,9 +143,14 @@ function DevPlanTab({ plan, gaps }) {
             You've manually corrected these conventions <strong style={{ color: "var(--text)" }}>{gaps.totalSignals} times</strong> across {gaps.totalGaps} patterns. Add them to your <code>.copilot-instructions.md</code> file and never correct them again.
           </div>
           {gaps.gaps?.slice(0, 3).map((g, i) => (
-            <div key={i} style={{ padding: "6px 8px", borderTop: "1px solid var(--border)", fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--text)" }}>{g.label}</span>
-              <span style={{ color: "var(--text-muted)" }}>{g.count}× corrected</span>
+            <div key={i} style={{ padding: "8px 8px", borderTop: "1px solid var(--border)", fontSize: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "var(--text)" }}>{g.label}</span>
+                <span style={{ color: "var(--text-muted)" }}>{g.count}× corrected</span>
+              </div>
+              <div style={{ marginTop: 6, padding: "6px 10px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, fontFamily: "monospace", fontSize: 11, color: "var(--text-muted)", userSelect: "all", cursor: "text" }}>
+                {g.suggestedRule || `Add to .copilot-instructions.md: "${g.label}"`}
+              </div>
             </div>
           ))}
           <div style={{ padding: "8px 8px 4px", fontSize: 11 }}>
@@ -167,6 +172,9 @@ function DevPlanTab({ plan, gaps }) {
               </div>
               <p className="opp-desc">{o.description}</p>
               <div className="opp-metric">{o.metric}</div>
+              <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
+                🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
+              </div>
             </div>
           ))}
         </div>
@@ -434,7 +442,7 @@ function WeeklyGoals({ goals }) {
             <span className="goal-target">{Math.round(g.progress)}% → {g.target}</span>
           </div>
           {focused.includes(g._idx) && g.progress < 30 && (
-            <div style={{ fontSize: 10, color: "var(--yellow)", marginTop: 2 }}>💪 Keep this as your focus next week too — habits take time to build.</div>
+            <div style={{ fontSize: 10, color: "var(--yellow)", marginTop: 2 }}>💪 Consider continuing this focus next week if you haven't mastered it yet, or pick a new area to improve.</div>
           )}
         </div>
       ))}
