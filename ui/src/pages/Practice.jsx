@@ -216,8 +216,8 @@ function SandboxMode() {
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Input Tokens</div>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: result.tokenEfficiency.estimatedRetryProbability > 0.5 ? "var(--red)" : "var(--green)" }}>
-                      {Math.round(result.tokenEfficiency.estimatedRetryProbability * 100)}%
+                    <div style={{ fontSize: 22, fontWeight: 700, color: (result.tokenEfficiency.estimatedRetryProbability ?? 0) > 0.5 ? "var(--red)" : "var(--green)" }}>
+                      {Math.round((result.tokenEfficiency.estimatedRetryProbability ?? 0) * 100)}%
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Retry Probability</div>
                   </div>
@@ -249,7 +249,7 @@ function SandboxMode() {
                   </div>
                 )}
                 <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
-                  Grade: <strong>{result.tokenEfficiency.grade}</strong> · High retry probability means prompts that need follow-ups cost 3-5× more.
+                  Grade: <strong style={{ color: result.tokenEfficiency.grade?.color }}>{result.tokenEfficiency.grade?.label || "—"}</strong> · High retry probability means prompts that need follow-ups cost 3-5× more.
                 </div>
               </div>
             </div>

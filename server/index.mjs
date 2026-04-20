@@ -1018,7 +1018,6 @@ app.get("/api/sessions/:id/tokens", (req, res) => {
  */
 app.get("/api/sources", (_req, res) => {
   try {
-    const _cliSessions = listSessions({ limit: 1 });
     const vscodeSessions = listVscodeSessions({ limit: 1 });
     res.json({
       sources: [

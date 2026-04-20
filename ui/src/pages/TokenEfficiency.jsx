@@ -59,9 +59,31 @@ export default function TokenEfficiency() {
   if (!data) return null;
 
   const { aggregate, sessions } = data;
-  const maxTokens = sessions?.length
-    ? Math.max(...sessions.map((s) => s.totalTokens || 0))
-    : 1;
+
+  // Flatten session data for display
+  const displaySessions = (sessions || []).map((s) => ({
+    sessionId: s.sessionId,
+    summary: s.summary,
+    totalTokens: s.efficiency?.totalTokens || 0,
+    wastedTokens: s.efficiency?.wastedTokens || 0,
+    efficiencyRatio: s.efficiency?.efficiencyRatio,
+    grade: s.efficiency?.grade?.label || "—",
+  }));
+
+  // Build waste breakdown as {category: tokens} from the array shape
+  const wasteBreakdown = {};
+  if (aggregate?.wasteByCategory) {
+    for (const { category, tokens } of aggregate.wasteByCategory) {
+      wasteBreakdown[category] = tokens;
+    }
+  }
+
+  // Derive aggregate display values
+  const aggWastedTokens = aggregate?.totalWasted || 0;
+  const aggEfficiencyPct = aggregate?.avgEfficiency ?? null;
+  const aggGrade = aggEfficiencyPct != null
+    ? (aggEfficiencyPct >= 90 ? "Excellent" : aggEfficiencyPct >= 75 ? "Good" : aggEfficiencyPct >= 60 ? "Needs Work" : "Poor")
+    : null;
 
   return (
     <div className="page">
@@ -70,6 +92,7 @@ export default function TokenEfficiency() {
         <select
           value={timeframe}
           onChange={(e) => setTimeframe(e.target.value)}
+          aria-label="Select time period for token efficiency data"
           style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}
         >
           <option value="7d">Last 7 days</option>
@@ -94,18 +117,18 @@ export default function TokenEfficiency() {
             </div>
             <div>
               <div style={{ fontSize: 28, fontWeight: 700, color: "var(--red)" }}>
-                {aggregate.wastedTokens?.toLocaleString() || "—"}
+                {aggWastedTokens > 0 ? aggWastedTokens.toLocaleString() : "—"}
               </div>
               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Wasted Tokens</div>
             </div>
             <div>
               <div style={{ fontSize: 28, fontWeight: 700, color: "var(--green)" }}>
-                {aggregate.efficiencyRatio != null ? `${Math.round(aggregate.efficiencyRatio * 100)}%` : "—"}
+                {aggEfficiencyPct != null ? `${aggEfficiencyPct}%` : "—"}
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Efficiency Ratio</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Efficiency</div>
             </div>
             <div>
-              <GradeBadge grade={aggregate.grade} score={aggregate.score} />
+              {aggGrade ? <GradeBadge grade={aggGrade} score={data.pillarScore} /> : <span>—</span>}
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>Overall Grade</div>
             </div>
           </div>
@@ -113,17 +136,17 @@ export default function TokenEfficiency() {
       )}
 
       {/* Waste Breakdown */}
-      {aggregate?.wasteBreakdown && Object.keys(aggregate.wasteBreakdown).length > 0 && (
+      {Object.keys(wasteBreakdown).length > 0 && (
         <div className="card" style={{ marginBottom: 16, padding: 20 }}>
           <div className="card-header" style={{ marginBottom: 12 }}>🗑️ Waste Breakdown</div>
-          {Object.entries(aggregate.wasteBreakdown)
+          {Object.entries(wasteBreakdown)
             .sort((a, b) => b[1] - a[1])
             .map(([category, tokens]) => (
               <BarChart
                 key={category}
                 label={category}
                 value={tokens}
-                max={aggregate.wastedTokens || 1}
+                max={aggWastedTokens || 1}
                 color="var(--orange)"
               />
             ))}
@@ -131,7 +154,7 @@ export default function TokenEfficiency() {
       )}
 
       {/* Per-Session Table */}
-      {sessions && sessions.length > 0 && (
+      {displaySessions.length > 0 && (
         <div className="card" style={{ padding: 0 }}>
           <div className="card-header" style={{ padding: "12px 16px" }}>📊 Sessions by Token Usage</div>
           <table className="session-table">
@@ -145,13 +168,13 @@ export default function TokenEfficiency() {
               </tr>
             </thead>
             <tbody>
-              {sessions.slice(0, 20).map((s) => (
+              {displaySessions.slice(0, 20).map((s) => (
                 <tr key={s.sessionId}>
                   <td style={{ fontSize: 13 }}>
                     {s.summary?.substring(0, 40) || s.sessionId?.substring(0, 8)}
                   </td>
-                  <td>{(s.totalTokens || 0).toLocaleString()}</td>
-                  <td style={{ color: "var(--orange)" }}>{(s.wastedTokens || 0).toLocaleString()}</td>
+                  <td>{s.totalTokens.toLocaleString()}</td>
+                  <td style={{ color: "var(--orange)" }}>{s.wastedTokens.toLocaleString()}</td>
                   <td>{s.efficiencyRatio != null ? `${Math.round(s.efficiencyRatio * 100)}%` : "—"}</td>
                   <td><GradeBadge grade={s.grade} /></td>
                 </tr>
@@ -162,7 +185,7 @@ export default function TokenEfficiency() {
       )}
 
       {/* Empty state */}
-      {(!sessions || sessions.length === 0) && (
+      {displaySessions.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "40px 16px" }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>📭</div>
           <div style={{ fontSize: 16, fontWeight: 500 }}>No token data yet</div>
