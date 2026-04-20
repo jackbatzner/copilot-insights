@@ -10,6 +10,7 @@ import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
+import { WelcomeModal } from "./components/WelcomeModal.jsx";
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -33,10 +34,12 @@ function App() {
   return (
     <RefreshContext.Provider value={{ key: refreshKey, refresh, lastRefresh }}>
       <div className="app-layout">
+        <WelcomeModal />
         <nav className="sidebar">
           <div className="sidebar-logo">
             <span>💡</span> Copilot Insights
           </div>
+          <div className="nav-group-label">CORE</div>
           <NavLink to="/" end>
             <span className="nav-icon">📊</span><span className="nav-label">Overview</span>
           </NavLink>
@@ -46,6 +49,10 @@ function App() {
           <NavLink to="/learn">
             <span className="nav-icon">📚</span><span className="nav-label">Learn</span>
           </NavLink>
+          <NavLink to="/sessions">
+            <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
+          </NavLink>
+          <div className="nav-group-label">ADVANCED</div>
           <NavLink to="/analytics">
             <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
           </NavLink>
@@ -54,9 +61,6 @@ function App() {
           </NavLink>
           <NavLink to="/instructions">
             <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
-          </NavLink>
-          <NavLink to="/sessions">
-            <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
           </NavLink>
           <NavLink to="/practice">
             <span className="nav-icon">🧪</span><span className="nav-label">Practice</span>

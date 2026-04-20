@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { fetchInstructionGaps, fetchInstructionFailures } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { Link } from "react-router-dom";
 
 const CATEGORY_LABELS = {
   convention: { label: "Style & Conventions", emoji: "🎨", color: "#bc8cff" },
@@ -54,6 +56,9 @@ export default function Instructions() {
         <h1>⚙️ Instructions</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="instructions">
+        Analyzes your sessions to find conventions you teach the agent by hand (missing rules) and rules the agent already knows but ignores (failures). Add missing rules to your instruction files; rewrite vague rules that keep failing.
+      </PageBanner>
 
       {/* Tab switcher */}
       <div className="tab-bar">
@@ -295,7 +300,9 @@ function FailuresTab({ data }) {
               {data.worstSessions.slice(0, 5).map((s, i) => (
                 <tr key={i}>
                   <td className="truncate" style={{ maxWidth: 300 }} title={s.summary}>
-                    {s.summary || s.branch || s.id.substring(0, 8)}
+                    <Link to={`/sessions/${s.id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                      {s.summary || s.branch || s.id.substring(0, 8)}
+                    </Link>
                   </td>
                   <td>
                     <span className="clarity-badge" style={{ background: s.signalCount > 3 ? "#f85149" : "#d29922" }}>
@@ -313,10 +320,13 @@ function FailuresTab({ data }) {
         </div>
       )}
 
-      {/* Example signals */}
+      {/* Example signals with actionable context */}
       {data.examples?.length > 0 && (
         <div className="card">
           <div className="card-header">📋 Example Failure Signals</div>
+          <div style={{ padding: "8px 16px 0", fontSize: 12, color: "var(--text-muted)" }}>
+            Each example shows what you said to correct the agent. If you see the same correction repeatedly, add it as a rule in your instruction file.
+          </div>
           <div className="failure-examples">
             {data.examples.slice(0, 10).map((ex, i) => (
               <div key={i} className="failure-example">
@@ -326,6 +336,9 @@ function FailuresTab({ data }) {
                   <span className="failure-example-repo">{ex.repo}</span>
                 </div>
                 <code className="failure-example-text">{ex.context}</code>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                  💡 <em>Consider adding to instructions: "{ex.label}"</em>
+                </div>
               </div>
             ))}
           </div>
