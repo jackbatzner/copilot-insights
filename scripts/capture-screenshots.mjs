@@ -99,6 +99,10 @@ try {
     ? allPages.filter((p) => pageFilter.includes(p.name))
     : allPages;
 
+  // Dismiss the WelcomeModal so it doesn't block interactions
+  await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await page.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
+
   for (const p of filtered) {
     // Practice page: navigate to Rewrite Challenge with a loaded challenge
     if (p.name === "practice") {
