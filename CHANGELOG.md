@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **UX improvements** — Context, clarity, actionability, and session detection overhaul
+  - **Welcome modal** — First-time onboarding flow with dismissable intro
+  - **Page banners** — Contextual info banners on dashboard pages (dismissable, persisted)
+  - **Metric help tooltips** — Inline `MetricHelp` component explaining scores and pillars
+  - **Session type detection** — Auto-detects testing, debugging, and refactoring sessions from turn patterns
+  - **Manual session tagging** — Tag any session with a custom label, persisted to localStorage
+  - **Grade explainer** — Expanded tier display with score breakdown on Overview page
+  - **Coaching tips** — Actionable example tips in judgment feedback (judgment.mjs)
+  - **Suggested next actions** — `SuggestedNext` component with contextual follow-up prompts
+  - **Weekly goals** — Goal-setting with habit stacking on Learn page
+  - **Dev plan tab** — Structured improvement plan view on Learn page
 - **Session hiding** — Hide specific sessions (e.g., automated loops) from all analysis
   - 🙈 toggle per session row in the Sessions table, hide/unhide button in Session Detail
   - Hidden sessions are excluded from every analysis endpoint (summary, patterns, coaching, analytics, etc.)
@@ -69,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validate `since` query parameter on `/api/live/feed` — returns 400 for invalid dates
 - Create/Edit ratio and File Type Diversity charts rendering correctly
 - Mobile responsive overlap of tables and graphs on tablet/mobile
+- **Rules of Hooks crash** — `useState` for session tag was declared after conditional early returns in SessionDetail, causing React to throw on state transitions
+- **localStorage hardening** — Wrapped all `localStorage` read/write calls in try/catch across PageBanner, WelcomeModal, and SessionDetail to prevent crashes in Safari private browsing and restricted webviews
+- **Pure state updater** — Moved `localStorage.setItem` out of `useState` updater in Learn.jsx WeeklyGoals into a `useEffect` sync
+- **Dead code** — Removed unreachable `tier.description` conditional in Overview (field doesn't exist in TIERS data)
 
 ### Improved
 
