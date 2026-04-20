@@ -2286,8 +2286,8 @@ a:hover {
   .main-content { padding: 24px; }
   .stats-grid,
   .stats-grid-4,
-  .stats-grid-3,
-  .overview-hero { grid-template-columns: repeat(2, 1fr) !important; }
+  .stats-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .overview-hero { grid-template-columns: 1fr !important; }
   .stats-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
   .retro-header { flex-direction: column; text-align: center; }
   .retro-grade { font-size: 40px; min-width: auto; }
