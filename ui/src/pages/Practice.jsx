@@ -270,8 +270,10 @@ function SandboxMode() {
 function CoachingPanel({ challenge }) {
   if (!challenge) return null;
 
-  const { suggestions, heuristics, patterns, categories } = challenge;
-  const h = heuristics || {};
+  const suggestions = challenge.suggestions || [];
+  const h = challenge.heuristics || {};
+  const patterns = challenge.patterns || [];
+  const categories = challenge.categories || {};
   const details = h.details || [];
 
   // Collect the "what's wrong" items — missing quality signals

@@ -164,7 +164,7 @@ export function analyzeInstructionGaps({ repo, since, excludeIds } = {}) {
  * Turn a detected convention example into a ready-to-paste instruction line.
  * Strips matched-text artifacts and rewrites in imperative form.
  */
-function exampleToInstruction(example, label, category) {
+function exampleToInstruction(example, label) {
   if (!example) return `- ${label}`;
 
   // Clean up the example text — trim context padding, normalize whitespace
@@ -248,7 +248,7 @@ function generateSnippet(gapItems) {
     lines.push(CATEGORY_HEADINGS[cat] || `## ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
     lines.push("");
     for (const item of items) {
-      lines.push(exampleToInstruction(item.example, item.label, item.category));
+      lines.push(exampleToInstruction(item.example, item.label));
     }
     lines.push("");
   }
