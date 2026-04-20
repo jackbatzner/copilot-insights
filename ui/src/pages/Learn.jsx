@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchDevPlan, fetchProgressCheck, fetchRetro } from "../api.js";
+import { fetchDevPlan, fetchProgressCheck, fetchRetro, fetchInstructionGaps } from "../api.js";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
@@ -10,6 +10,7 @@ export default function Learn() {
   const [plan, setPlan] = useState(null);
   const [progress, setProgress] = useState(null);
   const [retro, setRetro] = useState(null);
+  const [gaps, setGaps] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [timeframe, setTimeframe] = useState("all");
@@ -21,8 +22,9 @@ export default function Learn() {
       fetchDevPlan(timeframe),
       fetchProgressCheck(timeframe),
       fetchRetro(timeframe),
+      fetchInstructionGaps(timeframe).catch(() => null),
     ])
-      .then(([p, pr, r]) => { setPlan(p); setProgress(pr); setRetro(r); })
+      .then(([p, pr, r, g]) => { setPlan(p); setProgress(pr); setRetro(r); setGaps(g); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [timeframe, refreshKey]);
@@ -44,7 +46,7 @@ export default function Learn() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="learn">
-        Your personalized improvement plan — set goals, track progress, and build better prompting habits week by week.
+        Your personalized improvement plan — pick 1-2 focus areas, build one habit at a time, and track your growth week by week. Generate Energy by making your learning visible.
       </PageBanner>
 
       {/* Pillar score hero */}
@@ -65,7 +67,7 @@ export default function Learn() {
         ))}
       </div>
 
-      {tab === "plan" && plan && <DevPlanTab plan={plan} />}
+      {tab === "plan" && plan && <DevPlanTab plan={plan} gaps={gaps} />}
       {tab === "check" && progress && <DailyCheckTab progress={progress} />}
       {tab === "retro" && retro && <RetroTab retro={retro} />}
       {tab === "learn" && plan && <ResourcesTab plan={plan} />}
@@ -86,35 +88,71 @@ function ScoreCard({ emoji, label, score, highlight }) {
       <div style={{ fontSize: 28 }}>{emoji}</div>
       <div className="stat-value" style={{ color, fontSize: 36 }}>{score}</div>
       <div className="stat-label">{label}</div>
-      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Current Score</div>
+      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+        {label === "Overall" ? "Average of 3 pillars" : "Score out of 100"}
+      </div>
       {score < 80 && <div style={{ fontSize: 10, color: "var(--yellow)" }}>→ Target: 80</div>}
     </div>
   );
 }
 
+function QuickWinsCard({ wins }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? wins : wins.slice(0, 1);
+  return (
+    <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--green)" }}>
+      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>⚡ Quick Wins — Start Here</span>
+        {wins.length > 1 && (
+          <button onClick={() => setExpanded(!expanded)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "3px 8px", cursor: "pointer" }}>
+            {expanded ? "Show less" : `Show all ${wins.length}`}
+          </button>
+        )}
+      </div>
+      {shown.map((w, i) => (
+        <div key={i} className="opportunity-item quick-win">
+          <div className="opp-header">
+            <span className="pillar-pill" data-pillar={w.pillar}>{w.pillar}</span>
+            <strong>{w.title}</strong>
+          </div>
+          <p className="opp-desc">{w.description}</p>
+          <div className="opp-metric">{w.metric}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── Dev Plan Tab ──────────────────────────────────────────────── */
-function DevPlanTab({ plan }) {
+function DevPlanTab({ plan, gaps }) {
   return (
     <>
       {/* Quick wins */}
       {plan.quickWins.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--green)" }}>
-          <div className="card-header">⚡ Quick Wins</div>
-          {plan.quickWins.map((w, i) => (
-            <div key={i} className="opportunity-item quick-win">
-              <div className="opp-header">
-                <span className="pillar-pill" data-pillar={w.pillar}>{w.pillar}</span>
-                <strong>{w.title}</strong>
-              </div>
-              <p className="opp-desc">{w.description}</p>
-              <div className="opp-metric">{w.metric}</div>
-            </div>
-          ))}
-        </div>
+        <QuickWinsCard wins={plan.quickWins} />
       )}
 
       {/* Weekly goals with habit stacking */}
       <WeeklyGoals goals={plan.weeklyGoals} />
+
+      {/* Instruction gaps — stop repeating yourself */}
+      {gaps && gaps.totalGaps > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
+          <div className="card-header">🔁 Stop Repeating Yourself</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "0 4px 8px" }}>
+            You've manually corrected these conventions <strong style={{ color: "var(--text)" }}>{gaps.totalSignals} times</strong> across {gaps.totalGaps} patterns. Add them to your <code>.copilot-instructions.md</code> file and never correct them again.
+          </div>
+          {gaps.gaps?.slice(0, 3).map((g, i) => (
+            <div key={i} style={{ padding: "6px 8px", borderTop: "1px solid var(--border)", fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "var(--text)" }}>{g.label}</span>
+              <span style={{ color: "var(--text-muted)" }}>{g.count}× corrected</span>
+            </div>
+          ))}
+          <div style={{ padding: "8px 8px 4px", fontSize: 11 }}>
+            <a href="/instructions" style={{ color: "var(--accent)" }}>View all {gaps.totalGaps} gaps →</a>
+          </div>
+        </div>
+      )}
 
       {/* High impact opportunities */}
       {plan.opportunities.filter((o) => o.type === "high_impact").length > 0 && (
@@ -217,6 +255,13 @@ function RetroTab({ retro }) {
         <div className="retro-grade">{retro.grade}</div>
         <div className="retro-summary">
           <h3>Period Retro</h3>
+          {retro.period.startDate && retro.period.endDate ? (
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              {new Date(retro.period.startDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} – {new Date(retro.period.endDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Weekly review (Mon–Sun)</div>
+          )}
           <p>{retro.period.sessions} sessions · {retro.period.totalTurns} turns · Overall {retro.pillarScores.overall}/100</p>
         </div>
       </div>
@@ -386,8 +431,11 @@ function WeeklyGoals({ goals }) {
             <div className="goal-progress-bar">
               <div className="goal-progress-fill" style={{ width: `${g.progress}%` }} />
             </div>
-            <span className="goal-target">{g.target}</span>
+            <span className="goal-target">{Math.round(g.progress)}% → {g.target}</span>
           </div>
+          {focused.includes(g._idx) && g.progress < 30 && (
+            <div style={{ fontSize: 10, color: "var(--yellow)", marginTop: 2 }}>💪 Keep this as your focus next week too — habits take time to build.</div>
+          )}
         </div>
       ))}
     </div>

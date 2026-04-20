@@ -43,7 +43,7 @@ export default function Coaching() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="coaching">
-        Detailed analysis of your three core skills — how you delegate work, review agent output, and communicate requirements.
+        Your three AI leadership skills — mapped to Microsoft's Leading with AI framework. Delegation = Create Clarity (framing problems well). Judgment = Deliver Success (owning output quality). Feedback = Generate Energy (iterating and sharing learnings).
       </PageBanner>
 
       {/* Three pillars hero */}
@@ -51,14 +51,17 @@ export default function Coaching() {
         <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
           <div className="stat-label">🤝 Delegation</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Create Clarity</div>
           <div className="stat-sub">work handed off to agent</div>
           <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {delegation?.overallDelegationRatio >= 60 ? "✅ Good delegation" : delegation?.overallDelegationRatio >= 30 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60%+
           </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Ratio: {delegation?.overallDelegationRatio}% → Score: {Math.round(delegation?.delegationScore || 0)}/100</div>
         </div>
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
           <div className="stat-label">🧠 Judgment</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Deliver Success</div>
           <div className="stat-sub">review quality / 100</div>
           <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {judgment?.avgScore >= 80 ? "✅ Excellent" : judgment?.avgScore >= 70 ? "✅ Good" : judgment?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
@@ -67,6 +70,7 @@ export default function Coaching() {
         <div className={`stat-card pillar-card ${tab === "feedback" ? "pillar-active" : ""}`} onClick={() => setTab("feedback")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
           <div className="stat-label">💬 Feedback</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Generate Energy</div>
           <div className="stat-sub">clarity score / 100</div>
           <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {clarity?.avgScore >= 80 ? "✅ Excellent" : clarity?.avgScore >= 70 ? "✅ Good" : clarity?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
@@ -180,6 +184,19 @@ function DelegationTab({ data }) {
               ))}
             </div>
           </div>
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
+            <strong style={{ color: "var(--accent)" }}>📖 What each interaction style means:</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
+              <div><strong style={{ color: "var(--text)" }}>✅ Approval</strong> — Short confirmations ("yes", "looks good", "ship it"). You're trusting the agent's output. <em>Good when output is genuinely correct.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🤝 Delegation</strong> — High-level task descriptions. You define WHAT to do, the agent decides HOW. <em>This is the goal for most tasks.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+              💡 <strong>Ideal distribution:</strong> High delegation + some approval, low guided + low correction. The shift from Guided→Delegation means you're trusting the agent with HOW, while you focus on WHAT and WHY — that's Create Clarity.
+            </div>
+          </div>
         </div>
       )}
 
@@ -204,9 +221,9 @@ function DelegationTab({ data }) {
         <div className="card">
           <div className="card-header">🚀 Most Productive Sessions</div>
           <p className="card-subtitle">Highest file operations per turn — effective delegation</p>
-          <table className="data-table">
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead>
-              <tr><th>Productivity</th><th>Output</th><th>Session</th></tr>
+              <tr><th style={{ width: 120, textAlign: "left" }}>Productivity</th><th style={{ width: 160, textAlign: "left" }}>Output</th><th style={{ textAlign: "left" }}>Session</th></tr>
             </thead>
             <tbody>
               {data.topDelegated.slice(0, 5).map((s, i) => (
@@ -276,8 +293,8 @@ function JudgmentTab({ data }) {
         <div className="card">
           <div className="card-header">🔄 Most Revised Files</div>
           <p className="card-subtitle">Files edited 3+ times in a session — sign of unclear requirements</p>
-          <table className="data-table">
-            <thead><tr><th>File</th><th>Edits</th></tr></thead>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ textAlign: "left" }}>File</th><th style={{ width: 80, textAlign: "left" }}>Edits</th></tr></thead>
             <tbody>
               {data.allThrashed.slice(0, 8).map((f, i) => (
                 <tr key={i}>
@@ -294,8 +311,8 @@ function JudgmentTab({ data }) {
       {data.worstJudgment?.length > 0 && (
         <div className="card">
           <div className="card-header">⚠️ Sessions Needing Better Review</div>
-          <table className="data-table">
-            <thead><tr><th>Score</th><th>Issues</th><th>Session</th></tr></thead>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ width: 180, textAlign: "left" }}>Issues</th><th style={{ textAlign: "left" }}>Session</th></tr></thead>
             <tbody>
               {data.worstJudgment.slice(0, 5).map((s, i) => (
                 <tr key={i}>
@@ -339,6 +356,9 @@ function FeedbackTab({ clarity, efficiency }) {
       {clarity?.topTips?.length > 0 && (
         <div className="card">
           <div className="card-header">💡 Most Common Feedback Gaps</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
+            Each percentage shows how often this element was <strong style={{ color: "var(--text)" }}>missing from your opening prompts</strong>. Higher % = bigger opportunity to improve. Adding these upfront reduces redirections.
+          </div>
           <div className="tips-list">
             {clarity.topTips.map((t, i) => (
               <div key={i} className="tip-row">
@@ -354,6 +374,9 @@ function FeedbackTab({ clarity, efficiency }) {
       {efficiency?.aggregate?.completionBreakdown && (
         <div className="card">
           <div className="card-header">🏁 Session Outcomes</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px" }}>
+            How your sessions ended. <strong style={{ color: "var(--text)" }}>Abandoned</strong> = session stopped before reaching a resolution (no final file changes or approvals after the last exchange). Some abandoned sessions are normal — the task may have become irrelevant.
+          </div>
           <div className="completion-grid">
             {Object.entries(efficiency.aggregate.completionBreakdown).map(([status, count]) => (
               <div key={status} className="completion-item">
@@ -385,8 +408,11 @@ function FeedbackTab({ clarity, efficiency }) {
       {clarity?.sessions?.length > 0 && (
         <div className="card">
           <div className="card-header">🔍 Weakest Opening Prompts</div>
-          <table className="data-table">
-            <thead><tr><th>Score</th><th>Session</th><th>Missing</th></tr></thead>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
+            Sessions with the lowest first-turn clarity scores. Some may be <strong style={{ color: "var(--accent)" }}>learning/Q&A sessions</strong> (no file edits) — these naturally score lower since they don't include file paths or acceptance criteria. Click into the session to see if it's flagged as 📚 Learning.
+          </div>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ textAlign: "left" }}>Session</th><th style={{ width: 220, textAlign: "left" }}>Missing</th></tr></thead>
             <tbody>
               {clarity.sessions.slice(0, 8).map((s) => (
                 <tr key={s.sessionId}>

@@ -63,31 +63,40 @@ export default function Overview() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="overview">
-        Your snapshot — how your prompting is trending and where you stand across delegation, judgment, and feedback.
+        Your snapshot of how you lead AI — tracking your growth across the skills that matter: framing problems clearly (Create Clarity), reviewing output critically (Deliver Success), and iterating intentionally (Generate Energy).
       </PageBanner>
 
       {/* Hero stats */}
       <div className="stats-grid stats-grid-overview">
         {pillarTrends && (
-          <div className="card" style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div className="card" style={{ textAlign: "center", padding: "12px 16px" }}>
             <div className="card-header">Your Tier</div>
-            <div style={{ fontSize: 48, margin: "4px 0" }}>{tier.emoji}</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{tier.name}</div>
+            <div style={{ fontSize: 36, margin: "4px 0" }}>{tier.emoji} {tier.name}</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{tier.description || `Score: ${overallScore}/100`}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {[...TIERS].reverse().map((t) => {
+                const isCurrent = t.name === tier.name;
+                const isPast = t.min < tier.min;
+                return (
+                  <div key={t.name} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
+                    borderRadius: 6, fontSize: 12,
+                    background: isCurrent ? "rgba(88, 166, 255, 0.12)" : "transparent",
+                    border: isCurrent ? "1px solid var(--accent)" : "1px solid transparent",
+                    opacity: isPast ? 0.4 : 1,
+                  }}>
+                    <span style={{ width: 24 }}>{t.emoji}</span>
+                    <span style={{ flex: 1, textAlign: "left", fontWeight: isCurrent ? 700 : 400, color: isCurrent ? "var(--accent)" : "var(--text)" }}>{t.name}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t.min}+</span>
+                    {isCurrent && <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>← YOU</span>}
+                  </div>
+                );
+              })}
+            </div>
             {tier.next && (
-              <div style={{ width: "80%", marginTop: 8 }}>
-                <div style={{ height: 4, background: "var(--border)", borderRadius: 2 }}>
-                  <div style={{
-                    width: `${Math.round((overallScore - tier.min) / (tier.next.min - tier.min) * 100)}%`,
-                    height: "100%", borderRadius: 2, background: "var(--green)", transition: "width 0.3s"
-                  }} />
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                  {tier.next.min - overallScore} pts to {tier.next.emoji} {tier.next.name}
-                </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                {tier.next.min - overallScore} points to reach {tier.next.emoji} {tier.next.name}
               </div>
-            )}
-            {!tier.next && (
-              <div style={{ fontSize: 11, color: "var(--green)", marginTop: 4 }}>Max tier reached!</div>
             )}
           </div>
         )}
@@ -274,6 +283,33 @@ export default function Overview() {
               </div>
             </div>
           )}
+
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="card-header">📖 Understanding Your Work Styles</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "0 4px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 8 }}>
+                <div style={{ borderLeft: "3px solid #3fb950", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>🏗️ Structured</strong>
+                  <div style={{ marginTop: 4 }}>You planned first — defined the problem, constraints, and approach before writing code. Best for complex tasks. Maps to <em>Create Clarity</em>.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #f85149", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>⚡ Vibe Coding</strong>
+                  <div style={{ marginTop: 4 }}>You jumped straight to code (first file edit on turn 0-1). Great for quick fixes and small tasks. Risk: more redirections on complex work.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #d29922", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>🔄 Iterative</strong>
+                  <div style={{ marginTop: 4 }}>You alternated between planning and coding. Good for exploration where requirements evolve, but watch for excessive back-and-forth.</div>
+                </div>
+                <div style={{ borderLeft: "3px solid #58a6ff", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>🎨 Mixed</strong>
+                  <div style={{ marginTop: 4 }}>A blend of styles within a session. This is natural — the key is matching your style to the task complexity.</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(88, 166, 255, 0.06)", borderRadius: 6, fontSize: 12 }}>
+                💡 <strong>What's in it for you?</strong> Structured sessions have the lowest redirection rates. As tasks get more complex, planning first saves turns and frustration. The goal isn't to always be structured — it's to <em>match your approach to the task</em>.
+              </div>
+            </div>
+          </div>
         </>
       )}
 

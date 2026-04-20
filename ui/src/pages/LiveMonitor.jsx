@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchLiveFeed } from "../api";
+import { PageBanner } from "../components/PageBanner.jsx";
 
 const POLL_INTERVAL = 5000;
 
@@ -102,6 +103,10 @@ export default function LiveMonitor() {
           </span>
         </div>
       </div>
+
+      <PageBanner pageId="live-monitor">
+        Real-time view of your active coding sessions — useful when you're working in another window and want to monitor how the agent is performing. Alerts flag redirections, frustration signals, and rollbacks as they happen. Most users check this during active sessions, not as a daily dashboard.
+      </PageBanner>
 
       {error && (
         <div className="card" style={{ borderColor: "var(--red)", marginBottom: 12 }}>

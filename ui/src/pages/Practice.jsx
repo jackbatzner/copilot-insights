@@ -14,7 +14,7 @@ export default function Practice() {
         <h1>🧪 Practice Lab</h1>
       </div>
       <PageBanner pageId="practice">
-        Practice prompting in a sandbox with instant feedback, or try rewriting real prompts from your sessions to improve your score.
+        Practice rewriting real prompts from your sessions. The goal: Create Clarity upfront so the agent can deliver on the first try.
       </PageBanner>
       <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
@@ -267,6 +267,20 @@ function SandboxMode() {
 
 /* ── Challenge Mode ────────────────────────────────────────── */
 
+const TAG_EXPLANATIONS = {
+  vague: "The prompt is too short or generic for the agent to know what you actually want. Add specifics: what file, what behavior, what the output should look like.",
+  "no-files": "No file paths are mentioned, so the agent has to guess which files to work on — leading to wasted turns or wrong edits. Specify the files upfront.",
+  "no-context": "The prompt lacks background about why this change is needed or how it fits into the bigger picture. The agent works better when it understands the intent.",
+  "no-constraints": "No boundaries are set (language, framework, style, scope). Without constraints, the agent may choose an approach that doesn't fit your project.",
+  "no-criteria": "There's no definition of done — how should the agent know when it's finished? Add acceptance criteria: what should work, what tests to pass, what output to expect.",
+  "no-examples": "No example input/output is provided. Examples are the fastest way to show the agent exactly what you expect.",
+  "no-format": "The prompt doesn't specify what format the output should be in (code, markdown, JSON, etc.). Be explicit about the deliverable.",
+  "no-steps": "This is a complex task crammed into one prompt. Break it into smaller steps so the agent can succeed at each one before moving to the next.",
+  correction: "This prompt is a correction of something the agent already did wrong. To avoid this, provide clearer constraints and examples in the original prompt.",
+  frustration: "This prompt shows frustration — the agent isn't meeting expectations. Step back and reframe: what exactly do you need, and what has the agent gotten wrong?",
+  rollback: "You're asking the agent to undo its work. This usually means the original prompt was missing constraints or acceptance criteria.",
+};
+
 const TAG_LABELS = {
   "": "All Topics",
   vague: "🔍 Vague / Too Short",
@@ -441,13 +455,16 @@ function ChallengeMode() {
         </div>
         {challenge && (challenge.tags || challenge.hint || challenge.category) && (
           <div style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 4, fontSize: 13 }}>
+            <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 8, fontSize: 13 }}>
               🔍 What's wrong with this prompt?
             </div>
             {challenge.tags && (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
                 {(Array.isArray(challenge.tags) ? challenge.tags : [challenge.tags]).map((tag, i) => (
-                  <span key={i} style={{ background: "rgba(248, 81, 73, 0.15)", color: "#f85149", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500 }}>{tag}</span>
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span style={{ background: "rgba(248, 81, 73, 0.15)", color: "#f85149", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", marginTop: 1 }}>{TAG_LABELS[tag] || tag}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{TAG_EXPLANATIONS[tag] || ""}</span>
+                  </div>
                 ))}
               </div>
             )}

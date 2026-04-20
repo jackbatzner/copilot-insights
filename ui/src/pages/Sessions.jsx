@@ -76,7 +76,7 @@ export default function Sessions() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="sessions">
-        Browse and filter your sessions — click any to see the turn-by-turn detail with annotations showing where redirections happened.
+        Your session history — click any session to see the turn-by-turn replay and understand what worked vs. what needed course correction.
       </PageBanner>
 
       <div className="filter-bar">

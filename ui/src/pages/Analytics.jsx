@@ -77,7 +77,7 @@ export default function Analytics() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="analytics">
-        Patterns in your prompting style — when you're most productive, how prompt length affects outcomes, and repository health.
+        Patterns in how you interact with AI — understand your working style so you can make deliberate choices about when to plan first vs. dive in.
       </PageBanner>
 
       {/* Hero stats */}
@@ -88,9 +88,9 @@ export default function Analytics() {
           sub="in timeframe"
         />
         <StatCard
-          label={<MetricHelp label="Avg Depth" definition="Average number of conversation turns per session." target="Depends on task complexity. Look at redirection rate rather than raw depth." />}
-          value={depth?.avgTurns ? `${depth.avgTurns} turns` : "—"}
-          sub="per session"
+          label={<MetricHelp label="Avg Redirection Rate" definition="Average percentage of turns that are redirections (agent changing direction due to unclear instructions) across all sessions." target="Below 20% is good. High rates suggest prompts need more context or clearer framing." />}
+          value={depth?.avgRedirectionRate != null ? `${depth.avgRedirectionRate}%` : "—"}
+          sub="redirections / turns"
         />
         <StatCard
           label="Files Touched"
@@ -118,6 +118,26 @@ export default function Analytics() {
               <div className="card-header">🎨 Work Style Distribution</div>
               <p className="card-subtitle">How you approach sessions: vibe, structured, iterative, or mixed</p>
               {workStyle && <WorkStyleChart data={workStyle} />}
+              <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ borderLeft: "3px solid #3fb950", paddingLeft: 10 }}>
+                    <strong style={{ color: "var(--text)" }}>🏗️ Structured</strong>
+                    <div style={{ marginTop: 4 }}>Planned first — defined the problem before writing code. Best for complex tasks.</div>
+                  </div>
+                  <div style={{ borderLeft: "3px solid #f85149", paddingLeft: 10 }}>
+                    <strong style={{ color: "var(--text)" }}>⚡ Vibe Coding</strong>
+                    <div style={{ marginTop: 4 }}>Jumped straight to code (first edit on turn 0-1). Great for quick fixes.</div>
+                  </div>
+                  <div style={{ borderLeft: "3px solid #d29922", paddingLeft: 10 }}>
+                    <strong style={{ color: "var(--text)" }}>🔄 Iterative</strong>
+                    <div style={{ marginTop: 4 }}>Alternated between planning and coding. Good for evolving requirements.</div>
+                  </div>
+                  <div style={{ borderLeft: "3px solid #58a6ff", paddingLeft: 10 }}>
+                    <strong style={{ color: "var(--text)" }}>🎨 Mixed</strong>
+                    <div style={{ marginTop: 4 }}>A blend of styles — natural when task complexity varies mid-session.</div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="card" style={{ flex: 1 }}>
               <div className="card-header"><MetricHelp label="📏 Prompt Length vs Redirections" definition="Shows how your prompt length correlates with redirection rate. Redirections occur when the agent needs to change direction due to unclear instructions." target="Aim for medium-length prompts (100-500 chars) with redirection rates below 20%." /></div>
@@ -146,6 +166,9 @@ export default function Analytics() {
               <div style={{ marginTop: 8, color: "var(--text-muted)" }}>
                 More turns isn't inherently bad — it depends on what those turns are. A 30-turn session with 0 redirections is a productive deep-dive. A 10-turn session with 5 redirections needs work. Focus on the <strong>redirection rate</strong> (redirections ÷ total turns) rather than raw turn count.
               </div>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, fontStyle: "italic" }}>
+              Focus on sessions with high redirection rates (red) rather than raw turn count. Long sessions with low redirections are productive deep-dives.
             </div>
           </div>
         </>
