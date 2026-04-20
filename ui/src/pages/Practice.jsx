@@ -261,6 +261,100 @@ function SandboxMode() {
   );
 }
 
+/* ── Coaching Panel (shown before rewrite) ─────────────────── */
+
+/**
+ * Explains specifically what's wrong with the original prompt and
+ * gives the user concrete guidance BEFORE they attempt a rewrite.
+ */
+function CoachingPanel({ challenge }) {
+  if (!challenge) return null;
+
+  const { suggestions, heuristics, patterns, categories } = challenge;
+  const h = heuristics || {};
+  const details = h.details || [];
+
+  // Collect the "what's wrong" items — missing quality signals
+  const missingSignals = details.filter((d) => d.severity === "info" || d.severity === "warning");
+
+  // If there's nothing to coach on, skip
+  if (patterns.length === 0 && missingSignals.length === 0 && (!suggestions || suggestions.length === 0)) {
+    return null;
+  }
+
+  return (
+    <div className="card coaching-panel" style={{ marginBottom: 16 }}>
+      <div className="card-header">🎓 What's Wrong With This Prompt</div>
+
+      {/* Problem patterns — explain why this prompt triggers redirections */}
+      {patterns.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">⚠️ Detected Problems</div>
+          {patterns.map((p, i) => (
+            <div key={i} className="coaching-problem">
+              <span className="coaching-problem-emoji">{categories[p.category]?.emoji || "❓"}</span>
+              <div className="coaching-problem-content">
+                <strong>{p.label}</strong>
+                {p.matchedText && (
+                  <span className="coaching-matched"> — triggered by: &ldquo;{p.matchedText}&rdquo;</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Missing quality signals — what this prompt is lacking */}
+      {missingSignals.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">📋 What's Missing</div>
+          {missingSignals.map((d, i) => (
+            <div key={i} className="coaching-missing">
+              <span className="coaching-missing-dot" style={{
+                background: d.severity === "warning" ? "#d29922" : "#58a6ff"
+              }} />
+              <div>
+                <strong>{d.label}</strong>
+                <div className="coaching-missing-tip">{d.tip}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Rewrite guides — show before/after examples for their specific patterns */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">✨ How to Fix It</div>
+          {suggestions.map((s, i) => (
+            <div key={i} className="coaching-guide">
+              <div className="coaching-guide-header">
+                {s.categoryEmoji} <strong>{s.principle}</strong>
+              </div>
+              {s.before && s.after && (
+                <div className="coaching-rewrite-example">
+                  <div className="coaching-rewrite-before">
+                    <span className="coaching-rewrite-label">❌ Before:</span>
+                    <q>{s.before}</q>
+                  </div>
+                  <div className="coaching-rewrite-after">
+                    <span className="coaching-rewrite-label">✅ After:</span>
+                    <q>{s.after}</q>
+                  </div>
+                  <div className="coaching-rewrite-why">💡 {s.why}</div>
+                </div>
+              )}
+              <ul className="coaching-tips-list">
+                {s.tips.map((t, j) => <li key={j}>{t}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Challenge Mode ────────────────────────────────────────── */
 
 const TAG_LABELS = {
@@ -468,6 +562,9 @@ function ChallengeMode() {
           </div>
         )}
       </div>
+
+      {/* Coaching panel — explain what's wrong before asking for a rewrite */}
+      <CoachingPanel challenge={challenge} />
 
       {/* Rewrite area */}
       <div className="card" style={{ marginBottom: 16 }}>

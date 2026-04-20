@@ -1112,6 +1112,60 @@ a:hover {
   margin-left: auto;
 }
 
+/* ── Instruction Snippets ─────────────────────────────────── */
+
+.snippet-block {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #0d1117;
+  overflow: hidden;
+}
+
+.snippet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(110, 118, 129, 0.1);
+  border-bottom: 1px solid var(--border);
+}
+
+.snippet-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.snippet-copy-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.snippet-copy-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.snippet-code {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e6edf3;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  overflow-x: auto;
+}
+
 /* ── Tab bar ───────────────────────────────────────────────── */
 
 .tab-bar {
@@ -2042,6 +2096,156 @@ a:hover {
 .practice-verdict-loss {
   color: var(--red);
   font-size: 14px;
+}
+
+/* ── Coaching Panel (Practice Challenge) ──────────────────── */
+
+.coaching-panel {
+  border-left: 3px solid #bc8cff;
+}
+
+.coaching-section {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.coaching-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.coaching-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.coaching-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(248, 81, 73, 0.06);
+  border-radius: var(--radius);
+  border: 1px solid rgba(248, 81, 73, 0.12);
+}
+
+.coaching-problem-emoji {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.coaching-problem-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.coaching-matched {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.coaching-missing {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.coaching-missing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.coaching-missing strong {
+  font-size: 13px;
+  color: var(--text);
+  display: block;
+}
+
+.coaching-missing-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.coaching-guide {
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: rgba(63, 185, 80, 0.05);
+  border-radius: var(--radius);
+  border: 1px solid rgba(63, 185, 80, 0.12);
+}
+
+.coaching-guide:last-child {
+  margin-bottom: 0;
+}
+
+.coaching-guide-header {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.coaching-rewrite-example {
+  margin: 10px 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.coaching-rewrite-before,
+.coaching-rewrite-after {
+  padding: 6px 0;
+}
+
+.coaching-rewrite-label {
+  font-size: 11px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.coaching-rewrite-before q {
+  color: #f85149;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.coaching-rewrite-after q {
+  color: #3fb950;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.coaching-rewrite-why {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.coaching-tips-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.coaching-tips-list li {
+  margin-bottom: 2px;
 }
 
 /*  Responsive Design ─ */
