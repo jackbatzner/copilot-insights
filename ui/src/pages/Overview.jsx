@@ -67,12 +67,12 @@ export default function Overview() {
       </PageBanner>
 
       {/* Hero stats */}
-      <div className="stats-grid stats-grid-overview">
+      <div className="overview-hero">
         {pillarTrends && (
           <div className="card" style={{ textAlign: "center", padding: "12px 16px" }}>
             <div className="card-header">Your Tier</div>
             <div style={{ fontSize: 36, margin: "4px 0" }}>{tier.emoji} {tier.name}</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{/* TODO: add description field to TIERS in tiers.mjs */}
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
             Score: {overallScore}/100</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {[...TIERS].reverse().map((t) => {
@@ -101,31 +101,33 @@ export default function Overview() {
             )}
           </div>
         )}
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Sessions Analyzed</div>
-          <div className="stat-value">{aggregate.sessionsAnalyzed}</div>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">With Redirections</div>
-          <div className={`stat-value ${rateColor(aggregate.sessionsWithRedirections / Math.max(aggregate.sessionsAnalyzed, 1))}`}>
-            {aggregate.sessionsWithRedirections}
+        <div className="overview-stats-2x2">
+          <div className="card overview-stat-card">
+            <div className="card-header">Sessions Analyzed</div>
+            <div className="stat-value">{aggregate.sessionsAnalyzed}</div>
           </div>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Total Redirections</div>
-          <div className="stat-value">{aggregate.totalRedirections}</div>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header"><MetricHelp
-            label="Avg Redirection Rate"
-            definition="Percentage of your turns that correct or redirect the agent."
-            target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
-            action="Provide more context upfront — include file paths, constraints, and acceptance criteria in your first message."
-          /></div>
-          <div className={`stat-value ${rateColor(avgRate)}`}>
-            {(avgRate * 100).toFixed(1)}%
+          <div className="card overview-stat-card">
+            <div className="card-header">With Redirections</div>
+            <div className={`stat-value ${rateColor(aggregate.sessionsWithRedirections / Math.max(aggregate.sessionsAnalyzed, 1))}`}>
+              {aggregate.sessionsWithRedirections}
+            </div>
           </div>
-          <div className="stat-label">of user turns are corrections</div>
+          <div className="card overview-stat-card">
+            <div className="card-header">Total Redirections</div>
+            <div className="stat-value">{aggregate.totalRedirections}</div>
+          </div>
+          <div className="card overview-stat-card">
+            <div className="card-header"><MetricHelp
+              label="Avg Redirection Rate"
+              definition="Percentage of your turns that correct or redirect the agent."
+              target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
+              action="Provide more context upfront — include file paths, constraints, and acceptance criteria in your first message."
+            /></div>
+            <div className={`stat-value ${rateColor(avgRate)}`}>
+              {(avgRate * 100).toFixed(1)}%
+            </div>
+            <div className="stat-label">of user turns are corrections</div>
+          </div>
         </div>
       </div>
 

@@ -217,7 +217,25 @@ a:hover {
 .stats-grid-4 { grid-template-columns: repeat(4, 1fr); }
 .stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stats-grid-2 { grid-template-columns: repeat(2, 1fr); }
-.stats-grid-overview { grid-template-columns: auto 1fr 1fr 1fr 1fr; }
+/* Overview hero: tier card + 2×2 stat grid */
+.overview-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.overview-stats-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.overview-stat-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 
 .stat-card {
   composes: card;
@@ -271,7 +289,6 @@ a:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  table-layout: fixed;
 }
 
 .data-table-wrapper,
@@ -2250,8 +2267,8 @@ a:hover {
 
 /* Mid-width: stats grids to 2 columns before tablet collapse */
 @media (max-width: 1200px) {
-  .stats-grid-4,
-  .stats-grid-overview { grid-template-columns: repeat(2, 1fr) !important; }
+  .stats-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .overview-hero { grid-template-columns: 1fr !important; }
 }
 
 /* Tablet: collapse sidebar to icons, stack grids */
@@ -2269,8 +2286,8 @@ a:hover {
   .main-content { padding: 24px; }
   .stats-grid,
   .stats-grid-4,
-  .stats-grid-3,
-  .stats-grid-overview { grid-template-columns: repeat(2, 1fr) !important; }
+  .stats-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .overview-hero { grid-template-columns: 1fr !important; }
   .stats-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
   .retro-header { flex-direction: column; text-align: center; }
   .retro-grade { font-size: 40px; min-width: auto; }
@@ -2344,7 +2361,8 @@ a:hover {
   .stats-grid-4,
   .stats-grid-3,
   .stats-grid-2,
-  .stats-grid-overview { grid-template-columns: 1fr !important; }
+  .overview-hero { grid-template-columns: 1fr !important; }
+  .overview-stats-2x2 { grid-template-columns: 1fr 1fr !important; }
   .tab-bar { overflow-x: auto; flex-wrap: nowrap; }
   .tab-btn { white-space: nowrap; flex-shrink: 0; font-size: 13px; padding: 6px 12px; }
   .card { padding: 14px; overflow-x: auto; }
