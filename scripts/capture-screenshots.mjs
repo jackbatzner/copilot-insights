@@ -84,19 +84,24 @@ try {
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
   const allPages = [
-    { path: "/",          name: "overview" },
-    { path: "/learn",     name: "learn" },
-    { path: "/sessions",  name: "sessions" },
-    { path: "/analytics", name: "analytics" },
-    { path: "/coaching",      name: "coaching" },
-    { path: "/practice",      name: "practice" },
-    { path: "/instructions",  name: "instructions" },
-    { path: "/live",          name: "live" },
+    { path: "/",                  name: "overview" },
+    { path: "/learn",             name: "learn" },
+    { path: "/sessions",          name: "sessions" },
+    { path: "/analytics",         name: "analytics" },
+    { path: "/coaching",          name: "coaching" },
+    { path: "/practice",          name: "practice" },
+    { path: "/instructions",      name: "instructions" },
+    { path: "/tokens",            name: "token-efficiency" },
+    { path: "/live",              name: "live" },
   ];
 
   const filtered = pageFilter
     ? allPages.filter((p) => pageFilter.includes(p.name))
     : allPages;
+
+  // Dismiss the WelcomeModal so it doesn't block interactions
+  await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await page.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
 
   for (const p of filtered) {
     // Practice page: navigate to Rewrite Challenge with a loaded challenge
@@ -191,6 +196,10 @@ async function recordFullDemoGif(browser, baseUrl) {
     recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } },
   });
   const gifPage = await gifContext.newPage();
+
+  // Dismiss the WelcomeModal before recording
+  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await gifPage.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
 
   // ── Scene 1: Overview — show the main dashboard ───────────────
   await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });

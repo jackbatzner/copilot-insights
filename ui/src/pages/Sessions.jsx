@@ -1,10 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
+import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession, fetchVscodeSessions } from "../api.js";
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
+
+/** Source badge component — shows CLI or VSCode origin. */
+function SourceBadge({ source }) {
+  if (source === "vscode") {
+    return (
+      <span className="source-badge source-vscode" title="VSCode Chat">
+        💬 <span className="source-label">VSCode</span>
+      </span>
+    );
+  }
+  return (
+    <span className="source-badge source-cli" title="Copilot CLI">
+      🖥️ <span className="source-label">CLI</span>
+    </span>
+  );
+}
 
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
@@ -15,23 +31,61 @@ export default function Sessions() {
   const [error, setError] = useState(null);
   const [repoFilter, setRepoFilter] = useState("");
   const [timeframe, setTimeframe] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState(() =>
+    localStorage.getItem("copilot-insights-source-filter") || "all"
+  );
   const [sortField, setSortField] = useState("totalWeight");
   const [sortDir, setSortDir] = useState("desc");
   const navigate = useNavigate();
 
+  // Persist source filter preference
+  const handleSourceChange = (val) => {
+    setSourceFilter(val);
+    localStorage.setItem("copilot-insights-source-filter", val);
+    setLoading(true);
+  };
+
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetchSessions(timeframe, repoFilter || undefined),
-      fetchHiddenSessions(),
-    ])
-      .then(([sessions, hidden]) => {
-        setData(sessions);
+    const fetchAll = async () => {
+      try {
+        const [sessions, hidden] = await Promise.all([
+          fetchSessions(timeframe, repoFilter || undefined),
+          fetchHiddenSessions(),
+        ]);
+
+        // Tag CLI sessions with source
+        const cliSessions = (sessions.sessions || []).map((s) => ({ ...s, source: s.source || "cli" }));
+
+        // Fetch VSCode sessions if needed
+        let allSessions = cliSessions;
+        if (sourceFilter === "all" || sourceFilter === "vscode") {
+          try {
+            const vscodeData = await fetchVscodeSessions(timeframe);
+            const vscodeSessions = (vscodeData.sessions || []).map((s) => ({ ...s, source: "vscode" }));
+            allSessions = [...cliSessions, ...vscodeSessions];
+          } catch {
+            // VSCode sessions unavailable — continue with CLI only
+          }
+        }
+
+        // Apply source filter
+        if (sourceFilter === "cli") {
+          allSessions = allSessions.filter((s) => s.source !== "vscode");
+        } else if (sourceFilter === "vscode") {
+          allSessions = allSessions.filter((s) => s.source === "vscode");
+        }
+
+        setData({ sessions: allSessions, aggregate: sessions.aggregate });
         setHiddenIds(new Set(hidden.sessionIds));
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [repoFilter, timeframe, refreshKey]);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, [repoFilter, timeframe, sourceFilter, refreshKey]);
 
   const toggleHide = useCallback(async (id, e) => {
     e.stopPropagation();
@@ -92,6 +146,16 @@ export default function Sessions() {
             setRepoFilter(e.target.value);
           }}
         />
+        <select
+          value={sourceFilter}
+          onChange={(e) => handleSourceChange(e.target.value)}
+          aria-label="Filter by source"
+          style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}
+        >
+          <option value="all">All Sources</option>
+          <option value="cli">🖥️ CLI Only</option>
+          <option value="vscode">💬 VSCode Only</option>
+        </select>
         <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
           {sorted.length} session(s)
           {hiddenIds.size > 0 && (
@@ -123,6 +187,7 @@ export default function Sessions() {
             <thead>
               <tr>
                 <th style={{ textAlign: "left" }}>Session</th>
+                <th>Source</th>
                 <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 80 }}>
                   Turns{arrow("turnCount")}
                 </th>
@@ -158,6 +223,7 @@ export default function Sessions() {
                         </div>
                       )}
                     </td>
+                    <td><SourceBadge source={s.source} /></td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.turnCount}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.redirectionCount}</td>
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
