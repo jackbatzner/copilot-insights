@@ -83,6 +83,10 @@ try {
   const page = await context.newPage();
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
+  // Dismiss the welcome modal so it doesn't block interactions
+  await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await page.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
+
   const allPages = [
     { path: "/",                  name: "overview" },
     { path: "/learn",             name: "learn" },
@@ -197,12 +201,12 @@ async function recordFullDemoGif(browser, baseUrl) {
   });
   const gifPage = await gifContext.newPage();
 
-  // Dismiss the WelcomeModal before recording
+  // Dismiss the welcome modal then load the overview
   await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
   await gifPage.evaluate(() => localStorage.setItem("copilot-insights-welcomed", "true"));
 
   // ── Scene 1: Overview — show the main dashboard ───────────────
-  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
+  await gifPage.reload({ waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 
   // ── Scene 2: Sessions list ────────────────────────────────────
