@@ -183,6 +183,15 @@ describe("POST /api/practice/analyze", () => {
     assert.ok("grade" in body, "missing grade");
   });
 
+  it("includes heuristics in response", async () => {
+    const { status, body } = await postJSON("/api/practice/analyze", {
+      text: "Create a React component for user login with email and password fields",
+    });
+    assert.equal(status, 200);
+    assert.ok("heuristics" in body, "missing heuristics");
+    assert.ok(Array.isArray(body.heuristics?.details), "heuristics.details should be an array");
+  });
+
   it("returns 400 when text is missing", async () => {
     const { status, body } = await postJSON("/api/practice/analyze", {});
     assert.equal(status, 400);
@@ -218,5 +227,14 @@ describe("GET /api/practice/library", () => {
     assert.equal(status, 200);
     // Returns either a challenge object or null
     assert.ok("total" in body, "missing total");
+  });
+
+  it("includes heuristics in random challenge response", async () => {
+    const { status, body } = await getJSON("/api/practice/library?random=1");
+    assert.equal(status, 200);
+    if (body.challenge) {
+      assert.ok("heuristics" in body.challenge, "challenge should include heuristics");
+      assert.ok(Array.isArray(body.challenge.heuristics?.details), "heuristics.details should be an array");
+    }
   });
 });

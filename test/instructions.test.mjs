@@ -72,16 +72,27 @@ describe("analyzeInstructionGaps", () => {
     }
   });
 
-  it("suggestions generated when gaps found (type 'instruction_file' for repeated)", () => {
+  it("suggestions with snippet field for repeated conventions", () => {
     const result = analyzeInstructionGaps({ repo: "org/app" });
-    assert.ok(result.suggestions.length > 0, "Should have suggestions");
-    // "Style rule" appears 2+ times (from "Always use TypeScript" and "always use vitest")
-    // so the instruction_file suggestion should fire
     const instrSuggestion = result.suggestions.find((s) => s.type === "instruction_file");
     assert.ok(instrSuggestion, "Should have instruction_file suggestion for repeated conventions");
     assert.equal(instrSuggestion.priority, "high");
     assert.ok(Array.isArray(instrSuggestion.items));
     assert.ok(instrSuggestion.items.length > 0);
+    // snippet field should be a non-empty markdown string
+    assert.ok(typeof instrSuggestion.snippet === "string", "suggestion should have snippet string");
+    assert.ok(instrSuggestion.snippet.length > 0, "snippet should not be empty");
+    assert.ok(instrSuggestion.snippet.includes("##"), "snippet should contain markdown heading");
+  });
+
+  it("all suggestions with items include a snippet field", () => {
+    const result = analyzeInstructionGaps({ repo: "org/app" });
+    const withItems = result.suggestions.filter((s) => s.items && s.items.length > 0);
+    assert.ok(withItems.length > 0, "Should have suggestions with items");
+    for (const s of withItems) {
+      assert.ok(typeof s.snippet === "string", `suggestion '${s.type}' should have snippet`);
+      assert.ok(s.snippet.length > 0, `snippet for '${s.type}' should not be empty`);
+    }
   });
 
   it("repoBreakdown has repo names from seeded data", () => {

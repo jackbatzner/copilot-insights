@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
+- **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
+- **Practice coaching panel** — Before asking you to rewrite a bad prompt, the Practice Lab now shows "What's Wrong" guidance:
+  - ⚠️ Detected Problems — patterns like correction, frustration, or rollback language
+  - 📋 What's Missing — quality signals the prompt is lacking (file references, constraints, criteria, etc.)
+  - ✨ How to Fix It — before/after rewrite examples for the detected issues
+- **Tag-based coaching** — Challenge library prompts tagged as vague, no-files, no-context, etc. now always show coaching content even when heuristic thresholds aren't triggered
+- `heuristics` field returned in `/api/practice/challenge` and `/api/practice/library` responses
+
 ## [0.2.0] - 2026-04-18
 
 ### Added

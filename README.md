@@ -146,9 +146,13 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/learn.png" alt="Learn and grow" width="800" />
 
-**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges
+**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges with coaching panel
 
 <img src="docs/screenshots/practice.png" alt="Practice Lab" width="800" />
+
+**Instructions** — convention gap analysis with copy-paste snippets
+
+<img src="docs/screenshots/instructions.png" alt="Instructions" width="800" />
 
 **Session Detail** — turn-by-turn replay with annotations
 
@@ -169,7 +173,7 @@ The web dashboard gives you a full view of your prompting habits:
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
-- **Instructions** — Custom instruction effectiveness analysis
+- **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time).
@@ -180,7 +184,7 @@ The Practice Lab is an interactive sandbox for improving your prompting skills:
 
 **🧪 Sandbox Mode** — Type any prompt and click **Analyze** to get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions. Coaching nudges help you improve — "try mentioning the specific file" or "what should the result look like?"
 
-**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve. Personalized recommendations highlight which categories need the most work based on your real session patterns.
+**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve. Before you rewrite, a **coaching panel** shows what's wrong: detected problems, missing quality signals, and before/after rewrite examples — so you know exactly what to fix. Personalized recommendations highlight which categories need the most work based on your real session patterns.
 
 Scoring is based on heuristics derived from published prompting guides — see [docs/prompting-resources.md](docs/prompting-resources.md) for the full list of sources.
 

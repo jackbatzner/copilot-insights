@@ -265,6 +265,134 @@ function SandboxMode() {
   );
 }
 
+/* ── Coaching Panel (shown before rewrite) ─────────────────── */
+
+/**
+ * Human-readable coaching tips keyed by challenge tag.
+ * Used when heuristic details don't cover the tag's weakness.
+ */
+const TAG_COACHING = {
+  vague: { label: "Too vague or short", tip: "Add specifics: which file, function, endpoint, or behavior? A one-liner rarely gives the agent enough to work with." },
+  "no-files": { label: "No file or path references", tip: "Mention the specific file or path, e.g. \"in src/auth.ts\" or \"the /api/login endpoint\"." },
+  "no-context": { label: "Missing context or reasoning", tip: "Explain why — \"because the token expires too early\" or \"so the redirect works for OAuth\"." },
+  "no-constraints": { label: "No constraints or boundaries", tip: "Add guardrails: \"don't modify tests\", \"only change the middleware\", \"keep backward compat\"." },
+  "no-criteria": { label: "No acceptance criteria", tip: "Describe the expected outcome: \"it should return 200 with…\" or \"the test should pass when…\"." },
+  "no-examples": { label: "No examples provided", tip: "Include a sample: \"e.g. parseDate('11/14/2023') → Date\" helps clarify intent." },
+  "no-format": { label: "No output format specified", tip: "State the format: \"respond as a markdown table\" or \"return JSON with fields…\"." },
+  "no-steps": { label: "Not broken into steps", tip: "Break complex tasks into numbered steps: \"1. First... 2. Then...\"." },
+  correction: { label: "Correction pattern", tip: "Instead of correcting after the fact, state the requirement upfront in your initial prompt." },
+  frustration: { label: "Frustration signal", tip: "Describe what you see vs. what you expected — symptoms + hypothesis give the agent a debugging path." },
+  rollback: { label: "Unscoped rollback", tip: "Scope what to revert: \"revert only changes to src/auth.ts — keep the other files\"." },
+};
+
+/**
+ * Explains specifically what's wrong with the original prompt and
+ * gives the user concrete guidance BEFORE they attempt a rewrite.
+ */
+function CoachingPanel({ challenge }) {
+  if (!challenge) return null;
+
+  const suggestions = challenge.suggestions || [];
+  const h = challenge.heuristics || {};
+  const patterns = challenge.patterns || [];
+  const categories = challenge.categories || {};
+  const details = h.details || [];
+  const tags = challenge.tags || [];
+
+  // Collect the "what's wrong" items — missing quality signals from heuristics
+  const missingSignals = details.filter((d) => d.severity === "info" || d.severity === "warning");
+
+  // Also generate coaching items from tags that aren't already covered by heuristics
+  const coveredIds = new Set(details.map((d) => d.id));
+  const tagCoaching = tags
+    .filter((t) => TAG_COACHING[t] && !coveredIds.has(t))
+    .map((t) => TAG_COACHING[t]);
+
+  const hasContent = patterns.length > 0 || missingSignals.length > 0 || tagCoaching.length > 0 || suggestions.length > 0;
+  if (!hasContent) return null;
+
+  return (
+    <div className="card coaching-panel" style={{ marginBottom: 16 }}>
+      <div className="card-header">🎓 What's Wrong With This Prompt</div>
+
+      {/* Problem patterns — explain why this prompt triggers redirections */}
+      {patterns.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">⚠️ Detected Problems</div>
+          {patterns.map((p, i) => (
+            <div key={i} className="coaching-problem">
+              <span className="coaching-problem-emoji">{categories[p.category]?.emoji || "❓"}</span>
+              <div className="coaching-problem-content">
+                <strong>{p.label}</strong>
+                {p.matchedText && (
+                  <span className="coaching-matched"> — triggered by: &ldquo;{p.matchedText}&rdquo;</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Missing quality signals — what this prompt is lacking */}
+      {(missingSignals.length > 0 || tagCoaching.length > 0) && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">📋 What's Missing</div>
+          {missingSignals.map((d, i) => (
+            <div key={i} className="coaching-missing">
+              <span className="coaching-missing-dot" style={{
+                background: d.severity === "warning" ? "#d29922" : "#58a6ff"
+              }} />
+              <div>
+                <strong>{d.label}</strong>
+                <div className="coaching-missing-tip">{d.tip}</div>
+              </div>
+            </div>
+          ))}
+          {tagCoaching.map((t, i) => (
+            <div key={`tag-${i}`} className="coaching-missing">
+              <span className="coaching-missing-dot" style={{ background: "#d29922" }} />
+              <div>
+                <strong>{t.label}</strong>
+                <div className="coaching-missing-tip">{t.tip}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Rewrite guides — show before/after examples for their specific patterns */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">✨ How to Fix It</div>
+          {suggestions.map((s, i) => (
+            <div key={i} className="coaching-guide">
+              <div className="coaching-guide-header">
+                {s.categoryEmoji} <strong>{s.principle}</strong>
+              </div>
+              {s.before && s.after && (
+                <div className="coaching-rewrite-example">
+                  <div className="coaching-rewrite-before">
+                    <span className="coaching-rewrite-label">❌ Before:</span>
+                    <q>{s.before}</q>
+                  </div>
+                  <div className="coaching-rewrite-after">
+                    <span className="coaching-rewrite-label">✅ After:</span>
+                    <q>{s.after}</q>
+                  </div>
+                  <div className="coaching-rewrite-why">💡 {s.why}</div>
+                </div>
+              )}
+              <ul className="coaching-tips-list">
+                {s.tips.map((t, j) => <li key={j}>{t}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Challenge Mode ────────────────────────────────────────── */
 
 const TAG_EXPLANATIONS = {
@@ -531,6 +659,9 @@ function ChallengeMode() {
           </div>
         )}
       </div>
+
+      {/* Coaching panel — explain what's wrong before asking for a rewrite */}
+      <CoachingPanel challenge={challenge} />
 
       {/* Rewrite area */}
       <div className="card" style={{ marginBottom: 16 }}>

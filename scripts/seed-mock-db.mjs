@@ -158,6 +158,27 @@ const goodUserMessages = [
   "Set up the WebSocket connection for notifications",
 ];
 
+// Convention messages — user teaching the agent project rules
+// These trigger instruction-gap detection ("always use", "don't use", "we use", "put files in")
+const conventionMessages = [
+  "Always use TypeScript in this project, not plain JavaScript",
+  "Don't use class-based components — we only use functional components with hooks",
+  "We always use vitest for testing, never jest",
+  "Put test files in __tests__/ next to the source file",
+  "Always use named exports, never default exports",
+  "We use pnpm, not npm or yarn",
+  "Don't use any inline styles — always use CSS modules",
+  "Always add JSDoc comments to exported functions",
+  "We always use Tailwind CSS for styling in this repo",
+  "Put all API route handlers in src/routes/ directory",
+  "Don't use console.log — use the project logger instead",
+  "We prefer zod for validation over manual checks",
+  "Always use async/await, never .then() chains",
+  "Put shared types in src/types/ and import from there",
+  "We use ESM imports, not CommonJS require",
+  "Don't use any as a TypeScript type — be explicit",
+];
+
 // Redirection messages — user correcting the agent
 const redirectionMessages = [
   "No, that's wrong. I said to use async/await, not callbacks",
@@ -283,8 +304,14 @@ const seedAll = db.transaction(() => {
     const sessionFiles = [];
 
     for (let t = 0; t < turnCount; t++) {
-      const isRedirection = Math.random() < redirectionRate;
-      const userMsg = isRedirection ? pick(redirectionMessages) : pick(goodUserMessages);
+      const roll = Math.random();
+      const isRedirection = roll < redirectionRate;
+      const isConvention = !isRedirection && roll < redirectionRate + 0.15;
+      const userMsg = isRedirection
+        ? pick(redirectionMessages)
+        : isConvention
+          ? pick(conventionMessages)
+          : pick(goodUserMessages);
       const assistantMsg = pick(assistantResponses);
       const turnTime = new Date(created.getTime() + t * randInt(30, 300) * 1000);
 

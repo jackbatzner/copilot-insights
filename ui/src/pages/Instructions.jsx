@@ -377,6 +377,29 @@ function FailuresTab({ data }) {
 
 /* ── Shared Components ─────────────────────────────────────── */
 
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Clipboard API unavailable (e.g. HTTP context) — ignore gracefully
+    });
+  };
+
+  return (
+    <button
+      className="snippet-copy-btn"
+      onClick={handleCopy}
+      title="Copy to clipboard"
+    >
+      {copied ? "✅ Copied!" : "📋 Copy"}
+    </button>
+  );
+}
+
 function SuggestionsStack({ suggestions }) {
   return (
     <div className="suggestions-stack">
@@ -399,6 +422,15 @@ function SuggestionsStack({ suggestions }) {
                   {item.repos && <span className="item-repos">repos: {item.repos}</span>}
                 </div>
               ))}
+            </div>
+          )}
+          {s.snippet && (
+            <div className="snippet-block">
+              <div className="snippet-header">
+                <span className="snippet-label">Add this to your instruction file:</span>
+                <CopyButton text={s.snippet} />
+              </div>
+              <pre className="snippet-code">{s.snippet}</pre>
             </div>
           )}
         </div>
