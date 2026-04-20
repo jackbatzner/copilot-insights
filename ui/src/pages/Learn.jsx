@@ -132,6 +132,27 @@ function DevPlanTab({ plan, gaps }) {
         <QuickWinsCard wins={plan.quickWins} />
       )}
 
+      {/* High impact opportunities — right after quick wins */}
+      {plan.opportunities.filter((o) => o.type === "high_impact").length > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--yellow)" }}>
+          <div className="card-header">🚀 High-Impact Opportunities</div>
+          {plan.opportunities.filter((o) => o.type === "high_impact").map((o, i) => (
+            <div key={i} className="opportunity-item">
+              <div className="opp-header">
+                <span className="pillar-pill" data-pillar={o.pillar}>{o.pillar}</span>
+                <strong>{o.title}</strong>
+                <span className="impact-badge">Impact: {o.impact}/10</span>
+              </div>
+              <p className="opp-desc">{o.description}</p>
+              <div className="opp-metric">{o.metric}</div>
+              <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
+                🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Weekly goals with habit stacking */}
       <WeeklyGoals goals={plan.weeklyGoals} />
 
@@ -156,27 +177,6 @@ function DevPlanTab({ plan, gaps }) {
           <div style={{ padding: "8px 8px 4px", fontSize: 11 }}>
             <a href="/instructions" style={{ color: "var(--accent)" }}>View all {gaps.totalGaps} gaps →</a>
           </div>
-        </div>
-      )}
-
-      {/* High impact opportunities */}
-      {plan.opportunities.filter((o) => o.type === "high_impact").length > 0 && (
-        <div className="card" style={{ borderLeft: "3px solid var(--yellow)" }}>
-          <div className="card-header">🚀 High-Impact Opportunities</div>
-          {plan.opportunities.filter((o) => o.type === "high_impact").map((o, i) => (
-            <div key={i} className="opportunity-item">
-              <div className="opp-header">
-                <span className="pillar-pill" data-pillar={o.pillar}>{o.pillar}</span>
-                <strong>{o.title}</strong>
-                <span className="impact-badge">Impact: {o.impact}/10</span>
-              </div>
-              <p className="opp-desc">{o.description}</p>
-              <div className="opp-metric">{o.metric}</div>
-              <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
-                🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </>

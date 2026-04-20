@@ -458,6 +458,31 @@ function ChallengeMode() {
             <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 8, fontSize: 13 }}>
               🔍 What's wrong with this prompt?
             </div>
+            {/* Specific evidence from the prompt */}
+            {(() => {
+              const prompt = challenge.originalPrompt || "";
+              const words = prompt.trim().split(/\s+/).length;
+              const hasFiles = /[\/\\][\w.-]+\.\w+|\.jsx?|\.tsx?|\.py|\.css|\.mjs/.test(prompt);
+              const hasConstraints = /must|should|don't|avoid|only|limit|require|constraint/i.test(prompt);
+              const hasCriteria = /expect|result|output|return|should.*work|accept|test|verify/i.test(prompt);
+              const hasContext = /because|since|currently|right now|the goal|we need|background/i.test(prompt);
+              const issues = [];
+              if (words < 15) issues.push(`📏 Only ${words} words — too short for the agent to understand what you need.`);
+              else if (words < 30) issues.push(`📏 Only ${words} words — short prompts often lack enough detail for the agent.`);
+              if (!hasFiles) issues.push("📁 No file paths mentioned — the agent has to guess which files to work on.");
+              if (!hasConstraints) issues.push("🚧 No constraints given — no \"must\", \"should\", \"avoid\" etc. The agent might choose an approach that doesn't fit.");
+              if (!hasCriteria) issues.push("✅ No acceptance criteria — how will the agent know when it's done correctly?");
+              if (!hasContext) issues.push("💭 No context about WHY this change is needed or how it fits the bigger picture.");
+              if (issues.length === 0) issues.push("🔍 This prompt is technically okay but could be more specific to reduce back-and-forth.");
+              return (
+                <div style={{ background: "rgba(248, 81, 73, 0.05)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Specifically, this prompt:</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, color: "var(--text-muted)" }}>
+                    {issues.map((issue, i) => <div key={i}>{issue}</div>)}
+                  </div>
+                </div>
+              );
+            })()}
             {challenge.tags && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
                 {(Array.isArray(challenge.tags) ? challenge.tags : [challenge.tags]).map((tag, i) => (

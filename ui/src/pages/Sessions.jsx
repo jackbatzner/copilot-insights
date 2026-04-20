@@ -118,7 +118,8 @@ export default function Sessions() {
             <p>No redirections found. Your prompting is on point!</p>
           </div>
         ) : (
-          <table className="session-table" style={{ tableLayout: "fixed", width: "100%" }}>
+          <div className="session-table-wrapper">
+          <table className="session-table" style={{ width: "100%" }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left" }}>Session</th>
@@ -187,6 +188,7 @@ export default function Sessions() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>

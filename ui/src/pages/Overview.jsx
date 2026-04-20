@@ -147,10 +147,10 @@ export default function Overview() {
             <strong style={{ color: "var(--text)", fontSize: 13 }}>What each category means:</strong>
             <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
               <div><strong style={{ color: "#f85149" }}>Explicit Correction</strong> — You directly told the agent it was wrong ("no", "that's not right"). <em>Reduce by providing clearer acceptance criteria upfront.</em></div>
-              <div><strong style={{ color: "#d29922" }}>Course Change</strong> — You changed direction mid-task. <em>Some is natural as you learn; frequent changes suggest the goal wasn't clear at the start.</em></div>
+              <div><strong style={{ color: "#58a6ff" }}>Course Change</strong> — You changed direction mid-task. <em>Some is natural as you learn; frequent changes suggest the goal wasn't clear at the start.</em></div>
               <div><strong style={{ color: "#bc8cff" }}>Repetition</strong> — You had to restate the same instruction. <em>The agent didn't "get it" — try rephrasing with examples or constraints.</em></div>
-              <div><strong style={{ color: "#58a6ff" }}>Rollback</strong> — You asked the agent to undo or revert changes. <em>Review agent output more carefully before approving, or add tests to catch issues early.</em></div>
-              <div><strong style={{ color: "#8b949e" }}>Frustration</strong> — Emotional signals or repeated failures. <em>If this is high, step back and re-scope the task into smaller, clearer chunks.</em></div>
+              <div><strong style={{ color: "#db6d28" }}>Rollback</strong> — You asked the agent to undo or revert changes. <em>Review agent output more carefully before approving, or add tests to catch issues early.</em></div>
+              <div><strong style={{ color: "#d29922" }}>Frustration</strong> — Emotional signals or repeated failures. <em>If this is high, step back and re-scope the task into smaller, clearer chunks.</em></div>
             </div>
           </div>
         </div>
@@ -271,18 +271,6 @@ export default function Overview() {
                   💡 <strong>Coaching Tip:</strong> {workStyle.coachingTip}
                 </div>
               )}
-              <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}>
-                <strong style={{ color: "var(--accent)", fontSize: 13 }}>🎯 Which style fits which task?</strong>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#58a6ff" }}>🌊 Vibe</strong> — Quick fixes, typos, simple refactors. Low risk, you know the codebase well.</div>
-                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#3fb950" }}>📋 Structured</strong> — New features, architecture changes, multi-file tasks. Plan first, then delegate.</div>
-                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#d29922" }}>🔄 Iterative</strong> — Debugging, exploration, learning new APIs. Back-and-forth is expected.</div>
-                  <div style={{ color: "var(--text-muted)" }}><strong style={{ color: "#8b949e" }}>🔀 Mixed</strong> — Tasks that evolve. Fine if intentional, but frequent mixing may mean unclear goals upfront.</div>
-                </div>
-                <div style={{ marginTop: 8, color: "var(--text-muted)" }}>
-                  💡 <strong>Key insight:</strong> Match your style to your task. Structured for complex, vibe for simple. If you're iterating on something you already understand well, consider whether a clearer upfront spec could have saved turns.
-                </div>
-              </div>
             </div>
           </div>
 
@@ -315,26 +303,30 @@ export default function Overview() {
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-header">📖 Understanding Your Work Styles</div>
             <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "0 4px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 8 }}>
+              <div style={{ display: "grid", gap: 12, marginTop: 8 }}>
                 <div style={{ borderLeft: "3px solid #3fb950", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>🏗️ Structured</strong>
-                  <div style={{ marginTop: 4 }}>You planned first — defined the problem, constraints, and approach before writing code. Best for complex tasks. Maps to <em>Create Clarity</em>.</div>
+                  <strong style={{ color: "var(--text)" }}>📋 Structured</strong>
+                  <div style={{ marginTop: 4 }}>You planned first — defined the problem, constraints, and approach before writing code. Maps to <em>Create Clarity</em>.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> New features, architecture changes, multi-file tasks. Plan first, then delegate.</div>
                 </div>
-                <div style={{ borderLeft: "3px solid #f85149", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>⚡ Vibe Coding</strong>
+                <div style={{ borderLeft: "3px solid #58a6ff", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>🌊 Vibe Coding</strong>
                   <div style={{ marginTop: 4 }}>You jumped straight to code (first file edit on turn 0-1). Great for quick fixes and small tasks. Risk: more redirections on complex work.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Quick fixes, typos, simple refactors. Low risk, you know the codebase well.</div>
                 </div>
                 <div style={{ borderLeft: "3px solid #d29922", paddingLeft: 10 }}>
                   <strong style={{ color: "var(--text)" }}>🔄 Iterative</strong>
                   <div style={{ marginTop: 4 }}>You alternated between planning and coding. Good for exploration where requirements evolve, but watch for excessive back-and-forth.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Debugging, exploration, learning new APIs. Back-and-forth is expected.</div>
                 </div>
-                <div style={{ borderLeft: "3px solid #58a6ff", paddingLeft: 10 }}>
-                  <strong style={{ color: "var(--text)" }}>🎨 Mixed</strong>
+                <div style={{ borderLeft: "3px solid #8b949e", paddingLeft: 10 }}>
+                  <strong style={{ color: "var(--text)" }}>🔀 Mixed</strong>
                   <div style={{ marginTop: 4 }}>A blend of styles within a session. This is natural — the key is matching your style to the task complexity.</div>
+                  <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)" }}>🎯 <strong>Best task fit:</strong> Tasks that evolve. Fine if intentional, but frequent mixing may mean unclear goals upfront.</div>
                 </div>
               </div>
               <div style={{ marginTop: 12, padding: "8px 12px", background: "rgba(88, 166, 255, 0.06)", borderRadius: 6, fontSize: 12 }}>
-                💡 <strong>What's in it for you?</strong> Structured sessions have the lowest redirection rates. As tasks get more complex, planning first saves turns and frustration. The goal isn't to always be structured — it's to <em>match your approach to the task</em>.
+                💡 <strong>Key insight:</strong> Match your style to your task. Structured for complex, vibe for simple. Structured sessions have the lowest redirection rates — planning first saves turns and frustration.
               </div>
             </div>
           </div>
