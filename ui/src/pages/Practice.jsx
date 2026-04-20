@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
+import { PageBanner } from "../components/PageBanner.jsx";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -12,6 +13,9 @@ export default function Practice() {
       <div className="page-header">
         <h1>🧪 Practice Lab</h1>
       </div>
+      <PageBanner pageId="practice">
+        Practice rewriting real prompts from your sessions. The goal: Create Clarity upfront so the agent can deliver on the first try.
+      </PageBanner>
       <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
       </p>
@@ -312,7 +316,149 @@ function SandboxMode() {
   );
 }
 
+/* ── Coaching Panel (shown before rewrite) ─────────────────── */
+
+/**
+ * Human-readable coaching tips keyed by challenge tag.
+ * Used when heuristic details don't cover the tag's weakness.
+ */
+const TAG_COACHING = {
+  vague: { label: "Too vague or short", tip: "Add specifics: which file, function, endpoint, or behavior? A one-liner rarely gives the agent enough to work with." },
+  "no-files": { label: "No file or path references", tip: "Mention the specific file or path, e.g. \"in src/auth.ts\" or \"the /api/login endpoint\"." },
+  "no-context": { label: "Missing context or reasoning", tip: "Explain why — \"because the token expires too early\" or \"so the redirect works for OAuth\"." },
+  "no-constraints": { label: "No constraints or boundaries", tip: "Add guardrails: \"don't modify tests\", \"only change the middleware\", \"keep backward compat\"." },
+  "no-criteria": { label: "No acceptance criteria", tip: "Describe the expected outcome: \"it should return 200 with…\" or \"the test should pass when…\"." },
+  "no-examples": { label: "No examples provided", tip: "Include a sample: \"e.g. parseDate('11/14/2023') → Date\" helps clarify intent." },
+  "no-format": { label: "No output format specified", tip: "State the format: \"respond as a markdown table\" or \"return JSON with fields…\"." },
+  "no-steps": { label: "Not broken into steps", tip: "Break complex tasks into numbered steps: \"1. First... 2. Then...\"." },
+  correction: { label: "Correction pattern", tip: "Instead of correcting after the fact, state the requirement upfront in your initial prompt." },
+  frustration: { label: "Frustration signal", tip: "Describe what you see vs. what you expected — symptoms + hypothesis give the agent a debugging path." },
+  rollback: { label: "Unscoped rollback", tip: "Scope what to revert: \"revert only changes to src/auth.ts — keep the other files\"." },
+};
+
+/**
+ * Explains specifically what's wrong with the original prompt and
+ * gives the user concrete guidance BEFORE they attempt a rewrite.
+ */
+function CoachingPanel({ challenge }) {
+  if (!challenge) return null;
+
+  const suggestions = challenge.suggestions || [];
+  const h = challenge.heuristics || {};
+  const patterns = challenge.patterns || [];
+  const categories = challenge.categories || {};
+  const details = h.details || [];
+  const tags = challenge.tags || [];
+
+  // Collect the "what's wrong" items — missing quality signals from heuristics
+  const missingSignals = details.filter((d) => d.severity === "info" || d.severity === "warning");
+
+  // Also generate coaching items from tags that aren't already covered by heuristics
+  const coveredIds = new Set(details.map((d) => d.id));
+  const tagCoaching = tags
+    .filter((t) => TAG_COACHING[t] && !coveredIds.has(t))
+    .map((t) => TAG_COACHING[t]);
+
+  const hasContent = patterns.length > 0 || missingSignals.length > 0 || tagCoaching.length > 0 || suggestions.length > 0;
+  if (!hasContent) return null;
+
+  return (
+    <div className="card coaching-panel" style={{ marginBottom: 16 }}>
+      <div className="card-header">🎓 What's Wrong With This Prompt</div>
+
+      {/* Problem patterns — explain why this prompt triggers redirections */}
+      {patterns.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">⚠️ Detected Problems</div>
+          {patterns.map((p, i) => (
+            <div key={i} className="coaching-problem">
+              <span className="coaching-problem-emoji">{categories[p.category]?.emoji || "❓"}</span>
+              <div className="coaching-problem-content">
+                <strong>{p.label}</strong>
+                {p.matchedText && (
+                  <span className="coaching-matched"> — triggered by: &ldquo;{p.matchedText}&rdquo;</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Missing quality signals — what this prompt is lacking */}
+      {(missingSignals.length > 0 || tagCoaching.length > 0) && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">📋 What's Missing</div>
+          {missingSignals.map((d, i) => (
+            <div key={i} className="coaching-missing">
+              <span className="coaching-missing-dot" style={{
+                background: d.severity === "warning" ? "#d29922" : "#58a6ff"
+              }} />
+              <div>
+                <strong>{d.label}</strong>
+                <div className="coaching-missing-tip">{d.tip}</div>
+              </div>
+            </div>
+          ))}
+          {tagCoaching.map((t, i) => (
+            <div key={`tag-${i}`} className="coaching-missing">
+              <span className="coaching-missing-dot" style={{ background: "#d29922" }} />
+              <div>
+                <strong>{t.label}</strong>
+                <div className="coaching-missing-tip">{t.tip}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Rewrite guides — show before/after examples for their specific patterns */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="coaching-section">
+          <div className="coaching-section-title">✨ How to Fix It</div>
+          {suggestions.map((s, i) => (
+            <div key={i} className="coaching-guide">
+              <div className="coaching-guide-header">
+                {s.categoryEmoji} <strong>{s.principle}</strong>
+              </div>
+              {s.before && s.after && (
+                <div className="coaching-rewrite-example">
+                  <div className="coaching-rewrite-before">
+                    <span className="coaching-rewrite-label">❌ Before:</span>
+                    <q>{s.before}</q>
+                  </div>
+                  <div className="coaching-rewrite-after">
+                    <span className="coaching-rewrite-label">✅ After:</span>
+                    <q>{s.after}</q>
+                  </div>
+                  <div className="coaching-rewrite-why">💡 {s.why}</div>
+                </div>
+              )}
+              <ul className="coaching-tips-list">
+                {s.tips.map((t, j) => <li key={j}>{t}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Challenge Mode ────────────────────────────────────────── */
+
+const TAG_EXPLANATIONS = {
+  vague: "The prompt is too short or generic for the agent to know what you actually want. Add specifics: what file, what behavior, what the output should look like.",
+  "no-files": "No file paths are mentioned, so the agent has to guess which files to work on — leading to wasted turns or wrong edits. Specify the files upfront.",
+  "no-context": "The prompt lacks background about why this change is needed or how it fits into the bigger picture. The agent works better when it understands the intent.",
+  "no-constraints": "No boundaries are set (language, framework, style, scope). Without constraints, the agent may choose an approach that doesn't fit your project.",
+  "no-criteria": "There's no definition of done — how should the agent know when it's finished? Add acceptance criteria: what should work, what tests to pass, what output to expect.",
+  "no-examples": "No example input/output is provided. Examples are the fastest way to show the agent exactly what you expect.",
+  "no-format": "The prompt doesn't specify what format the output should be in (code, markdown, JSON, etc.). Be explicit about the deliverable.",
+  "no-steps": "This is a complex task crammed into one prompt. Break it into smaller steps so the agent can succeed at each one before moving to the next.",
+  correction: "This prompt is a correction of something the agent already did wrong. To avoid this, provide clearer constraints and examples in the original prompt.",
+  frustration: "This prompt shows frustration — the agent isn't meeting expectations. Step back and reframe: what exactly do you need, and what has the agent gotten wrong?",
+  rollback: "You're asking the agent to undo its work. This usually means the original prompt was missing constraints or acceptance criteria.",
+};
 
 const TAG_LABELS = {
   "": "All Topics",
@@ -486,8 +632,53 @@ function ChallengeMode() {
         <div className="practice-challenge-original">
           <q style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{challenge.originalPrompt}</q>
         </div>
-        {challenge.hint && (
-          <div className="practice-challenge-hint">💡 {challenge.hint}</div>
+        {challenge && (challenge.tags || challenge.hint || challenge.category) && (
+          <div style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 8, fontSize: 13 }}>
+              🔍 What's wrong with this prompt?
+            </div>
+            {/* Specific evidence from the prompt */}
+            {(() => {
+              const prompt = challenge.originalPrompt || "";
+              const words = prompt.trim().split(/\s+/).length;
+              const hasFiles = /[\/\\][\w.-]+\.\w+|\.jsx?|\.tsx?|\.py|\.css|\.mjs/.test(prompt);
+              const hasConstraints = /must|should|don't|avoid|only|limit|require|constraint/i.test(prompt);
+              const hasCriteria = /expect|result|output|return|should.*work|accept|test|verify/i.test(prompt);
+              const hasContext = /because|since|currently|right now|the goal|we need|background/i.test(prompt);
+              const issues = [];
+              if (words < 15) issues.push(`📏 Only ${words} words — too short for the agent to understand what you need.`);
+              else if (words < 30) issues.push(`📏 Only ${words} words — short prompts often lack enough detail for the agent.`);
+              if (!hasFiles) issues.push("📁 No file paths mentioned — the agent has to guess which files to work on.");
+              if (!hasConstraints) issues.push("🚧 No constraints given — no \"must\", \"should\", \"avoid\" etc. The agent might choose an approach that doesn't fit.");
+              if (!hasCriteria) issues.push("✅ No acceptance criteria — how will the agent know when it's done correctly?");
+              if (!hasContext) issues.push("💭 No context about WHY this change is needed or how it fits the bigger picture.");
+              if (issues.length === 0) issues.push("🔍 This prompt is technically okay but could be more specific to reduce back-and-forth.");
+              return (
+                <div style={{ background: "rgba(248, 81, 73, 0.05)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Specifically, this prompt:</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, color: "var(--text-muted)" }}>
+                    {issues.map((issue, i) => <div key={i}>{issue}</div>)}
+                  </div>
+                </div>
+              );
+            })()}
+            {challenge.tags && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                {(Array.isArray(challenge.tags) ? challenge.tags : [challenge.tags]).map((tag, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span style={{ background: "rgba(248, 81, 73, 0.15)", color: "#f85149", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", marginTop: 1 }}>{TAG_LABELS[tag] || tag}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{TAG_EXPLANATIONS[tag] || ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {challenge.hint && <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>💡 <em>{challenge.hint}</em></p>}
+            {challenge.hint && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#3fb950" }}>
+                ✅ <strong>How to improve:</strong> {challenge.suggestion || challenge.hint}
+              </div>
+            )}
+          </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div className="practice-score-pill" style={{ background: SCORE_COLORS[challenge.grade?.color] + "22", color: SCORE_COLORS[challenge.grade?.color] }}>
@@ -519,6 +710,9 @@ function ChallengeMode() {
           </div>
         )}
       </div>
+
+      {/* Coaching panel — explain what's wrong before asking for a rewrite */}
+      <CoachingPanel challenge={challenge} />
 
       {/* Rewrite area */}
       <div className="card" style={{ marginBottom: 16 }}>

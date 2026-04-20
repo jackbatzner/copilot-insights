@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { MetricHelp } from "../components/MetricHelp.jsx";
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
@@ -38,23 +42,39 @@ export default function Coaching() {
         <h1>🎓 Agent Coaching</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="coaching">
+        Your three AI leadership skills — mapped to Microsoft's Leading with AI framework. Delegation = Create Clarity (framing problems well). Judgment = Deliver Success (owning output quality). Feedback = Generate Energy (iterating and sharing learnings).
+      </PageBanner>
 
       {/* Three pillars hero */}
       <div className="stats-grid stats-grid-3">
         <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
           <div className="stat-label">🤝 Delegation</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Create Clarity</div>
           <div className="stat-sub">work handed off to agent</div>
+          <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {delegation?.overallDelegationRatio >= 60 ? "✅ Good delegation" : delegation?.overallDelegationRatio >= 30 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60%+
+          </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Ratio: {delegation?.overallDelegationRatio}% → Score: {Math.round(delegation?.delegationScore || 0)}/100</div>
         </div>
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
           <div className="stat-label">🧠 Judgment</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Deliver Success</div>
           <div className="stat-sub">review quality / 100</div>
+          <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {judgment?.avgScore >= 80 ? "✅ Excellent" : judgment?.avgScore >= 70 ? "✅ Good" : judgment?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          </div>
         </div>
         <div className={`stat-card pillar-card ${tab === "feedback" ? "pillar-active" : ""}`} onClick={() => setTab("feedback")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
           <div className="stat-label">💬 Feedback</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Generate Energy</div>
           <div className="stat-sub">clarity score / 100</div>
+          <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {clarity?.avgScore >= 80 ? "✅ Excellent" : clarity?.avgScore >= 70 ? "✅ Good" : clarity?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          </div>
         </div>
       </div>
 
@@ -70,6 +90,12 @@ export default function Coaching() {
       {tab === "delegation" && <DelegationTab data={delegation} />}
       {tab === "judgment" && <JudgmentTab data={judgment} />}
       {tab === "feedback" && <FeedbackTab clarity={clarity} efficiency={efficiency} />}
+      <SuggestedNext
+        to="/learn"
+        icon="📚"
+        label="Learn & Grow"
+        description="Your personalized improvement plan with goals, retros, and learning resources"
+      />
     </div>
   );
 }
@@ -82,11 +108,11 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
     ...(delegation ? buildDelegationSuggestions(delegation) : []),
     ...(efficiency?.aggregate?.totalDripFeeds > 5 ? [{
       priority: "medium", emoji: "💧", title: "Reduce Drip-Feeding",
-      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load requirements in your first message.`,
+      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load requirements in your first message.\n\n💡 Example: Instead of "Add a button" → "Make it blue" → "Put it in the header" → "It should call /api/save", try "Add a blue 'Save' button in the header that calls POST /api/save on click."`,
     }] : []),
     ...(clarity?.avgScore < 50 ? [{
       priority: "high", emoji: "📝", title: "Improve Opening Prompts",
-      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior in your first message.`,
+      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior in your first message.\n\n💡 Example: Instead of "Fix the login bug", try "The POST /api/login endpoint returns 401 for valid credentials. Check JWT verification in src/auth.ts — I think token expiry uses seconds instead of milliseconds."`,
     }] : []),
   ].sort((a, b) => {
     const p = { high: 0, medium: 1, low: 2, info: 3 };
@@ -98,10 +124,10 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
       <div className="card">
         <div className="card-header">🎯 Key Metrics</div>
         <div className="stats-grid stats-grid-4">
-          <MiniStat label="Agent Leverage" value={`${delegation?.overallLeverage ?? 0}x`} sub="output/input ratio" />
-          <MiniStat label="File Operations" value={delegation?.totalFileOps ?? 0} sub="agent-created files" />
-          <MiniStat label="Rubber-Stamp Rate" value={`${judgment?.rubberStampRate ?? 0}%`} sub="approvals before fix" />
-          <MiniStat label="Turn Efficiency" value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
+          <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters. Higher means the agent is doing more of the work." target="2x+ is good, 3x+ is excellent." action="Delegate higher-level tasks instead of giving step-by-step instructions." />} value={`${delegation?.overallLeverage ?? 0}x`} sub="output/input ratio" />
+          <MiniStat label={<MetricHelp label="File Operations" definition="Number of files the agent created or edited across your sessions. More file operations = agent doing more real work (not just chatting)." target="Higher is better — it means you're using the agent for actual coding tasks." action="When delegating, include specific files and paths. Agents perform best when they know exactly where to make changes." />} value={delegation?.totalFileOps ?? 0} sub="agent-created files" />
+          <MiniStat label={<MetricHelp label="Rubber-Stamp Rate" definition="How often you approved agent work and then had to correct it — approving without properly reviewing." target="0% is ideal. Over 30% is heavily penalized." action="Read agent output carefully before approving. Check that it actually does what you asked." />} value={`${judgment?.rubberStampRate ?? 0}%`} sub="approvals before fix" />
+          <MiniStat label={<MetricHelp label="Turn Efficiency" definition="Percentage of your turns that are productive (not corrections or redirections)." target="90%+ excellent, 75%+ good, below 60% needs work." action="Provide clearer upfront context to reduce back-and-forth corrections." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
         </div>
       </div>
 
@@ -128,10 +154,10 @@ function DelegationTab({ data }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Delegation Ratio" value={`${data.overallDelegationRatio}%`} sub="autonomous turns" />
-        <MiniStat label="Agent Leverage" value={`${data.overallLeverage}x`} sub="output per input char" />
-        <MiniStat label="File Operations" value={data.totalFileOps} sub="agent-touched files" />
-        <MiniStat label="Your Input" value={`${data.userInputKB}KB`} sub={`→ ${data.agentOutputKB}KB output`} />
+        <MiniStat label={<MetricHelp label="Delegation Ratio" definition="Percentage of your turns that hand off work to the agent (delegations + approvals) vs. micro-managing step-by-step." target="Over 60% means good delegation. Under 30% means you're micro-managing." action="Try single-prompt kickoffs — describe the goal, not the steps." />} value={`${data.overallDelegationRatio}%`} sub="autonomous turns" />
+        <MiniStat label={<MetricHelp label="Agent Leverage" definition="Ratio of agent output characters to your input characters." target="2x+ good, 3x+ excellent — agent writing much more than you type." action="Delegate bigger tasks to increase the agent's output per your input." />} value={`${data.overallLeverage}x`} sub="output per input char" />
+        <MiniStat label={<MetricHelp label="File Operations" definition="Number of files the agent created or edited. More file operations = agent doing more real work." target="Higher is better for coding tasks. Zero means no code was produced." />} value={data.totalFileOps} sub="agent-touched files" />
+        <MiniStat label={<MetricHelp label="Input → Output" definition="Total characters you typed (input) vs. total characters the agent produced (output). A higher ratio means the agent is generating more code per keystroke you invest." target="Higher output-to-input ratio = better delegation. You want the agent writing significantly more than you type." action="Delegate bigger tasks with clear specs instead of providing step-by-step instructions." />} value={`${data.userInputKB}KB`} sub={`→ ${data.agentOutputKB}KB output`} />
       </div>
 
       {/* Turn type breakdown */}
@@ -151,11 +177,26 @@ function DelegationTab({ data }) {
               {data.turnTypeBreakdown.map((t, i) => (
                 <div key={i} className="delegation-legend-row">
                   <span className="dot" style={{ background: t.color }} />
-                  <span className="delegation-legend-label">{t.type}</span>
+                  <span className="delegation-legend-label" style={{ color: t.color }}>{t.type}</span>
                   <span className="delegation-legend-count">{t.count}</span>
                   <span className="delegation-legend-desc">{t.description}</span>
                 </div>
               ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
+            <strong style={{ color: "var(--accent)" }}>📖 What each interaction style means:</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
+              <div><strong style={{ color: "#58a6ff" }}>✅ Approval</strong> — Short confirmations ("yes", "looks good", "ship it"). You're trusting the agent's output. <em>Good when output is genuinely correct.</em></div>
+              <div><strong style={{ color: "#3fb950" }}>🤝 Delegation</strong> — High-level task descriptions. You define WHAT to do, the agent decides HOW. <em>This is the goal for most tasks.</em></div>
+              <div><strong style={{ color: "#db6d28" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
+              <div><strong style={{ color: "#f85149" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
+              <div><strong style={{ color: "#8b949e" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
+              <div><strong style={{ color: "#d29922" }}>💬 Collaborative</strong> — Conversational back-and-forth where you and the agent work through the problem together. <em>Good for exploring options, but may be less efficient than clear delegation.</em></div>
+              <div><strong style={{ color: "#bc8cff" }}>📑 Detailed Spec</strong> — Long, structured prompts with specific requirements, constraints, and acceptance criteria. <em>Excellent for complex tasks — this IS good delegation when done upfront.</em></div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+              💡 <strong>Ideal distribution:</strong> High delegation + some approval, low guided + low correction. The shift from Guided→Delegation means you're trusting the agent with HOW, while you focus on WHAT and WHY — that's Create Clarity.
             </div>
           </div>
         </div>
@@ -174,6 +215,19 @@ function DelegationTab({ data }) {
               </div>
             ))}
           </div>
+          <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
+            <strong style={{ color: "var(--accent)" }}>📖 What each session style means:</strong>
+            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
+              <div><strong style={{ color: "var(--text)" }}>🤝 Delegator</strong> — You defined the goal and let the agent handle execution. <em>Ideal for tasks where you trust the agent's judgment. Your delegation ratio was high ({'>'}60%).</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🛠️ Hands-on</strong> — You guided the agent step-by-step. <em>Fine for learning, but for tasks you've done before, try shifting to delegation — define WHAT, not HOW.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🔍 Exploratory</strong> — You asked lots of questions to understand something. <em>Great for learning! These are discovery sessions — don't judge them on delegation metrics.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>🔄 Corrective</strong> — You spent a lot of turns fixing the agent's output. <em>Review your opening prompt — more context upfront usually prevents excessive corrections.</em></div>
+              <div><strong style={{ color: "var(--text)" }}>💬 Collaborative</strong> — A balanced back-and-forth. <em>Default style — not bad, but consider whether a clearer initial spec could have been more efficient.</em></div>
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
+              💡 <strong>Action:</strong> Aim for more Delegator sessions on tasks you understand well. Reserve Hands-on and Exploratory for genuinely new territory.
+            </div>
+          </div>
         </div>
       )}
 
@@ -182,16 +236,16 @@ function DelegationTab({ data }) {
         <div className="card">
           <div className="card-header">🚀 Most Productive Sessions</div>
           <p className="card-subtitle">Highest file operations per turn — effective delegation</p>
-          <table className="data-table">
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead>
-              <tr><th>Productivity</th><th>Output</th><th>Session</th></tr>
+              <tr><th style={{ width: 120, textAlign: "left" }}>Productivity</th><th style={{ width: 160, textAlign: "left" }}>Output</th><th style={{ textAlign: "left" }}>Session</th></tr>
             </thead>
             <tbody>
               {data.topDelegated.slice(0, 5).map((s, i) => (
                 <tr key={i}>
                   <td><span className="clarity-badge" style={{ background: "#3fb950" }}>{s.productivity}</span> files/turn</td>
                   <td style={{ fontSize: 12 }}>{s.filesCreated + s.filesEdited} files · {s.turnCount} turns</td>
-                  <td className="truncate" style={{ maxWidth: 250 }}>{s.summary || s.repo}</td>
+                  <td className="truncate" style={{ maxWidth: 250 }}><Link to={`/sessions/${s.sessionId || s.id}`}>{s.summary || s.repo || "View session"}</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -215,10 +269,10 @@ function JudgmentTab({ data }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Judgment Score" value={data.avgScore} sub="/100 average" />
+        <MiniStat label={<MetricHelp label="Judgment Score" definition="How well you evaluate agent output. Based on catching issues early, avoiding rubber-stamps, and not needing costly late-stage rollbacks. Baseline starts at 70." target="70+ is good, 80+ is excellent." action="Review each agent change before approving. Catch issues early — late catches cost 10 points each." />} value={data.avgScore} sub="/100 average" />
         <MiniStat label="Issues Caught" value={data.totalCatches} sub="problems spotted" />
-        <MiniStat label="Late Catches" value={data.totalLateCatches} sub="costly rollbacks" />
-        <MiniStat label="Rubber-Stamp" value={`${data.rubberStampRate}%`} sub="approve → correct" />
+        <MiniStat label={<MetricHelp label="Late Catches" definition="Issues you caught many turns after they were introduced — costly rollbacks that waste work." target="0 is ideal. Each late catch costs -10 points on your judgment score." action="Review agent output at each step, not just at the end." />} value={data.totalLateCatches} sub="costly rollbacks" />
+        <MiniStat label={<MetricHelp label="Rubber-Stamp Rate" definition="How often you approved work then immediately corrected it — a sign of not reviewing carefully." target="0% ideal. Over 30% gets a -15 point penalty." action="Actually check agent output matches your request before saying 'looks good'." />} value={`${data.rubberStampRate}%`} sub="approve → correct" />
       </div>
 
       {/* Score distribution */}
@@ -254,8 +308,8 @@ function JudgmentTab({ data }) {
         <div className="card">
           <div className="card-header">🔄 Most Revised Files</div>
           <p className="card-subtitle">Files edited 3+ times in a session — sign of unclear requirements</p>
-          <table className="data-table">
-            <thead><tr><th>File</th><th>Edits</th></tr></thead>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ textAlign: "left" }}>File</th><th style={{ width: 80, textAlign: "left" }}>Edits</th></tr></thead>
             <tbody>
               {data.allThrashed.slice(0, 8).map((f, i) => (
                 <tr key={i}>
@@ -272,14 +326,14 @@ function JudgmentTab({ data }) {
       {data.worstJudgment?.length > 0 && (
         <div className="card">
           <div className="card-header">⚠️ Sessions Needing Better Review</div>
-          <table className="data-table">
-            <thead><tr><th>Score</th><th>Issues</th><th>Session</th></tr></thead>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ width: 180, textAlign: "left" }}>Issues</th><th style={{ textAlign: "left" }}>Session</th></tr></thead>
             <tbody>
               {data.worstJudgment.slice(0, 5).map((s, i) => (
                 <tr key={i}>
                   <td><span className="clarity-badge" style={{ background: s.score < 40 ? "#f85149" : "#d29922" }}>{s.score}</span></td>
                   <td style={{ fontSize: 12 }}>{s.catches} catches · {s.lateCatches} late</td>
-                  <td className="truncate" style={{ maxWidth: 300 }}>{s.summary || s.repo}</td>
+                  <td className="truncate" style={{ maxWidth: 300 }}><Link to={`/sessions/${s.sessionId || s.id}`}>{s.summary || s.repo || "View session"}</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -301,10 +355,10 @@ function FeedbackTab({ clarity, efficiency }) {
       </p>
 
       <div className="stats-grid stats-grid-4">
-        <MiniStat label="Clarity Score" value={clarity?.avgScore ?? "—"} sub="/100 avg first-turn" />
-        <MiniStat label="Turn Efficiency" value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
-        <MiniStat label="Recovery Speed" value={efficiency?.aggregate?.avgRecoveryTurns ?? "—"} sub="turns after redirect" />
-        <MiniStat label="Context Drips" value={efficiency?.aggregate?.totalDripFeeds ?? 0} sub="piecemeal info adds" />
+        <MiniStat label={<MetricHelp label="Clarity Score" definition="Quality of your first message in each session. Checks for file paths, constraints, acceptance criteria, context, and examples." target="70+ is clear communication. Under 50 needs work." action="Include specific files, constraints, and what success looks like in your opening prompt." />} value={clarity?.avgScore ?? "—"} sub="/100 avg first-turn" />
+        <MiniStat label={<MetricHelp label="Turn Efficiency" definition="Percentage of turns that are productive vs. corrections/redirections." target="90%+ excellent, 75%+ good." action="Front-load requirements to avoid back-and-forth." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="productive turns" />
+        <MiniStat label={<MetricHelp label="Recovery Speed" definition="Average number of turns to get back on track after a redirection." target="Under 1.5 turns is good — quick recoveries." action="When correcting the agent, be specific about what went wrong and what you want instead." />} value={efficiency?.aggregate?.avgRecoveryTurns ?? "—"} sub="turns after redirect" />
+        <MiniStat label={<MetricHelp label="Context Drips" definition="Times you added context piecemeal after your first message — 'oh and...', 'I forgot to mention...', 'also...'." target="0 is ideal. Each drip-feed costs 5 points on your feedback score." action="Write down everything the agent needs before sending your first message." />} value={efficiency?.aggregate?.totalDripFeeds ?? 0} sub="piecemeal info adds" />
       </div>
 
       {clarity && (
@@ -317,6 +371,9 @@ function FeedbackTab({ clarity, efficiency }) {
       {clarity?.topTips?.length > 0 && (
         <div className="card">
           <div className="card-header">💡 Most Common Feedback Gaps</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
+            Each percentage shows how often this element was <strong style={{ color: "var(--text)" }}>missing from your opening prompts</strong>. Higher % = bigger opportunity to improve. Adding these upfront reduces redirections.
+          </div>
           <div className="tips-list">
             {clarity.topTips.map((t, i) => (
               <div key={i} className="tip-row">
@@ -332,6 +389,9 @@ function FeedbackTab({ clarity, efficiency }) {
       {efficiency?.aggregate?.completionBreakdown && (
         <div className="card">
           <div className="card-header">🏁 Session Outcomes</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px" }}>
+            How your sessions ended. <strong style={{ color: "var(--text)" }}>Abandoned</strong> = session stopped before reaching a resolution (no final file changes or approvals after the last exchange). Some abandoned sessions are normal — the task may have become irrelevant.
+          </div>
           <div className="completion-grid">
             {Object.entries(efficiency.aggregate.completionBreakdown).map(([status, count]) => (
               <div key={status} className="completion-item">
@@ -363,13 +423,16 @@ function FeedbackTab({ clarity, efficiency }) {
       {clarity?.sessions?.length > 0 && (
         <div className="card">
           <div className="card-header">🔍 Weakest Opening Prompts</div>
-          <table className="data-table">
-            <thead><tr><th>Score</th><th>Session</th><th>Missing</th></tr></thead>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
+            Sessions with the lowest first-turn clarity scores. Some may be <strong style={{ color: "var(--accent)" }}>📚 learning sessions</strong> (no file edits) or <strong style={{ color: "var(--yellow)" }}>🧪 testing/feedback sessions</strong> (long iterative reviews with intentional corrections). These naturally score differently — click into the session to see context.
+          </div>
+          <table className="data-table" style={{ tableLayout: "fixed" }}>
+            <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ textAlign: "left" }}>Session</th><th style={{ width: 220, textAlign: "left" }}>Missing</th></tr></thead>
             <tbody>
               {clarity.sessions.slice(0, 8).map((s) => (
                 <tr key={s.sessionId}>
                   <td><span className="clarity-badge" style={{ background: clarityColor(s.clarity.score) }}>{s.clarity.score}</span></td>
-                  <td className="truncate" title={s.firstMessage}>{s.summary || s.firstMessage?.substring(0, 80) || s.sessionId.slice(0, 8)}</td>
+                  <td className="truncate" title={s.firstMessage}><Link to={`/sessions/${s.sessionId}`}>{s.summary || s.firstMessage?.substring(0, 80) || s.sessionId.slice(0, 8)}</Link></td>
                   <td className="tip-cell">{s.clarity.tips[0] || "—"}</td>
                 </tr>
               ))}
@@ -455,13 +518,13 @@ function buildDelegationSuggestions(data) {
   if (data.overallDelegationRatio < 20) {
     suggestions.push({
       priority: "medium", emoji: "🤝", title: "Delegate More",
-      body: `Only ${data.overallDelegationRatio}% delegation. Try giving high-level goals and letting the agent choose the approach.`,
+      body: `Only ${data.overallDelegationRatio}% delegation. Try giving high-level goals and letting the agent choose the approach.\n\n💡 Example: Instead of "Open src/auth.ts, find the verifyToken function, add a try/catch around line 42, and return null on error", try "Add error handling to the token verification in the auth module — if verification fails, return null gracefully."`,
     });
   }
   if (data.overallLeverage < 0.5) {
     suggestions.push({
       priority: "medium", emoji: "📈", title: "Low Agent Leverage",
-      body: `Agent output is only ${data.overallLeverage}x your input. You may be writing more than the agent — consider delegating larger chunks.`,
+      body: `Agent output is only ${data.overallLeverage}x your input. You may be writing more than the agent — consider delegating larger chunks.\n\n💡 Example: Instead of "Edit line 45 of auth.js to change the timeout from 30 to 60", try "Update the auth timeout to 60 seconds — the agent knows where to find it."`,
     });
   }
   return suggestions;

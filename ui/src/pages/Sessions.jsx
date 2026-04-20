@@ -4,6 +4,7 @@ import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession, fetchVs
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
+import { PageBanner } from "../components/PageBanner.jsx";
 
 /** Source badge component — shows CLI or VSCode origin. */
 function SourceBadge({ source }) {
@@ -128,6 +129,9 @@ export default function Sessions() {
         <h1>📋 Sessions</h1>
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
+      <PageBanner pageId="sessions">
+        Your session history — click any session to see the turn-by-turn replay and understand what worked vs. what needed course correction.
+      </PageBanner>
 
       <div className="filter-bar">
         <label htmlFor="repo-filter" className="sr-only">Filter by repository</label>
@@ -178,21 +182,22 @@ export default function Sessions() {
             <p>No redirections found. Your prompting is on point!</p>
           </div>
         ) : (
-          <table className="session-table">
+          <div className="session-table-wrapper">
+          <table className="session-table" style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th>Session</th>
+                <th style={{ textAlign: "left" }}>Session</th>
                 <th>Source</th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 80 }}>
                   Turns{arrow("turnCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 100 }}>
                   Redirections{arrow("redirectionCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer" }}>
+                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 80 }}>
                   Rate{arrow("redirectionRate")}
                 </th>
-                <th>Top Issue</th>
+                <th style={{ width: 120 }}>Top Issue</th>
                 <th style={{ width: 40 }}></th>
               </tr>
             </thead>
@@ -219,9 +224,9 @@ export default function Sessions() {
                       )}
                     </td>
                     <td><SourceBadge source={s.source} /></td>
-                    <td>{s.turnCount}</td>
-                    <td>{s.redirectionCount}</td>
-                    <td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.turnCount}</td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.redirectionCount}</td>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                       <ScoreBadge rate={s.redirectionRate} />
                     </td>
                     <td>
@@ -249,6 +254,7 @@ export default function Sessions() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </>

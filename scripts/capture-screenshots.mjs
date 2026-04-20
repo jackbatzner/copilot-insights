@@ -90,6 +90,7 @@ try {
     { path: "/analytics",         name: "analytics" },
     { path: "/coaching",          name: "coaching" },
     { path: "/practice",          name: "practice" },
+    { path: "/instructions",      name: "instructions" },
     { path: "/token-efficiency",  name: "token-efficiency" },
     { path: "/live",              name: "live" },
   ];
@@ -99,6 +100,40 @@ try {
     : allPages;
 
   for (const p of filtered) {
+    // Practice page: navigate to Rewrite Challenge with a loaded challenge
+    if (p.name === "practice") {
+      console.log("📸 Capturing practice (Rewrite Challenge with coaching panel)…");
+      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(1000);
+
+      // Click "Rewrite Challenge" tab
+      const challengeTab = page.locator("button", { hasText: "Rewrite Challenge" });
+      if (await challengeTab.count()) {
+        await challengeTab.click();
+        await page.waitForTimeout(500);
+      }
+
+      // Click "Prompt Library" source button
+      const libraryBtn = page.locator("button", { hasText: "Prompt Library" });
+      if (await libraryBtn.count()) {
+        await libraryBtn.click();
+        await page.waitForTimeout(500);
+      }
+
+      // Click "Pick Random Challenge" or similar to load a challenge
+      const pickBtn = page.locator("button", { hasText: /random|pick|challenge/i });
+      if (await pickBtn.count()) {
+        await pickBtn.first().click();
+        await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(2000);
+      }
+
+      const outPath = resolve(SCREENSHOTS_DIR, `${p.name}.png`);
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+      continue;
+    }
+
     console.log(`📸 Capturing ${p.name}…`);
     await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
     await page.waitForTimeout(2000); // let charts animate

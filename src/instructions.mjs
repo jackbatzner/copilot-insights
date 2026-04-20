@@ -161,93 +161,200 @@ export function analyzeInstructionGaps({ repo, since, excludeIds } = {}) {
 }
 
 /**
+ * Turn a detected convention example into a ready-to-paste instruction line.
+ * Strips matched-text artifacts and rewrites in imperative form.
+ */
+function exampleToInstruction(example, label) {
+  if (!example) return `- ${label}`;
+
+  // Clean up the example text — trim context padding, normalize whitespace
+  let text = example.replace(/[""]/g, "").replace(/\s+/g, " ").trim();
+
+  // Strip leading "…" or partial-word artifacts from context extraction
+  text = text.replace(/^[…\s.,:;]+/, "").replace(/[…\s.,:;]+$/, "").trim();
+
+  // If the example already reads like an instruction, use it directly
+  if (/^(use|always|never|don't|do not|prefer|avoid|put|keep|name|follow|import)/i.test(text)) {
+    // Capitalize first letter, ensure it reads as a rule
+    return `- ${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+  }
+
+  // Otherwise, try to extract the actionable part
+  // "we use X" → "Use X"
+  const weUseMatch = text.match(/\bwe\s+(use|prefer|always|never|don't|keep|store|organize|test|mock|stub|assert)\s+(.+)/i);
+  if (weUseMatch) {
+    const verb = weUseMatch[1].charAt(0).toUpperCase() + weUseMatch[1].slice(1);
+    return `- ${verb} ${weUseMatch[2]}`;
+  }
+
+  // "in this project/repo we X" → "X"
+  const inProjectMatch = text.match(/\bin\s+this\s+(?:project|repo|codebase)\s+(.+)/i);
+  if (inProjectMatch) {
+    const rest = inProjectMatch[1].replace(/^[,.]?\s*(we\s+)?/i, "");
+    return `- ${rest.charAt(0).toUpperCase()}${rest.slice(1)}`;
+  }
+
+  // "don't use X" → "Do not use X"
+  const dontMatch = text.match(/\bdon'?t\s+use\s+(.+)/i);
+  if (dontMatch) {
+    return `- Do not use ${dontMatch[1]}`;
+  }
+
+  // "use X instead of Y" → "Use X instead of Y"
+  const insteadMatch = text.match(/\buse\s+(\w+)\s+instead\s+of\s+(.+)/i);
+  if (insteadMatch) {
+    return `- Use ${insteadMatch[1]} instead of ${insteadMatch[2]}`;
+  }
+
+  // "put/files go in X" → "Place files in X"
+  const putMatch = text.match(/\bput\s+(?:it|that|this|files?)\s+(in|under|inside)\s+(.+)/i);
+  if (putMatch) {
+    return `- Place files ${putMatch[1]} ${putMatch[2]}`;
+  }
+
+  // Fallback: use the example as-is with the label for context
+  if (text.length > 10) {
+    return `- ${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+  }
+  return `- ${label}`;
+}
+
+/**
+ * Category heading for instruction snippet generation.
+ */
+const CATEGORY_HEADINGS = {
+  convention: "## Style & Conventions",
+  structure: "## Project Structure",
+  naming: "## Naming Conventions",
+  testing: "## Testing",
+  error_handling: "## Error Handling",
+  imports: "## Imports & Dependencies",
+};
+
+/**
+ * Generate a ready-to-paste instruction snippet from a group of gaps.
+ */
+function generateSnippet(gapItems) {
+  // Group by category
+  const byCategory = {};
+  for (const item of gapItems) {
+    const cat = item.category || "convention";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(item);
+  }
+
+  const lines = [];
+  for (const [cat, items] of Object.entries(byCategory)) {
+    lines.push(CATEGORY_HEADINGS[cat] || `## ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
+    lines.push("");
+    for (const item of items) {
+      lines.push(exampleToInstruction(item.example, item.label));
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n").trim();
+}
+
+/**
  * Generate concrete suggestions for instruction file improvements.
  */
 function generateInstructionSuggestions(gaps, _repoConventions) {
   const suggestions = [];
 
-  // Find repeated conventions (3+ occurrences = should be in instructions)
+  // Find repeated conventions (2+ occurrences = should be in instructions)
   const repeated = gaps.filter((g) => g.count >= 2);
   if (repeated.length > 0) {
+    const items = repeated.slice(0, 5).map((g) => ({
+      label: g.label,
+      example: g.examples[0]?.text || "",
+      category: g.category,
+    }));
     suggestions.push({
       type: "instruction_file",
       priority: "high",
       emoji: "📝",
       title: "Add to .copilot-instructions.md",
       body: `You've stated ${repeated.length} conventions ${repeated[0].count}+ times. These should be in your instruction file so the agent knows them automatically.`,
-      items: repeated.slice(0, 5).map((g) => ({
-        label: g.label,
-        example: g.examples[0]?.text || "",
-        category: g.category,
-      })),
+      items,
+      snippet: generateSnippet(items),
     });
   }
 
   // Convention patterns — style rules
   const styleGaps = gaps.filter((g) => g.category === "convention");
   if (styleGaps.length > 0) {
+    const items = styleGaps.slice(0, 4).map((g) => ({
+      label: g.label,
+      example: g.examples[0]?.text || "",
+      category: g.category,
+    }));
     suggestions.push({
       type: "coding_style",
       priority: "medium",
       emoji: "🎨",
       title: "Codify Style Preferences",
       body: "You're correcting style choices manually. Add a style section to your instructions.",
-      items: styleGaps.slice(0, 4).map((g) => ({
-        label: g.label,
-        example: g.examples[0]?.text || "",
-        category: g.category,
-      })),
+      items,
+      snippet: generateSnippet(items),
     });
   }
 
   // Structure / architecture rules
   const structGaps = gaps.filter((g) => g.category === "structure");
   if (structGaps.length > 0) {
+    const items = structGaps.slice(0, 4).map((g) => ({
+      label: g.label,
+      example: g.examples[0]?.text || "",
+      category: g.category,
+    }));
     suggestions.push({
       type: "architecture",
       priority: "medium",
       emoji: "🏗️",
       title: "Document Project Structure",
       body: "You're guiding file placement manually. Add an architecture section describing your folder structure.",
-      items: structGaps.slice(0, 4).map((g) => ({
-        label: g.label,
-        example: g.examples[0]?.text || "",
-        category: g.category,
-      })),
+      items,
+      snippet: generateSnippet(items),
     });
   }
 
   // Naming convention gaps
   const namingGaps = gaps.filter((g) => g.category === "naming");
   if (namingGaps.length > 0) {
+    const items = namingGaps.slice(0, 3).map((g) => ({
+      label: g.label,
+      example: g.examples[0]?.text || "",
+      category: g.category,
+    }));
     suggestions.push({
       type: "naming",
       priority: "low",
       emoji: "🏷️",
       title: "Set Naming Conventions",
       body: "Define your naming patterns (casing, prefixes, suffixes) in instructions.",
-      items: namingGaps.slice(0, 3).map((g) => ({
-        label: g.label,
-        example: g.examples[0]?.text || "",
-        category: g.category,
-      })),
+      items,
+      snippet: generateSnippet(items),
     });
   }
 
   // Multi-repo convention drift
   const multiRepo = gaps.filter((g) => g.repoCount > 1);
   if (multiRepo.length > 0) {
+    const items = multiRepo.slice(0, 3).map((g) => ({
+      label: g.label,
+      example: g.examples[0]?.text || "",
+      repos: g.repos.join(", "),
+      category: g.category,
+    }));
     suggestions.push({
       type: "global_instructions",
       priority: "high",
       emoji: "🌐",
       title: "Create Global Instructions",
       body: `${multiRepo.length} conventions appear across multiple repos. Consider adding them to your global Copilot settings.`,
-      items: multiRepo.slice(0, 3).map((g) => ({
-        label: g.label,
-        repos: g.repos.join(", "),
-        category: g.category,
-      })),
+      items,
+      snippet: generateSnippet(items),
     });
   }
 

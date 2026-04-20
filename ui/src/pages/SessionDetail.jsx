@@ -4,6 +4,7 @@ import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSe
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
+import { MetricHelp } from "../components/MetricHelp";
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -16,6 +17,10 @@ export default function SessionDetail() {
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const tagKey = `session-tag-${id}`;
+  const [sessionTag, setSessionTag] = useState(() => {
+    try { return localStorage.getItem(tagKey) || ""; } catch { return ""; }
+  });
 
   useEffect(() => {
     Promise.all([
@@ -46,6 +51,47 @@ export default function SessionDetail() {
 
   const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
     data;
+
+  const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
+
+  // Testing/feedback session detection:
+  // 1. Scan user messages for feedback-like language patterns
+  // 2. Also check structural signals: high turns, repeated file edits, plan mode usage
+  const isTestingSession = (() => {
+    if (isLearningSession) return false;
+    const FEEDBACK_PATTERNS = /\b(feedback|round of|another round|testing|let'?s fix|here'?s what|improvements?|issues?:|bugs?:|fix(es|ing)?:|update(s|d)?:|change(s|d)?:|should be|needs to|doesn'?t (work|look|line|align|match)|still (not|doesn'?t|broken|wrong|missing)|try again|one more)\b/i;
+    const PLAN_PATTERNS = /\[\[PLAN\]\]|plan mode/i;
+
+    let feedbackTurns = 0;
+    let planTurns = 0;
+    const userMessages = replay?.turns?.filter(t => t.speaker === "user") || [];
+
+    for (const turn of userMessages) {
+      const msg = turn.messagePreview || "";
+      if (FEEDBACK_PATTERNS.test(msg)) feedbackTurns++;
+      if (PLAN_PATTERNS.test(msg)) planTurns++;
+    }
+
+    // Auto-suggest if: multiple feedback-patterned turns, or plan mode + high corrections
+    const hasFeedbackLanguage = feedbackTurns >= 3;
+    const hasStructuralSignals = session.turnCount >= 20 && stats.redirectionRate >= 0.15 && complexity?.breakdown?.fileOps > 3;
+
+    return hasFeedbackLanguage || (planTurns >= 2 && hasStructuralSignals);
+  })();
+
+  // Manual session tagging (persisted in localStorage)
+  const setTag = (tag) => {
+    const newTag = sessionTag === tag ? "" : tag;
+    setSessionTag(newTag);
+    try {
+      if (newTag) localStorage.setItem(tagKey, newTag);
+      else localStorage.removeItem(tagKey);
+    } catch { /* storage unavailable */ }
+  };
+  const isTaggedTesting = sessionTag === "testing";
+  const isTaggedLearning = sessionTag === "learning";
+  const showTestingBadge = isTaggedTesting || (isTestingSession && !isTaggedLearning);
+  const showLearningBadge = isTaggedLearning || (isLearningSession && !isTaggedTesting);
 
   return (
     <>
@@ -97,7 +143,12 @@ export default function SessionDetail() {
           <div className="stat-value">{session.turnCount}</div>
         </div>
         <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Redirections</div>
+          <div className="card-header"><MetricHelp
+            label="Redirections"
+            definition="Turns where you corrected, redirected, or repeated yourself to the agent. Each one means the agent didn't do what you wanted on the first try."
+            target="Fewer is better. Under 10% of turns is smooth; over 25% means your opening prompt needed more context."
+            action="Add file paths, constraints, and acceptance criteria to your first message. The clearer your initial prompt, the fewer redirections you'll need."
+          /></div>
           <div className={`stat-value ${rateColor(stats.redirectionRate)}`}>
             {stats.totalRedirections}
           </div>
@@ -122,6 +173,54 @@ export default function SessionDetail() {
             <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
           </div>
         )}
+        {showLearningBadge && (
+          <div className="card" style={{ textAlign: "center", background: "rgba(88, 166, 255, 0.08)", borderColor: "var(--accent)" }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>📚</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>Learning Session</div>
+            <div className="stat-sub">Q&A / exploration — no files changed</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Delegation and file metrics don't apply to this session type.</div>
+          </div>
+        )}
+        {showTestingBadge && (
+          <div className="card" style={{ textAlign: "center", background: "rgba(210, 153, 34, 0.08)", borderColor: "var(--yellow)" }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>🧪</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--yellow)" }}>Testing & Feedback Session</div>
+            <div className="stat-sub">{isTestingSession && !isTaggedTesting ? "Auto-detected:" : ""} Multiple rounds of feedback and iteration</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Redirections here are intentional feedback, not poor prompting. Expect higher redirection rates for comprehensive testing/review sessions.</div>
+          </div>
+        )}
+      </div>
+
+      {/* Manual session type tag */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Tag this session:</span>
+        <button
+          onClick={() => setTag("testing")}
+          style={{
+            background: isTaggedTesting ? "rgba(210, 153, 34, 0.15)" : "var(--bg-card)",
+            border: `1px solid ${isTaggedTesting ? "var(--yellow)" : "var(--border)"}`,
+            color: isTaggedTesting ? "var(--yellow)" : "var(--text-muted)",
+            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
+          }}
+        >
+          🧪 Testing/Feedback
+        </button>
+        <button
+          onClick={() => setTag("learning")}
+          style={{
+            background: isTaggedLearning ? "rgba(88, 166, 255, 0.15)" : "var(--bg-card)",
+            border: `1px solid ${isTaggedLearning ? "var(--accent)" : "var(--border)"}`,
+            color: isTaggedLearning ? "var(--accent)" : "var(--text-muted)",
+            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
+          }}
+        >
+          📚 Learning/Q&A
+        </button>
+        {sessionTag && (
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            (click again to remove)
+          </span>
+        )}
       </div>
 
       {session.summary && (
@@ -142,6 +241,7 @@ export default function SessionDetail() {
         const gradeColors = { A: "#3fb950", B: "#58a6ff", C: "#d29922", D: "#f85149" };
         const grade = replay.summary.overallGrade;
         return (
+          <>
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card">
               <div className="stat-value" style={{ color: gradeColors[grade] || "#e6edf3", fontSize: 36 }}>
@@ -165,6 +265,38 @@ export default function SessionDetail() {
               <div className="stat-sub">{replay.summary.redirectionCount} redirections · {replay.summary.dripFeedCount} drip-feeds · {replay.summary.rubberStampCount} rubber stamps</div>
             </div>
           </div>
+          <div className="card" style={{ marginBottom: 24, borderLeft: `3px solid ${gradeColors[grade] || "#8b949e"}` }}>
+            <div className="card-header">📐 How This Grade Was Calculated</div>
+            {isLearningSession && (
+              <div style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid rgba(88, 166, 255, 0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "var(--accent)" }}>
+                📚 This was a learning/exploration session with no file operations. Delegation and file-based metrics are scored lower because no code work was done — this doesn't reflect poor prompting.
+              </div>
+            )}
+            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0 12px" }}>
+              Your session score is the average of three pillars (delegation + judgment + feedback), each scored 0-100.
+              <strong style={{ color: "var(--text)" }}> A</strong> ≥ 80 · <strong style={{ color: "var(--text)" }}>B</strong> ≥ 65 · <strong style={{ color: "var(--text)" }}>C</strong> ≥ 50 · <strong style={{ color: "var(--text)" }}>D</strong> &lt; 50
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
+              <div>
+                <div style={{ color: "var(--green)", fontWeight: 600, marginBottom: 4 }}>✅ Positive signals</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: "var(--text-muted)" }}>
+                  <li>Good delegations boost your score</li>
+                  <li>Quality catches (spotting issues early): +10 each</li>
+                  <li>Clear first-turn context improves clarity</li>
+                </ul>
+              </div>
+              <div>
+                <div style={{ color: "var(--red)", fontWeight: 600, marginBottom: 4 }}>❌ Negative signals</div>
+                <ul style={{ margin: 0, paddingLeft: 16, color: "var(--text-muted)" }}>
+                  <li>Redirections increase your redirection rate</li>
+                  <li>Drip-feeds: -5 points each on feedback</li>
+                  <li>Rubber stamps: -15 if rate exceeds 30%</li>
+                  <li>Late catches: -10 points each on judgment</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          </>
         );
       })()}
 
