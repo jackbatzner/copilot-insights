@@ -387,6 +387,50 @@ const seedAll = db.transaction(() => {
       }
     }
   }
+
+  // ── Live Monitor: add a few sessions with very recent turns ──────
+  const liveMessages = [
+    "Refactor the auth middleware to validate JWT expiry before checking roles",
+    "No, that's not right — the token refresh should happen BEFORE the role check",
+    "Add rate limiting to the /api/upload endpoint, max 10 requests per minute",
+    "Can you also add unit tests for the rate limiter?",
+    "The test is failing because you're not mocking the Redis client",
+    "Update the README with the new API endpoints we added today",
+    "Actually, use markdown tables for the endpoint docs instead of bullet points",
+    "Deploy the staging build and verify the health check endpoint",
+  ];
+  const liveAssistantMsgs = [
+    "I'll refactor the auth middleware. Here's the updated flow:\n\n```ts\nasync function authMiddleware(req, res, next) {\n  const token = extractToken(req);\n  if (isExpired(token)) return res.status(401).json({ error: 'Token expired' });\n  ...\n}\n```",
+    "You're right — I've moved the token refresh before the role check. The updated middleware now refreshes first, then validates roles.",
+    "I've added rate limiting using a sliding window counter. The `/api/upload` endpoint now returns 429 after 10 requests per minute per IP.",
+    "Here are the unit tests for the rate limiter covering: normal flow, limit exceeded, window reset, and concurrent requests.",
+    "Good catch — I've added a Redis mock using `ioredis-mock`. All 4 tests now pass.",
+    "I've updated the README with the new endpoints. Each one includes method, path, description, and example request/response.",
+    "Done — switched from bullet points to markdown tables. The endpoint docs now show Method | Path | Description | Auth Required columns.",
+    "Deployed to staging. Health check at `/health` returns `{ status: 'ok', version: '2.1.0' }` with 200 OK.",
+  ];
+
+  for (let ls = 0; ls < 2; ls++) {
+    const liveSid = randomUUID();
+    const liveRepo = pick(repos);
+    const liveBranch = pick(branches);
+    const liveSummary = ls === 0 ? "Refactor auth middleware and add rate limiting" : "Update docs and deploy staging";
+    const liveCreated = new Date(Date.now() - randInt(5, 30) * 60000);
+    const liveUpdated = new Date(Date.now() - randInt(1, 4) * 60000);
+
+    insertSession.run(
+      liveSid, liveRepo, liveBranch, liveSummary,
+      isoDate(liveCreated), isoDate(liveUpdated),
+      "cli", `/home/dev/projects/${liveRepo.split("/")[1]}`
+    );
+
+    const turnOffset = ls * 4;
+    for (let t = 0; t < 4; t++) {
+      const minutesAgo = (4 - t) * randInt(2, 6);
+      const turnTime = new Date(Date.now() - minutesAgo * 60000);
+      insertTurn.run(liveSid, t, liveMessages[turnOffset + t], liveAssistantMsgs[turnOffset + t], isoDate(turnTime));
+    }
+  }
 });
 
 seedAll();
