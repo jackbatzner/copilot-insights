@@ -396,18 +396,17 @@ function WeeklyGoals({ goals }) {
 
   const toggleFocus = (idx) => {
     setFocused((prev) => {
-      let next;
-      if (prev.includes(idx)) {
-        next = prev.filter((i) => i !== idx);
-      } else if (prev.length < 2) {
-        next = [...prev, idx];
-      } else {
-        return prev;
-      }
-      localStorage.setItem(storageKey, JSON.stringify(next));
-      return next;
+      if (prev.includes(idx)) return prev.filter((i) => i !== idx);
+      if (prev.length < 2) return [...prev, idx];
+      return prev;
     });
   };
+
+  // TODO: indices break if server reorders goals — use stable identifiers
+  // Sync focused goals to localStorage outside the updater
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(focused)); } catch { /* storage unavailable */ }
+  }, [focused, storageKey]);
 
   const hasFocused = focused.length > 0;
   const displayGoals = hasFocused && !showAll

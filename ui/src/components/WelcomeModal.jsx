@@ -12,13 +12,15 @@ export function WelcomeModal() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      setVisible(true);
-    }
+    try {
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setVisible(true);
+      }
+    } catch { /* storage unavailable */ }
   }, []);
 
   function dismiss() {
-    localStorage.setItem(STORAGE_KEY, "true");
+    try { localStorage.setItem(STORAGE_KEY, "true"); } catch { /* storage unavailable */ }
     setVisible(false);
   }
 

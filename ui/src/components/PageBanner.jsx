@@ -5,11 +5,11 @@ export function PageBanner({ pageId, children }) {
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    setDismissed(!!localStorage.getItem(storageKey));
+    try { setDismissed(!!localStorage.getItem(storageKey)); } catch { /* storage unavailable */ }
   }, [storageKey]);
 
   function dismiss() {
-    localStorage.setItem(storageKey, "true");
+    try { localStorage.setItem(storageKey, "true"); } catch { /* storage unavailable */ }
     setDismissed(true);
   }
 

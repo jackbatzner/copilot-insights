@@ -72,7 +72,8 @@ export default function Overview() {
           <div className="card" style={{ textAlign: "center", padding: "12px 16px" }}>
             <div className="card-header">Your Tier</div>
             <div style={{ fontSize: 36, margin: "4px 0" }}>{tier.emoji} {tier.name}</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{tier.description || `Score: ${overallScore}/100`}</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{/* TODO: add description field to TIERS in tiers.mjs */}
+            Score: {overallScore}/100</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {[...TIERS].reverse().map((t) => {
                 const isCurrent = t.name === tier.name;

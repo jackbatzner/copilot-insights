@@ -17,6 +17,10 @@ export default function SessionDetail() {
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const tagKey = `session-tag-${id}`;
+  const [sessionTag, setSessionTag] = useState(() => {
+    try { return localStorage.getItem(tagKey) || ""; } catch { return ""; }
+  });
 
   useEffect(() => {
     Promise.all([
@@ -76,15 +80,13 @@ export default function SessionDetail() {
   })();
 
   // Manual session tagging (persisted in localStorage)
-  const tagKey = `session-tag-${id}`;
-  const [sessionTag, setSessionTag] = useState(() => {
-    try { return localStorage.getItem(tagKey) || ""; } catch { return ""; }
-  });
   const setTag = (tag) => {
     const newTag = sessionTag === tag ? "" : tag;
     setSessionTag(newTag);
-    if (newTag) localStorage.setItem(tagKey, newTag);
-    else localStorage.removeItem(tagKey);
+    try {
+      if (newTag) localStorage.setItem(tagKey, newTag);
+      else localStorage.removeItem(tagKey);
+    } catch { /* storage unavailable */ }
   };
   const isTaggedTesting = sessionTag === "testing";
   const isTaggedLearning = sessionTag === "learning";
