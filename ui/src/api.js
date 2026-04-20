@@ -175,7 +175,7 @@ export async function fetchSources() {
 export async function fetchVscodeSessions(timeframe) {
   const params = new URLSearchParams();
   if (timeframe && timeframe !== "all") params.set("timeframe", timeframe);
-  return safeFetch(`${API_BASE}/sessions/vscode?${params}`);
+  return safeFetch(`${API_BASE}/vscode-sessions?${params}`);
 }
 
 export async function fetchHiddenSessions() {

@@ -1034,7 +1034,7 @@ app.get("/api/sources", (_req, res) => {
  * GET /api/sessions/vscode
  * List VSCode Chat sessions with analysis.
  */
-app.get("/api/sessions/vscode", (req, res) => {
+app.get("/api/vscode-sessions", (req, res) => {
   try {
     const since = validateTimeframe(req, res);
     if (since === null) return;

@@ -349,7 +349,9 @@ function computeTokenEfficiencyEstimate(text, matches, heuristics) {
   if (!heuristics.hasConstraints && heuristics.wordCount > 15) qualityPenalty += 0.1;
   if (!heuristics.hasCriteria && heuristics.wordCount > 20) qualityPenalty += 0.08;
   if (!heuristics.hasContext && heuristics.wordCount > 20) qualityPenalty += 0.05;
-  if (heuristics.charCount < 30 && heuristics.wordCount > 3) qualityPenalty += 0.15;
+  // Very short prompts almost always need follow-up clarification
+  if (heuristics.charCount < 30) qualityPenalty += 0.3;
+  else if (heuristics.charCount < 60) qualityPenalty += 0.15;
 
   const estimatedRetryProbability = Math.min(patternPenalty + qualityPenalty, 0.95);
 
