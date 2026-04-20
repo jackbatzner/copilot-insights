@@ -217,7 +217,7 @@ a:hover {
 .stats-grid-4 { grid-template-columns: repeat(4, 1fr); }
 .stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stats-grid-2 { grid-template-columns: repeat(2, 1fr); }
-.stats-grid-overview { grid-template-columns: auto 1fr 1fr 1fr 1fr; }
+.stats-grid-overview { grid-template-columns: auto 1fr 1fr 1fr 1fr; align-items: center; }
 
 .stat-card {
   composes: card;
