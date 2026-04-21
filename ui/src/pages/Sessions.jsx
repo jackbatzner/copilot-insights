@@ -5,6 +5,7 @@ import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
@@ -76,7 +77,7 @@ export default function Sessions() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="sessions">
-        Your session history — click any session to see the turn-by-turn replay and understand what worked vs. what needed course correction.
+        Click any session to see the turn-by-turn replay and analysis.
       </PageBanner>
 
       <div className="filter-bar">
@@ -122,18 +123,18 @@ export default function Sessions() {
           <table className="session-table" style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left" }}>Session</th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 80 }}>
+                <th style={{ textAlign: "left", minWidth: 140 }}>Session</th>
+                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 60 }}>
                   Turns{arrow("turnCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 100 }}>
-                  Redirections{arrow("redirectionCount")}
+                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 50 }}>
+                  Redir{arrow("redirectionCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 80 }}>
+                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 90 }}>
                   Rate{arrow("redirectionRate")}
                 </th>
-                <th style={{ width: 120 }}>Top Issue</th>
-                <th style={{ width: 40 }}></th>
+                <th style={{ width: 100 }}>Top Issue</th>
+                <th style={{ width: 32 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -163,9 +164,9 @@ export default function Sessions() {
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                       <ScoreBadge rate={s.redirectionRate} />
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: "nowrap" }}>
                       {topMeta && (
-                        <span style={{ fontSize: 13 }}>
+                        <span style={{ fontSize: 12 }}>
                           {topMeta.emoji} {topMeta.label}
                         </span>
                       )}
@@ -191,6 +192,7 @@ export default function Sessions() {
           </div>
         )}
       </div>
+      <SuggestedNext to="/coaching" icon="🎓" label="Coaching" description="See tips based on your session patterns" />
     </>
   );
 }

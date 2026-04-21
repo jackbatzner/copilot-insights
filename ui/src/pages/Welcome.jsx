@@ -70,21 +70,24 @@ const STEPS = [
           <StartOption
             icon="📊"
             title="Check your Overview"
-            description="See your tier, trends, and key stats at a glance"
+            description="See your tier, top insight, and key stats at a glance"
             path="/"
+          />
+          <StartOption
+            icon="🎓"
+            title="Get Coaching tips"
+            description="Personalized scores for delegation, judgment, and feedback"
+            path="/coaching"
           />
           <StartOption
             icon="📋"
             title="Browse your Sessions"
-            description="Replay a session to see exactly where you corrected the AI"
+            description="Replay a session to see where you corrected the AI"
             path="/sessions"
           />
-          <StartOption
-            icon="🧪"
-            title="Try the Practice Lab"
-            description="Get instant feedback on any prompt you write"
-            path="/practice"
-          />
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12, textAlign: "center" }}>
+          More pages in the sidebar: Learn, Analytics, Practice, and more.
         </div>
       </>
     ),

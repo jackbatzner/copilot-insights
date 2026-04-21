@@ -123,7 +123,7 @@ First-time users are greeted with a **Welcome walkthrough** that explains what t
   <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
 </p>
 
-The main dashboard gives you a full view of your prompting habits, with collapsible sections so you can focus on what matters:
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions, Practice) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />

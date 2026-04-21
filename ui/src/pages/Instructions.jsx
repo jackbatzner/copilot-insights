@@ -4,6 +4,8 @@ import { TimeframeSelector } from "../components/TimeframeSelector";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { Link } from "react-router-dom";
+import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 const CATEGORY_LABELS = {
   convention: { label: "Style & Conventions", emoji: "🎨", color: "#bc8cff" },
@@ -57,7 +59,7 @@ export default function Instructions() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="instructions">
-        Analyzes your sessions to find conventions you teach the agent by hand (missing rules) and rules the agent already knows but ignores (failures). Add missing rules to your instruction files; rewrite vague rules that keep failing.
+        Conventions you keep teaching by hand — add them to your instruction file.
       </PageBanner>
 
       {/* Tab switcher */}
@@ -85,9 +87,7 @@ function GapsTab({ data }) {
   return (
     <>
       <p className="page-intro">
-        Conventions you've repeatedly taught the agent by hand.
-        Adding them to <code>.copilot-instructions.md</code> or <code>agent.md</code> means
-        you'll never have to correct them again.
+        Conventions you've taught the agent by hand. Add them to your instruction file to stop repeating yourself.
       </p>
 
       <div className="stats-grid stats-grid-3">
@@ -138,9 +138,7 @@ function GapsTab({ data }) {
       )}
 
       {data.gaps?.length > 0 && (
-        <div className="card">
-          <div className="card-header">🔍 Detected Convention Gaps</div>
-          <p className="card-subtitle">Each row is a convention you've stated manually — add it to your instruction file</p>
+        <CollapsibleSection title="🔍 Detected Convention Gaps" id="instructions-gaps-table" defaultOpen={false}>
           <table className="data-table">
             <thead>
               <tr>
@@ -166,13 +164,11 @@ function GapsTab({ data }) {
               })}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
 
       {data.repoBreakdown?.length > 0 && (
-        <div className="card">
-          <div className="card-header">📦 Per-Repo Convention Signals</div>
-          <p className="card-subtitle">Repos with the most manual corrections — priority targets for instruction files</p>
+        <CollapsibleSection title="📦 Per-Repo Convention Signals" id="instructions-repo-signals" defaultOpen={false}>
           <table className="data-table">
             <thead>
               <tr><th>Repository</th><th>Signals</th><th>Categories</th></tr>
@@ -197,7 +193,7 @@ function GapsTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
     </>
   );
@@ -211,9 +207,7 @@ function FailuresTab({ data }) {
   return (
     <>
       <p className="page-intro">
-        Rules the agent already knows (from your instructions or earlier in the session)
-        but <strong>ignores or forgets</strong>. Fix these by rewriting vague rules,
-        adding examples, or keeping sessions shorter.
+        Rules the agent knows but ignores. Fix by rewriting vague rules or adding examples.
       </p>
 
       <div className="stats-grid stats-grid-4">
@@ -286,8 +280,7 @@ function FailuresTab({ data }) {
 
       {/* Worst sessions */}
       {data.worstSessions?.length > 0 && (
-        <div className="card">
-          <div className="card-header">💥 Sessions With Most Failures</div>
+        <CollapsibleSection title="💥 Sessions With Most Failures" id="instructions-worst-sessions" defaultOpen={false}>
           <table className="data-table">
             <thead>
               <tr>
@@ -317,18 +310,14 @@ function FailuresTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Example signals with actionable context */}
       {data.examples?.length > 0 && (
-        <div className="card">
-          <div className="card-header">📋 Example Failure Signals</div>
-          <div style={{ padding: "8px 16px 0", fontSize: 12, color: "var(--text-muted)" }}>
-            Each example shows what you said to correct the agent. If you see the same correction repeatedly, add it as a rule in your instruction file.
-          </div>
+        <CollapsibleSection title="📋 Example Failure Signals" id="instructions-examples" defaultOpen={false}>
           <div className="failure-examples">
-            {data.examples.slice(0, 10).map((ex, i) => (
+            {data.examples.slice(0, 3).map((ex, i) => (
               <div key={i} className="failure-example">
                 <div className="failure-example-header">
                   <span className="severity-dot" style={{ background: SEVERITY_COLORS[ex.severity] || "#8b949e" }} />
@@ -336,19 +325,15 @@ function FailuresTab({ data }) {
                   <span className="failure-example-repo">{ex.repo}</span>
                 </div>
                 <code className="failure-example-text">{ex.context}</code>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-                  💡 <em>Consider adding to instructions: "{ex.label}"</em>
-                </div>
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Per-repo breakdown */}
       {data.repoBreakdown?.length > 0 && (
-        <div className="card">
-          <div className="card-header">📦 Failures by Repository</div>
+        <CollapsibleSection title="📦 Failures by Repository" id="instructions-failures-repo" defaultOpen={false}>
           <table className="data-table">
             <thead>
               <tr><th>Repository</th><th>Failures</th></tr>
@@ -369,7 +354,7 @@ function FailuresTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
     </>
   );
@@ -435,6 +420,7 @@ function SuggestionsStack({ suggestions }) {
           )}
         </div>
       ))}
+      <SuggestedNext to="/practice" icon="🧪" label="Practice" description="Strengthen these conventions with prompt drills" />
     </div>
   );
 }

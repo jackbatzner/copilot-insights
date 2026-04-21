@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
 import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -14,7 +15,7 @@ export default function Practice() {
         <h1>🧪 Practice Lab</h1>
       </div>
       <PageBanner pageId="practice">
-        Practice rewriting real prompts from your sessions. The goal: Create Clarity upfront so the agent can deliver on the first try.
+        Practice rewriting prompts to score higher. Create clarity upfront.
       </PageBanner>
       <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
@@ -396,17 +397,17 @@ function CoachingPanel({ challenge }) {
 /* ── Challenge Mode ────────────────────────────────────────── */
 
 const TAG_EXPLANATIONS = {
-  vague: "The prompt is too short or generic for the agent to know what you actually want. Add specifics: what file, what behavior, what the output should look like.",
-  "no-files": "No file paths are mentioned, so the agent has to guess which files to work on — leading to wasted turns or wrong edits. Specify the files upfront.",
-  "no-context": "The prompt lacks background about why this change is needed or how it fits into the bigger picture. The agent works better when it understands the intent.",
-  "no-constraints": "No boundaries are set (language, framework, style, scope). Without constraints, the agent may choose an approach that doesn't fit your project.",
-  "no-criteria": "There's no definition of done — how should the agent know when it's finished? Add acceptance criteria: what should work, what tests to pass, what output to expect.",
-  "no-examples": "No example input/output is provided. Examples are the fastest way to show the agent exactly what you expect.",
-  "no-format": "The prompt doesn't specify what format the output should be in (code, markdown, JSON, etc.). Be explicit about the deliverable.",
-  "no-steps": "This is a complex task crammed into one prompt. Break it into smaller steps so the agent can succeed at each one before moving to the next.",
-  correction: "This prompt is a correction of something the agent already did wrong. To avoid this, provide clearer constraints and examples in the original prompt.",
-  frustration: "This prompt shows frustration — the agent isn't meeting expectations. Step back and reframe: what exactly do you need, and what has the agent gotten wrong?",
-  rollback: "You're asking the agent to undo its work. This usually means the original prompt was missing constraints or acceptance criteria.",
+  vague: "Too short or generic \u2014 add specifics about what file, behavior, and output.",
+  "no-files": "No file paths mentioned \u2014 the agent has to guess where to edit.",
+  "no-context": "Missing background on why this change is needed.",
+  "no-constraints": "No boundaries set (language, framework, style, scope).",
+  "no-criteria": "No definition of done \u2014 how should the agent know when it's finished?",
+  "no-examples": "No example input/output provided.",
+  "no-format": "Output format not specified (code, markdown, JSON, etc.).",
+  "no-steps": "Complex task crammed into one prompt \u2014 break it into steps.",
+  correction: "A correction of something the agent already did wrong.",
+  frustration: "Shows frustration \u2014 step back and reframe what you need.",
+  rollback: "Asking the agent to undo work \u2014 original prompt was missing constraints.",
 };
 
 const TAG_LABELS = {
@@ -535,9 +536,8 @@ function ChallengeMode() {
           </div>
         )}
 
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 16 }}>
-          &ldquo;My Bad Prompts&rdquo; pulls real low-scoring prompts from your sessions.<br/>
-          &ldquo;Prompt Library&rdquo; has 80+ curated bad prompts covering best practices from GitHub, Anthropic, Google &amp; OpenAI.
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 16 }}>
+          &ldquo;My Bad Prompts&rdquo; uses your real low-scoring prompts. &ldquo;Prompt Library&rdquo; has 80+ curated examples.
         </p>
       </div>
     );
@@ -762,6 +762,7 @@ function ChallengeMode() {
           Switch Source
         </button>
       </div>
+      <SuggestedNext to="/sessions" icon="📋" label="Sessions" description="Apply what you practiced to real sessions" />
     </div>
   );
 }
