@@ -4,8 +4,24 @@ const API_BASE = "/api";
  * Wrapper around fetch that handles HTTP errors and JSON parse failures.
  */
 async function safeFetch(url, options) {
-  const res = await fetch(url, options);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    throw new Error(
+      "Can't reach the Copilot Insights server. Make sure it's running (npm start) and try refreshing."
+    );
+  }
+  if (!res.ok) {
+    let errorMessage;
+    try {
+      const body = await res.json();
+      errorMessage = body.error;
+    } catch {
+      // no JSON body
+    }
+    throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
+  }
   try {
     return await res.json();
   } catch {

@@ -8,10 +8,10 @@ import {
 import { CATEGORY_META } from "./ScoreBadge.jsx";
 
 const COLORS = {
-  explicit_correction: "#f85149",
+  explicit_correction: "#d29922",
   course_change: "#58a6ff",
-  frustration: "#d29922",
-  repetition: "#bc8cff",
+  frustration: "#bc8cff",
+  repetition: "#8b949e",
   rollback: "#db6d28",
 };
 

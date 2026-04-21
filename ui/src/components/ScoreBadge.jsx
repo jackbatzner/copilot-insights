@@ -28,9 +28,9 @@ export function rateColor(rate) {
 }
 
 export const CATEGORY_META = {
-  explicit_correction: { emoji: "🚫", label: "Explicit Correction" },
+  explicit_correction: { emoji: "🔄", label: "Iterative Refinement" },
   course_change: { emoji: "↩️", label: "Course Change" },
-  frustration: { emoji: "😤", label: "Frustration" },
-  repetition: { emoji: "🔁", label: "Repetition" },
-  rollback: { emoji: "⏪", label: "Rollback" },
+  frustration: { emoji: "💬", label: "Clarification Needed" },
+  repetition: { emoji: "🔁", label: "Reinforced Instruction" },
+  rollback: { emoji: "🔀", label: "Direction Change" },
 };

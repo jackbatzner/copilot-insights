@@ -12,9 +12,9 @@
 
 export const REDIRECTION_CATEGORIES = {
   explicit_correction: {
-    label: "Explicit Correction",
-    emoji: "🚫",
-    description: "User directly rejects or corrects the agent's output",
+    label: "Iterative Refinement",
+    emoji: "🔄",
+    description: "User refines or adjusts the agent's output",
   },
   course_change: {
     label: "Course Change",
@@ -22,19 +22,19 @@ export const REDIRECTION_CATEGORIES = {
     description: "User changes direction mid-task",
   },
   frustration: {
-    label: "Frustration Signal",
-    emoji: "😤",
-    description: "User shows impatience or repeats themselves",
+    label: "Clarification Needed",
+    emoji: "💬",
+    description: "User re-explains or adds clarity for the agent",
   },
   repetition: {
-    label: "Repeated Instruction",
+    label: "Reinforced Instruction",
     emoji: "🔁",
     description: "User re-states something they already said",
   },
   rollback: {
-    label: "Rollback Request",
-    emoji: "⏪",
-    description: "User asks to undo, revert, or go back",
+    label: "Direction Change",
+    emoji: "🔀",
+    description: "User steers toward a different approach",
   },
 };
 

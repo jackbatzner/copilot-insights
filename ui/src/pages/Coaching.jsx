@@ -8,6 +8,7 @@ import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
+import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
@@ -35,7 +36,18 @@ export default function Coaching() {
   }, [timeframe, refreshKey]);
 
   if (loading) return <div className="loading">Analyzing coaching metrics…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+        {error.includes("HTTP 500")
+          ? "Couldn't load coaching data. Make sure the Copilot Insights server is running and your session database exists."
+          : error}
+      </p>
+    </div>
+  );
+
+  const sessionCount = delegation?.sessionsAnalyzed ?? clarity?.sessions?.length ?? 0;
 
   return (
     <div className="page">
@@ -47,11 +59,15 @@ export default function Coaching() {
         Delegation, Judgment, Feedback — your three AI leadership skills.
       </PageBanner>
 
+      {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
+        <EmptyState sessionCount={sessionCount} feature="coaching insights" />
+      )}
+
       {/* Three pillars hero */}
       <div className="stats-grid stats-grid-3">
         <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
-          <div className="stat-label">🤝 Delegation</div>
+          <div className="stat-label"><MetricHelp label="🤝 Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." action="Describe WHAT you want, not HOW to do it." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Create Clarity</div>
           <div className="stat-sub">work handed off to agent</div>
           <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
@@ -61,7 +77,7 @@ export default function Coaching() {
         </div>
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
-          <div className="stat-label">🧠 Judgment</div>
+          <div className="stat-label"><MetricHelp label="🧠 Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping, avoiding costly late rollbacks." target="70+ is good, 80+ is excellent." action="Review each agent change carefully before approving." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Deliver Success</div>
           <div className="stat-sub">review quality / 100</div>
           <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
@@ -70,7 +86,7 @@ export default function Coaching() {
         </div>
         <div className={`stat-card pillar-card ${tab === "feedback" ? "pillar-active" : ""}`} onClick={() => setTab("feedback")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
-          <div className="stat-label">💬 Feedback</div>
+          <div className="stat-label"><MetricHelp label="💬 Feedback" definition="How clearly you communicate requirements and corrections to the agent. Clear feedback = fewer iterations." target="70+ clarity score is clear communication." action="Include file paths, constraints, and what success looks like." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Generate Energy</div>
           <div className="stat-sub">clarity score / 100</div>
           <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
@@ -297,9 +313,9 @@ function JudgmentTab({ data }) {
         </CollapsibleSection>
       )}
 
-      {/* Worst judgment sessions */}
+      {/* Sessions to review */}
       {data.worstJudgment?.length > 0 && (
-        <CollapsibleSection title="⚠️ Sessions Needing Better Review" id="coaching-worst-judgment" defaultOpen={false}>
+        <CollapsibleSection title="📋 Sessions to Review" id="coaching-worst-judgment" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ width: 180, textAlign: "left" }}>Issues</th><th style={{ textAlign: "left" }}>Session</th></tr></thead>
             <tbody>
@@ -395,7 +411,7 @@ function FeedbackTab({ clarity, efficiency }) {
       </div>
 
       {clarity?.sessions?.length > 0 && (
-        <CollapsibleSection title="🔍 Weakest Opening Prompts" id="coaching-weak-prompts" defaultOpen={false}>
+        <CollapsibleSection title="🔍 Prompts with Room to Grow" id="coaching-weak-prompts" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ textAlign: "left" }}>Session</th><th style={{ width: 220, textAlign: "left" }}>Missing</th></tr></thead>
             <tbody>

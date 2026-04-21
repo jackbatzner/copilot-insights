@@ -13,6 +13,7 @@ import { TIERS, getTier } from "@shared/tiers.mjs";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
@@ -53,10 +54,23 @@ export default function Overview() {
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
   if (loading) return <div className="loading">Loading analysis…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+        {error.includes("Session store not found") || error.includes("HTTP 500")
+          ? "Couldn't connect to your session data. Make sure the Copilot Insights server is running and you've completed at least one Copilot CLI session."
+          : error}
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+        Need help? Run <code>copilot-insights --help</code> to get started.
+      </p>
+    </div>
+  );
   if (!data) return null;
 
   const { aggregate } = data;
+  const sessionCount = aggregate.sessionsAnalyzed || 0;
   const avgRate = aggregate.avgRedirectionRate || 0;
 
   // Derive tier from latest pillar score
@@ -78,6 +92,11 @@ export default function Overview() {
       {/* Since Last Visit — shown for returning users */}
       <SinceLastVisit refreshKey={refreshKey} />
 
+      {/* Empty / low-session state */}
+      {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
+        <EmptyState sessionCount={sessionCount} feature="trend analysis and coaching" />
+      )}
+
       {/* ── THE 5-MINUTE WOW ──────────────────────────────────────── */}
 
       {/* Tier Hero — your level at a glance */}
@@ -86,7 +105,13 @@ export default function Overview() {
           <div className="tier-hero-content">
             <div style={{ fontSize: 36 }}>{tier.emoji}</div>
             <div className="tier-hero-info">
-              <div style={{ fontSize: 16, fontWeight: 600 }}>{tier.name}</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                <MetricHelp
+                  label={tier.name}
+                  definition="Your overall skill tier, derived from your combined Delegation + Judgment + Feedback pillar scores."
+                  target="Progress through tiers by improving your weakest pillar."
+                />
+              </div>
               <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Score: {overallScore}/100</div>
               {tier.next && (
                 <div className="tier-hero-progress">
@@ -132,7 +157,13 @@ export default function Overview() {
           <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.sessionsAnalyzed}</div>
         </div>
         <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Redirections</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+            <MetricHelp
+              label="Redirections"
+              definition="Total turns where you corrected, redirected, or re-explained something to the agent. Each one means the agent didn't do what you wanted on the first try."
+              target="Fewer is better — each redirection is a chance to improve your opening prompt."
+            />
+          </div>
           <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.totalRedirections}</div>
         </div>
         <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
@@ -237,9 +268,9 @@ export default function Overview() {
               </LineChart>
             </ResponsiveContainer>
             <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "#8b949e" }}>
-              <span><span style={{ color: "#58a6ff" }}>●</span> Delegation</span>
-              <span><span style={{ color: "#3fb950" }}>●</span> Judgment</span>
-              <span><span style={{ color: "#d29922" }}>●</span> Feedback</span>
+              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
+              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
+              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Feedback" definition="How clearly you communicate requirements and corrections to the agent." target="70+ clarity score is clear communication." /></span>
             </div>
           </div>
         </CollapsibleSection>

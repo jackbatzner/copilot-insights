@@ -6,6 +6,7 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
@@ -59,8 +60,19 @@ export default function Sessions() {
   };
 
   if (loading) return <div className="loading">Loading sessions…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+        {error.includes("HTTP 500")
+          ? "Couldn't load session data. Make sure the Copilot Insights server is running and your session database exists."
+          : error}
+      </p>
+    </div>
+  );
   if (!data) return null;
+
+  const sessionCount = data.sessions?.length || 0;
 
   const sorted = [...data.sessions].sort((a, b) => {
     const mul = sortDir === "desc" ? -1 : 1;
@@ -111,6 +123,10 @@ export default function Sessions() {
           )}
         </span>
       </div>
+
+      {sessionCount === 0 && (
+        <EmptyState sessionCount={0} feature="session analysis" />
+      )}
 
       <div className="card">
         {sorted.length === 0 ? (

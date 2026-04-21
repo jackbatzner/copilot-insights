@@ -27,8 +27,11 @@ export default class ErrorBoundary extends Component {
       return (
         <div style={{ padding: "2rem", textAlign: "center", color: "#c9d1d9" }}>
           <h2>Something went wrong</h2>
-          <p style={{ color: "#8b949e" }}>
+          <p style={{ color: "#8b949e", maxWidth: 500, margin: "0.5rem auto 1rem" }}>
             {this.state.error?.message || "An unexpected error occurred."}
+          </p>
+          <p style={{ color: "#8b949e", fontSize: "0.85rem" }}>
+            If this keeps happening, try refreshing the page or restarting the server.
           </p>
           <button
             onClick={this.handleReset}
