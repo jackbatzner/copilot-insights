@@ -25,6 +25,8 @@ export default function Overview() {
   const [error, setError] = useState(null);
   const [timeframe, setTimeframe] = useState("all");
 
+  useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -60,8 +62,6 @@ export default function Overview() {
     ? pillarTrends.weeks[pillarTrends.weeks.length - 1].overall
     : 0;
   const tier = getTier(overallScore);
-
-  useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
   return (
     <>
