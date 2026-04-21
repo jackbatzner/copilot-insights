@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
-import { Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
 import Overview from "./pages/Overview.jsx";
@@ -30,8 +30,14 @@ function useShowWelcome() {
   const [showWelcome, setShowWelcome] = useState(null); // null = still checking
 
   useEffect(() => {
-    // Fast path: localStorage flag exists
+    // Fast path: localStorage flag exists (including migrated old key)
     if (localStorage.getItem("onboarding-complete") === "true") {
+      setShowWelcome(false);
+      return;
+    }
+    // Migrate old WelcomeModal flag if present
+    if (localStorage.getItem("copilot-insights-welcomed") === "true") {
+      localStorage.setItem("onboarding-complete", "true");
       setShowWelcome(false);
       return;
     }

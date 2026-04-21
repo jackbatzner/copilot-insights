@@ -26,6 +26,7 @@ export default function Overview() {
   const [timeframe, setTimeframe] = useState("all");
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     Promise.all([
       fetchSessions(timeframe),
@@ -35,14 +36,16 @@ export default function Overview() {
       fetchWorkStyle(timeframe),
     ])
       .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData]) => {
+        if (cancelled) return;
         setData(sessionsData);
         setTrends(trendsData.trends);
         setInsights(insightsData.insights);
         setPillarTrends(pillarData);
         setWorkStyle(workStyleData);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [timeframe, refreshKey]);
 
   if (loading) return <div className="loading">Loading analysis…</div>;
@@ -58,8 +61,7 @@ export default function Overview() {
     : 0;
   const tier = getTier(overallScore);
 
-  // Detect if user is likely new (for default collapse state)
-  localStorage.setItem("overview-visited", "true");
+  useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
   return (
     <>
@@ -176,8 +178,8 @@ export default function Overview() {
       {insights && insights.length > 1 && (
         <CollapsibleSection title="💡 More Insights" id="overview-insights" defaultOpen={false}>
           <div className="insights-grid">
-            {insights.slice(1).map((insight, i) => (
-              <InsightCard key={i} insight={insight} />
+            {insights.slice(1).map((insight) => (
+              <InsightCard key={insight.title || insight.message} insight={insight} />
             ))}
           </div>
         </CollapsibleSection>
@@ -312,11 +314,12 @@ export default function Overview() {
             <div className="card" style={{ marginTop: 16 }}>
               <div className="card-header">Plan Completion Rates</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, padding: "12px 0" }}>
-                {workStyle.planVsExecution.map((item, i) => {
+                {workStyle.planVsExecution.map((item) => {
                   const pct = item.completionRate != null ? item.completionRate * 100 : 0;
                   const color = pct >= 80 ? "#3fb950" : pct >= 50 ? "#d29922" : "#f85149";
+                  const itemKey = item.session || item.name || `rate-${pct}`;
                   return (
-                    <div key={i} style={{ background: "#161b22", borderRadius: 8, padding: "10px 14px", border: "1px solid #30363d" }}>
+                    <div key={itemKey} style={{ background: "#161b22", borderRadius: 8, padding: "10px 14px", border: "1px solid #30363d" }}>
                       <div style={{ fontSize: 12, color: "#8b949e", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {item.session || item.name || `Session ${i + 1}`}
                       </div>

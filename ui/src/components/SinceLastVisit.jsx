@@ -11,6 +11,7 @@ export function SinceLastVisit({ refreshKey }) {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const lastVisit = localStorage.getItem("last-visit-timestamp");
     const now = new Date().toISOString();
 
@@ -23,6 +24,7 @@ export function SinceLastVisit({ refreshKey }) {
     // Fetch sessions to compute delta
     Promise.all([fetchSessions("all"), fetchInsights("7d")])
       .then(([sessionsData, insightsData]) => {
+        if (cancelled) return;
         const sessions = sessionsData.sessions || [];
         const lastVisitDate = new Date(lastVisit);
 
@@ -47,8 +49,9 @@ export function SinceLastVisit({ refreshKey }) {
       })
       .catch(() => {
         // Silently fail — this is non-critical UI
-        localStorage.setItem("last-visit-timestamp", now);
+        if (!cancelled) localStorage.setItem("last-visit-timestamp", now);
       });
+    return () => { cancelled = true; };
   }, [refreshKey]);
 
   if (!data || dismissed) return null;
