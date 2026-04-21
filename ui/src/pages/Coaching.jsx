@@ -7,6 +7,7 @@ import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
+import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
@@ -43,7 +44,7 @@ export default function Coaching() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="coaching">
-        Your three AI leadership skills — mapped to Microsoft's Leading with AI framework. Delegation = Create Clarity (framing problems well). Judgment = Deliver Success (owning output quality). Feedback = Generate Energy (iterating and sharing learnings).
+        Delegation, Judgment, Feedback — your three AI leadership skills.
       </PageBanner>
 
       {/* Three pillars hero */}
@@ -108,11 +109,11 @@ function OverviewTab({ clarity, efficiency, delegation, judgment }) {
     ...(delegation ? buildDelegationSuggestions(delegation) : []),
     ...(efficiency?.aggregate?.totalDripFeeds > 5 ? [{
       priority: "medium", emoji: "💧", title: "Reduce Drip-Feeding",
-      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load requirements in your first message.\n\n💡 Example: Instead of "Add a button" → "Make it blue" → "Put it in the header" → "It should call /api/save", try "Add a blue 'Save' button in the header that calls POST /api/save on click."`,
+      body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load all requirements in your first message.`,
     }] : []),
     ...(clarity?.avgScore < 50 ? [{
       priority: "high", emoji: "📝", title: "Improve Opening Prompts",
-      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior in your first message.\n\n💡 Example: Instead of "Fix the login bug", try "The POST /api/login endpoint returns 401 for valid credentials. Check JWT verification in src/auth.ts — I think token expiry uses seconds instead of milliseconds."`,
+      body: `Average clarity score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior upfront.`,
     }] : []),
   ].sort((a, b) => {
     const p = { high: 0, medium: 1, low: 2, info: 3 };
@@ -184,20 +185,8 @@ function DelegationTab({ data }) {
               ))}
             </div>
           </div>
-          <div style={{ marginTop: 16, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
-            <strong style={{ color: "var(--accent)" }}>📖 What each interaction style means:</strong>
-            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
-              <div><strong style={{ color: "#58a6ff" }}>✅ Approval</strong> — Short confirmations ("yes", "looks good", "ship it"). You're trusting the agent's output. <em>Good when output is genuinely correct.</em></div>
-              <div><strong style={{ color: "#3fb950" }}>🤝 Delegation</strong> — High-level task descriptions. You define WHAT to do, the agent decides HOW. <em>This is the goal for most tasks.</em></div>
-              <div><strong style={{ color: "#db6d28" }}>📋 Guided</strong> — Step-by-step instructions where YOU specify the how. <em>Useful for precise requirements, but reduces agent leverage — you're doing the thinking.</em></div>
-              <div><strong style={{ color: "#f85149" }}>🔄 Correction</strong> — Redirecting the agent after it went wrong. <em>Some is natural; a lot means your initial prompt lacked clarity.</em></div>
-              <div><strong style={{ color: "#8b949e" }}>❓ Question</strong> — Asking the agent for information. <em>Great for learning, but doesn't count toward delegation.</em></div>
-              <div><strong style={{ color: "#d29922" }}>💬 Collaborative</strong> — Conversational back-and-forth where you and the agent work through the problem together. <em>Good for exploring options, but may be less efficient than clear delegation.</em></div>
-              <div><strong style={{ color: "#bc8cff" }}>📑 Detailed Spec</strong> — Long, structured prompts with specific requirements, constraints, and acceptance criteria. <em>Excellent for complex tasks — this IS good delegation when done upfront.</em></div>
-            </div>
-            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
-              💡 <strong>Ideal distribution:</strong> High delegation + some approval, low guided + low correction. The shift from Guided→Delegation means you're trusting the agent with HOW, while you focus on WHAT and WHY — that's Create Clarity.
-            </div>
+          <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+            💡 <strong>Goal:</strong> High delegation + low correction. Shift from telling HOW to defining WHAT.
           </div>
         </div>
       )}
@@ -215,27 +204,15 @@ function DelegationTab({ data }) {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12, padding: "12px 16px", background: "rgba(88, 166, 255, 0.05)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}>
-            <strong style={{ color: "var(--accent)" }}>📖 What each session style means:</strong>
-            <div style={{ display: "grid", gap: 8, marginTop: 8, color: "var(--text-muted)" }}>
-              <div><strong style={{ color: "var(--text)" }}>🤝 Delegator</strong> — You defined the goal and let the agent handle execution. <em>Ideal for tasks where you trust the agent's judgment. Your delegation ratio was high ({'>'}60%).</em></div>
-              <div><strong style={{ color: "var(--text)" }}>🛠️ Hands-on</strong> — You guided the agent step-by-step. <em>Fine for learning, but for tasks you've done before, try shifting to delegation — define WHAT, not HOW.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>🔍 Exploratory</strong> — You asked lots of questions to understand something. <em>Great for learning! These are discovery sessions — don't judge them on delegation metrics.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>🔄 Corrective</strong> — You spent a lot of turns fixing the agent's output. <em>Review your opening prompt — more context upfront usually prevents excessive corrections.</em></div>
-              <div><strong style={{ color: "var(--text)" }}>💬 Collaborative</strong> — A balanced back-and-forth. <em>Default style — not bad, but consider whether a clearer initial spec could have been more efficient.</em></div>
-            </div>
-            <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-muted)" }}>
-              💡 <strong>Action:</strong> Aim for more Delegator sessions on tasks you understand well. Reserve Hands-on and Exploratory for genuinely new territory.
-            </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+            💡 Aim for more Delegator sessions. Reserve Hands-on for genuinely new territory.
           </div>
         </div>
       )}
 
       {/* Most productive sessions */}
       {data.topDelegated?.length > 0 && (
-        <div className="card">
-          <div className="card-header">🚀 Most Productive Sessions</div>
-          <p className="card-subtitle">Highest file operations per turn — effective delegation</p>
+        <CollapsibleSection title="🚀 Most Productive Sessions" id="coaching-top-delegated" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead>
               <tr><th style={{ width: 120, textAlign: "left" }}>Productivity</th><th style={{ width: 160, textAlign: "left" }}>Output</th><th style={{ textAlign: "left" }}>Session</th></tr>
@@ -250,7 +227,7 @@ function DelegationTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
     </>
   );
@@ -305,9 +282,7 @@ function JudgmentTab({ data }) {
 
       {/* Most thrashed files */}
       {data.allThrashed?.length > 0 && (
-        <div className="card">
-          <div className="card-header">🔄 Most Revised Files</div>
-          <p className="card-subtitle">Files edited 3+ times in a session — sign of unclear requirements</p>
+        <CollapsibleSection title="🔄 Most Revised Files" id="coaching-thrashed" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ textAlign: "left" }}>File</th><th style={{ width: 80, textAlign: "left" }}>Edits</th></tr></thead>
             <tbody>
@@ -319,13 +294,12 @@ function JudgmentTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Worst judgment sessions */}
       {data.worstJudgment?.length > 0 && (
-        <div className="card">
-          <div className="card-header">⚠️ Sessions Needing Better Review</div>
+        <CollapsibleSection title="⚠️ Sessions Needing Better Review" id="coaching-worst-judgment" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ width: 180, textAlign: "left" }}>Issues</th><th style={{ textAlign: "left" }}>Session</th></tr></thead>
             <tbody>
@@ -338,7 +312,7 @@ function JudgmentTab({ data }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
     </>
   );
@@ -421,11 +395,7 @@ function FeedbackTab({ clarity, efficiency }) {
       </div>
 
       {clarity?.sessions?.length > 0 && (
-        <div className="card">
-          <div className="card-header">🔍 Weakest Opening Prompts</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8, padding: "6px 10px", background: "rgba(88, 166, 255, 0.05)", borderRadius: 6 }}>
-            Sessions with the lowest first-turn clarity scores. Some may be <strong style={{ color: "var(--accent)" }}>📚 learning sessions</strong> (no file edits) or <strong style={{ color: "var(--yellow)" }}>🧪 testing/feedback sessions</strong> (long iterative reviews with intentional corrections). These naturally score differently — click into the session to see context.
-          </div>
+        <CollapsibleSection title="🔍 Weakest Opening Prompts" id="coaching-weak-prompts" defaultOpen={false}>
           <table className="data-table" style={{ tableLayout: "fixed" }}>
             <thead><tr><th style={{ width: 80, textAlign: "left" }}>Score</th><th style={{ textAlign: "left" }}>Session</th><th style={{ width: 220, textAlign: "left" }}>Missing</th></tr></thead>
             <tbody>
@@ -438,7 +408,7 @@ function FeedbackTab({ clarity, efficiency }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </CollapsibleSection>
       )}
     </>
   );

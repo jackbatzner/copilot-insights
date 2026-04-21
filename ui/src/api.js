@@ -160,38 +160,14 @@ export async function fetchLiveFeed(since) {
   return safeFetch(`${API_BASE}/live/feed?${params}`);
 }
 
-export async function fetchTokenEfficiency(timeframe, repo) {
-  return safeFetch(`${API_BASE}/token-efficiency?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchSessionTokens(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/tokens`);
-}
-
-export async function fetchSources() {
-  return safeFetch(`${API_BASE}/sources`);
-}
-
-export async function fetchVscodeSessions(timeframe) {
-  const params = new URLSearchParams();
-  if (timeframe && timeframe !== "all") params.set("timeframe", timeframe);
-  return safeFetch(`${API_BASE}/vscode-sessions?${params}`);
-}
-
 export async function fetchHiddenSessions() {
-  const res = await fetch(`${API_BASE}/hidden-sessions`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return safeFetch(`${API_BASE}/hidden-sessions`);
 }
 
 export async function hideSession(id) {
-  const res = await fetch(`${API_BASE}/sessions/${id}/hide`, { method: "POST" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "POST" });
 }
 
 export async function unhideSession(id) {
-  const res = await fetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
 }

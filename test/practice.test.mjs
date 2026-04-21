@@ -160,19 +160,4 @@ describe("analyzePrompt", () => {
       assert.ok(elapsed < 2000, `Took ${elapsed}ms, expected < 2000ms`);
     });
   });
-
-  describe("tokenEfficiency field", () => {
-    it("returns tokenEfficiency object for valid prompt", () => {
-      const r = analyzePrompt("Refactor the authentication middleware in src/auth.ts to use async/await and add proper error handling with try/catch blocks");
-      assert.ok(r.tokenEfficiency, "should include tokenEfficiency field");
-      assert.equal(typeof r.tokenEfficiency.estimatedInputTokens, "number");
-      assert.ok(r.tokenEfficiency.estimatedInputTokens > 0);
-    });
-
-    it("includes token estimate even for poor prompts", () => {
-      const r = analyzePrompt("fix the thing that is broken please");
-      assert.ok(r.tokenEfficiency, "should include tokenEfficiency field");
-      assert.equal(typeof r.tokenEfficiency.estimatedInputTokens, "number");
-    });
-  });
 });

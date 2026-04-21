@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
 import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -14,7 +15,7 @@ export default function Practice() {
         <h1>🧪 Practice Lab</h1>
       </div>
       <PageBanner pageId="practice">
-        Practice rewriting real prompts from your sessions. The goal: Create Clarity upfront so the agent can deliver on the first try.
+        Practice rewriting prompts to score higher. Create clarity upfront.
       </PageBanner>
       <p style={{ color: "var(--text-muted)", marginBottom: 16 }}>
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
@@ -208,57 +209,6 @@ function SandboxMode() {
 
           <Nudges result={result} />
 
-          {result.tokenEfficiency && (
-            <div className="card" style={{ marginTop: 16 }}>
-              <div className="card-header">⚡ Token Efficiency</div>
-              <div style={{ padding: "12px 16px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)" }}>
-                      ~{result.tokenEfficiency.estimatedInputTokens}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Input Tokens</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: (result.tokenEfficiency.estimatedRetryProbability ?? 0) > 0.5 ? "var(--red)" : "var(--green)" }}>
-                      {Math.round((result.tokenEfficiency.estimatedRetryProbability ?? 0) * 100)}%
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Retry Probability</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--orange)" }}>
-                      ~{result.tokenEfficiency.estimatedTotalTokens.toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Est. Total Tokens</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>
-                      ~{result.tokenEfficiency.optimizedEstimate.toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Optimized Tokens</div>
-                  </div>
-                </div>
-                {result.tokenEfficiency.savingsPercent > 0 && (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "8px 12px", borderRadius: 6,
-                    background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.2)",
-                    fontSize: 13,
-                  }}>
-                    <span>💰</span>
-                    <span>
-                      With improvements, this prompt could save <strong>{result.tokenEfficiency.savingsPercent}%</strong> of tokens
-                      ({result.tokenEfficiency.estimatedTotalTokens - result.tokenEfficiency.optimizedEstimate} tokens)
-                    </span>
-                  </div>
-                )}
-                <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
-                  Grade: <strong style={{ color: result.tokenEfficiency.grade?.color }}>{result.tokenEfficiency.grade?.label || "—"}</strong> · High retry probability means prompts that need follow-ups cost 3-5× more.
-                </div>
-              </div>
-            </div>
-          )}
-
           {result.patterns.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>
               <div className="card-header">⚠️ Detected Patterns</div>
@@ -447,17 +397,17 @@ function CoachingPanel({ challenge }) {
 /* ── Challenge Mode ────────────────────────────────────────── */
 
 const TAG_EXPLANATIONS = {
-  vague: "The prompt is too short or generic for the agent to know what you actually want. Add specifics: what file, what behavior, what the output should look like.",
-  "no-files": "No file paths are mentioned, so the agent has to guess which files to work on — leading to wasted turns or wrong edits. Specify the files upfront.",
-  "no-context": "The prompt lacks background about why this change is needed or how it fits into the bigger picture. The agent works better when it understands the intent.",
-  "no-constraints": "No boundaries are set (language, framework, style, scope). Without constraints, the agent may choose an approach that doesn't fit your project.",
-  "no-criteria": "There's no definition of done — how should the agent know when it's finished? Add acceptance criteria: what should work, what tests to pass, what output to expect.",
-  "no-examples": "No example input/output is provided. Examples are the fastest way to show the agent exactly what you expect.",
-  "no-format": "The prompt doesn't specify what format the output should be in (code, markdown, JSON, etc.). Be explicit about the deliverable.",
-  "no-steps": "This is a complex task crammed into one prompt. Break it into smaller steps so the agent can succeed at each one before moving to the next.",
-  correction: "This prompt is a correction of something the agent already did wrong. To avoid this, provide clearer constraints and examples in the original prompt.",
-  frustration: "This prompt shows frustration — the agent isn't meeting expectations. Step back and reframe: what exactly do you need, and what has the agent gotten wrong?",
-  rollback: "You're asking the agent to undo its work. This usually means the original prompt was missing constraints or acceptance criteria.",
+  vague: "Too short or generic \u2014 add specifics about what file, behavior, and output.",
+  "no-files": "No file paths mentioned \u2014 the agent has to guess where to edit.",
+  "no-context": "Missing background on why this change is needed.",
+  "no-constraints": "No boundaries set (language, framework, style, scope).",
+  "no-criteria": "No definition of done \u2014 how should the agent know when it's finished?",
+  "no-examples": "No example input/output provided.",
+  "no-format": "Output format not specified (code, markdown, JSON, etc.).",
+  "no-steps": "Complex task crammed into one prompt \u2014 break it into steps.",
+  correction: "A correction of something the agent already did wrong.",
+  frustration: "Shows frustration \u2014 step back and reframe what you need.",
+  rollback: "Asking the agent to undo work \u2014 original prompt was missing constraints.",
 };
 
 const TAG_LABELS = {
@@ -586,9 +536,8 @@ function ChallengeMode() {
           </div>
         )}
 
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 16 }}>
-          &ldquo;My Bad Prompts&rdquo; pulls real low-scoring prompts from your sessions.<br/>
-          &ldquo;Prompt Library&rdquo; has 80+ curated bad prompts covering best practices from GitHub, Anthropic, Google &amp; OpenAI.
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 16 }}>
+          &ldquo;My Bad Prompts&rdquo; uses your real low-scoring prompts. &ldquo;Prompt Library&rdquo; has 80+ curated examples.
         </p>
       </div>
     );
@@ -632,9 +581,52 @@ function ChallengeMode() {
         <div className="practice-challenge-original">
           <q style={{ fontStyle: "italic", color: "var(--text-muted)" }}>{challenge.originalPrompt}</q>
         </div>
-        {challenge.hint && (
-          <div style={{ background: "rgba(88, 166, 255, 0.06)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "var(--text-muted)" }}>
-            💡 <em>{challenge.hint}</em>
+        {challenge && (challenge.tags || challenge.hint || challenge.category) && (
+          <div style={{ background: "rgba(248, 81, 73, 0.08)", border: "1px solid rgba(248, 81, 73, 0.2)", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: "#f85149", marginBottom: 8, fontSize: 13 }}>
+              🔍 What's wrong with this prompt?
+            </div>
+            {/* Specific evidence from the prompt */}
+            {(() => {
+              const prompt = challenge.originalPrompt || "";
+              const words = prompt.trim().split(/\s+/).length;
+              const hasFiles = /[\/\\][\w.-]+\.\w+|\.jsx?|\.tsx?|\.py|\.css|\.mjs/.test(prompt);
+              const hasConstraints = /must|should|don't|avoid|only|limit|require|constraint/i.test(prompt);
+              const hasCriteria = /expect|result|output|return|should.*work|accept|test|verify/i.test(prompt);
+              const hasContext = /because|since|currently|right now|the goal|we need|background/i.test(prompt);
+              const issues = [];
+              if (words < 15) issues.push(`📏 Only ${words} words — too short for the agent to understand what you need.`);
+              else if (words < 30) issues.push(`📏 Only ${words} words — short prompts often lack enough detail for the agent.`);
+              if (!hasFiles) issues.push("📁 No file paths mentioned — the agent has to guess which files to work on.");
+              if (!hasConstraints) issues.push("🚧 No constraints given — no \"must\", \"should\", \"avoid\" etc. The agent might choose an approach that doesn't fit.");
+              if (!hasCriteria) issues.push("✅ No acceptance criteria — how will the agent know when it's done correctly?");
+              if (!hasContext) issues.push("💭 No context about WHY this change is needed or how it fits the bigger picture.");
+              if (issues.length === 0) issues.push("🔍 This prompt is technically okay but could be more specific to reduce back-and-forth.");
+              return (
+                <div style={{ background: "rgba(248, 81, 73, 0.05)", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12 }}>
+                  <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Specifically, this prompt:</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, color: "var(--text-muted)" }}>
+                    {issues.map((issue, i) => <div key={i}>{issue}</div>)}
+                  </div>
+                </div>
+              );
+            })()}
+            {challenge.tags && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                {(Array.isArray(challenge.tags) ? challenge.tags : [challenge.tags]).map((tag, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span style={{ background: "rgba(248, 81, 73, 0.15)", color: "#f85149", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", marginTop: 1 }}>{TAG_LABELS[tag] || tag}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{TAG_EXPLANATIONS[tag] || ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {challenge.hint && <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>💡 <em>{challenge.hint}</em></p>}
+            {challenge.hint && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#3fb950" }}>
+                ✅ <strong>How to improve:</strong> {challenge.suggestion || challenge.hint}
+              </div>
+            )}
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -770,6 +762,7 @@ function ChallengeMode() {
           Switch Source
         </button>
       </div>
+      <SuggestedNext to="/sessions" icon="📋" label="Sessions" description="Apply what you practiced to real sessions" />
     </div>
   );
 }

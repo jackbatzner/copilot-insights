@@ -4,6 +4,7 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 
 export default function Learn() {
   const { key: refreshKey } = useRefresh();
@@ -46,7 +47,7 @@ export default function Learn() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="learn">
-        Your personalized improvement plan — pick 1-2 focus areas, build one habit at a time, and track your growth week by week. Generate Energy by making your learning visible.
+        Your personalized improvement plan — pick a focus and build habits.
       </PageBanner>
 
       {/* Pillar score hero */}
@@ -136,8 +137,7 @@ function DevPlanTab({ plan, gaps }) {
 
       {/* High impact opportunities with mapped weekly goals */}
       {highImpact.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--yellow)" }}>
-          <div className="card-header">🚀 High-Impact Opportunities & Weekly Goals</div>
+        <CollapsibleSection title="🚀 High-Impact Opportunities & Weekly Goals" id="learn-high-impact" defaultOpen={false}>
           {highImpact.map((o, i) => {
             const relatedGoals = plan.weeklyGoals.filter((g) => g.pillar === o.pillar);
             return (
@@ -166,7 +166,7 @@ function DevPlanTab({ plan, gaps }) {
               </div>
             );
           })}
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Weekly goals — full list with starring */}
@@ -177,7 +177,7 @@ function DevPlanTab({ plan, gaps }) {
         <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
           <div className="card-header">🔁 Stop Repeating Yourself</div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "0 4px 8px" }}>
-            You've manually corrected these conventions <strong style={{ color: "var(--text)" }}>{gaps.totalSignals} times</strong> across {gaps.totalGaps} patterns. Add them to your <code>.copilot-instructions.md</code> file and never correct them again.
+            {gaps.totalSignals} manual corrections across {gaps.totalGaps} patterns. Add them to <code>.copilot-instructions.md</code>.
           </div>
           {gaps.gaps?.slice(0, 3).map((g, i) => (
             <div key={i} style={{ padding: "8px 8px", borderTop: "1px solid var(--border)", fontSize: 12 }}>

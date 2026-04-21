@@ -11,7 +11,7 @@
 
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
-> **Scope:** Supports [GitHub Copilot CLI](https://docs.github.com/en/copilot) sessions and **VSCode Copilot Chat** sessions (experimental). Other IDE-based Copilot usage is not yet supported.
+> **Scope:** Currently supports [GitHub Copilot CLI](https://docs.github.com/en/copilot) sessions only. IDE-based Copilot usage is not yet supported.
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -38,7 +38,6 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
-- 🪙 **Token efficiency** — Coaching-first analysis of token waste patterns with personalized tips
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 
@@ -118,7 +117,13 @@ Then restart Copilot CLI. The extension registers 7 tools that the agent can inv
 
 ## Dashboard
 
-The web dashboard gives you a full view of your prompting habits:
+First-time users are greeted with a **Welcome walkthrough** that explains what the tool does before diving in:
+
+<p align="center">
+  <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
+</p>
+
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions, Practice) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
@@ -163,22 +168,18 @@ The web dashboard gives you a full view of your prompting habits:
 
 <img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
 
-**Token Efficiency** — coaching-first token waste analysis with personalized tips
-
-<img src="docs/screenshots/token-efficiency.png" alt="Token Efficiency" width="800" />
-
 </details>
 
 ### Pages
 
-- **Overview** — Stats cards, trend chart, category donut, 4-pillar trend (delegation, judgment, feedback, token efficiency), work-style analysis
+- **Welcome** — 3-step onboarding for first-time users; always accessible via `/welcome`
+- **Overview** — Tier hero card, collapsible stats/trends/skill growth/work style sections, prompting insights; "Since last visit" summary for returning users
 - **Learn & Grow** — Personalized dev plan, daily check-in, retros, resources
-- **Sessions** — Sortable table of all sessions with redirections, filterable by repo and source (CLI / VSCode); hide noisy sessions from analysis
+- **Sessions** — Sortable table of all sessions with redirections, filterable by repo; hide noisy sessions from analysis
 - **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened; hide/unhide from detail view
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
-- **Token Efficiency** — Coaching-first token waste analysis: #1 opportunity hero card, personalized quick wins by user level, sortable/filterable session table, waste category coaching with actionable tips
 - **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
 
@@ -216,15 +217,13 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 
 ## How It Works
 
-The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It also discovers **VSCode Copilot Chat** sessions from VSCode's `workspaceStorage` directory across Code, Code Insiders, VSCodium, and Cursor. It scans user messages against 30+ regex patterns, categorizes matches, estimates token usage, and scores the results.
+The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results.
 
 ```
-~/.copilot/session-store.db (read-only)    ← CLI sessions
-~/<config>/Code/User/workspaceStorage/     ← VSCode sessions (experimental)
-  → Read user + assistant messages
+~/.copilot/session-store.db (read-only)
+  → Read user messages from turns table
   → Match against 30+ correction patterns
-  → Estimate token usage per turn (byte-pair heuristic)
-  → Categorize, aggregate, and score
+  → Categorize and aggregate
   → Serve via Express API → React dashboard
 ```
 
@@ -258,20 +257,15 @@ This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Ac
 
 ```mermaid
 graph LR
-    subgraph "Data Sources"
+    subgraph "Data Source"
         DB[(~/.copilot/session-store.db)]
-        VSCode[(VSCode workspaceStorage)]
     end
 
     subgraph "Analysis Engine"
         DB -->|read-only| Analyzer[analyzer.mjs]
-        VSCode -->|read-only| VSCodeReader[vscode-sessions.mjs]
-        VSCodeReader --> Analyzer
         Analyzer --> Patterns[30+ regex patterns]
-        Analyzer --> Pillars[Delegation · Judgment · Feedback · Token Efficiency]
+        Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
-        Analyzer --> TokenEngine[token-efficiency.mjs]
-        TokenEngine --> TokenReader[token-reader.mjs]
         Patterns --> Practice[practice.mjs]
         DB -->|polling| LiveFeed[/api/live/feed]
         LiveFeed --> Patterns
@@ -301,16 +295,12 @@ copilot-insights/
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
 │   ├── dev-plan.mjs       # Personalized coaching
-│   ├── token-reader.mjs   # Token usage from JSONL files + BPE estimator
-│   ├── token-efficiency.mjs # Token waste analysis and grading
-│   ├── vscode-sessions.mjs  # VSCode Copilot Chat session discovery
-│   ├── trends.mjs         # Pillar trend computation (4 pillars)
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor, TokenEfficiency
-│   └── components/        # Charts, badges, timeline, insights
+│   ├── pages/             # Welcome, Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor
+│   └── components/        # Charts, badges, timeline, insights, CollapsibleSection, NavGroup, SinceLastVisit
 ├── docs/
 │   └── prompting-resources.md  # Official guides, academic papers, scoring reference
 ├── scripts/               # Mock data seeder + screenshot/GIF capture
@@ -347,5 +337,3 @@ This project is not affiliated with, endorsed by, or sponsored by GitHub or Micr
 - **Team leaderboards** — Anonymous comparison across teams
 - **Custom instruction generation** — Auto-generate `.github/copilot-instructions.md` from common patterns
 - **OpenTelemetry tracing** — Opt-in distributed tracing via `@github/copilot-sdk` for debugging
-- **Full VSCode integration** — Graduate VSCode session support from experimental to first-class with IDE-specific coaching
-- **Sort/filter all tables** — Extend the Token Efficiency table pattern (sort, filter, pagination) to other data tables ([#30](https://github.com/jackbatzner/copilot-insights/issues/30))

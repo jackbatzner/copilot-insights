@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchLiveFeed } from "../api";
 import { PageBanner } from "../components/PageBanner.jsx";
+import { SuggestedNext } from "../components/SuggestedNext.jsx";
 
 const POLL_INTERVAL = 5000;
 
@@ -105,7 +106,7 @@ export default function LiveMonitor() {
       </div>
 
       <PageBanner pageId="live-monitor">
-        Real-time view of your active coding sessions — useful when you're working in another window and want to monitor how the agent is performing. Alerts flag redirections, frustration signals, and rollbacks as they happen. Most users check this during active sessions, not as a daily dashboard.
+        Real-time session feed — alerts flag redirections as they happen.
       </PageBanner>
 
       {error && (
@@ -167,6 +168,7 @@ export default function LiveMonitor() {
           ))
         )}
       </div>
+      <SuggestedNext to="/sessions" icon="📋" label="Sessions" description="Full replay history for completed sessions" />
     </div>
   );
 }
