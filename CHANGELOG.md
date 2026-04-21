@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tests in CI** — `npm test` now runs in the CI build matrix (Node 18/20/22); tests are a merge gate for all pull requests
+- **DB schema validation** — On startup, the database layer validates that `~/.copilot/session-store.db` has the expected tables. Missing required tables produce a clear error message; missing optional tables (`session_refs`, `checkpoints`) trigger graceful degradation with a console warning
+- **Practice Lab promoted to core nav** — Moved from the Advanced sidebar group to Core, with a "✨ New" badge and a quick-start option on the Welcome page
 - **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
 - **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
 - **Practice coaching panel** — Before asking you to rewrite a bad prompt, the Practice Lab now shows "What's Wrong" guidance:

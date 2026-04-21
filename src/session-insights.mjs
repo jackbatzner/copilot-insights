@@ -1,7 +1,7 @@
 // Session-level insight functions — complexity scoring, create/edit ratios, file-type diversity.
 
 import path from "node:path";
-import { getDb } from "./db.mjs";
+import { getDb, hasTable } from "./db.mjs";
 
 /**
  * Compute a complexity score (0-100) for a single session.
@@ -18,9 +18,9 @@ export function computeSessionComplexity(sessionId) {
     .prepare(`SELECT COUNT(*) as c FROM turns WHERE session_id = ?`)
     .get(sessionId).c;
 
-  const checkpointCount = db
-    .prepare(`SELECT COUNT(*) as c FROM checkpoints WHERE session_id = ?`)
-    .get(sessionId).c;
+  const checkpointCount = hasTable("checkpoints")
+    ? db.prepare(`SELECT COUNT(*) as c FROM checkpoints WHERE session_id = ?`).get(sessionId).c
+    : 0;
 
   const fileOps = db
     .prepare(`SELECT COUNT(*) as c FROM session_files WHERE session_id = ?`)

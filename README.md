@@ -123,7 +123,7 @@ First-time users are greeted with a **Welcome walkthrough** that explains what t
   <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
 </p>
 
-The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions, Practice) groups:
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Practice Lab, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
@@ -326,6 +326,10 @@ This project is not affiliated with, endorsed by, or sponsored by GitHub or Micr
 
 **"Cannot find module 'better-sqlite3'"**
 - Run `npm run setup` in the project root to install all dependencies.
+
+**"Copilot session DB is missing required tables"**
+- Your `~/.copilot/session-store.db` may be from an incompatible Copilot CLI version.
+- Update Copilot CLI and try again, or [open an issue](https://github.com/jackbatzner/copilot-insights/issues).
 
 **Dashboard loads but shows errors**
 - Ensure the server is running (`npm start`) before opening the dashboard.
