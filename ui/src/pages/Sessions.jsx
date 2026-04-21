@@ -139,18 +139,18 @@ export default function Sessions() {
           <table className="session-table" style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", minWidth: 140 }}>Session</th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 60 }}>
+                <th style={{ textAlign: "left", minWidth: 140 }} scope="col">Session</th>
+                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 60 }} scope="col">
                   Turns{arrow("turnCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 50 }}>
+                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 50 }} scope="col">
                   Redir{arrow("redirectionCount")}
                 </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 90 }}>
+                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 90 }} scope="col">
                   Rate{arrow("redirectionRate")}
                 </th>
-                <th style={{ width: 100 }}>Top Issue</th>
-                <th style={{ width: 32 }}></th>
+                <th style={{ width: 100 }} scope="col">Top Issue</th>
+                <th style={{ width: 32 }} scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -164,8 +164,14 @@ export default function Sessions() {
                   : null;
 
                 return (
-                  <tr key={s.id} onClick={() => navigate(`/sessions/${s.id}`)} style={isHidden ? { opacity: 0.4 } : undefined}>
-                    <td>
+                  <tr
+                    key={s.id}
+                    tabIndex={0}
+                    onClick={() => navigate(`/sessions/${s.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/sessions/${s.id}`); } }}
+                    style={isHidden ? { opacity: 0.4 } : undefined}
+                    aria-label={`Session ${s.summary?.substring(0, 50) || s.id.substring(0, 8)}, ${s.turnCount} turns, ${s.redirectionCount} redirections`}
+                  >                    <td>
                       <div style={{ fontWeight: 500, fontSize: 13 }}>
                         {s.summary?.substring(0, 50) || s.branch?.substring(0, 30) || s.id.substring(0, 8)}
                       </div>

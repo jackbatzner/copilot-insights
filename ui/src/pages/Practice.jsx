@@ -185,9 +185,9 @@ function SandboxMode() {
               marginBottom: 12,
               borderRadius: 8,
               background: "rgba(110, 118, 129, 0.15)",
-              border: "1px solid #30363d",
+              border: "1px solid var(--border)",
               fontSize: 13,
-              color: "#8b949e",
+              color: "var(--text-muted)",
             }}>
               <span style={{ fontSize: 18 }}>🤖</span>
               <span>This looks like an auto-generated prompt (system notification, cross-session message, etc.) — scores may not be meaningful for machine-generated content.</span>

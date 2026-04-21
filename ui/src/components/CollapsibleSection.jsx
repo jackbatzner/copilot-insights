@@ -17,17 +17,20 @@ export function CollapsibleSection({ title, id, defaultOpen = true, children }) 
     localStorage.setItem(storageKey, open ? "open" : "closed");
   }, [open, storageKey]);
 
+  const panelId = `panel-${id}`;
+
   return (
     <div className={`collapsible-section ${open ? "is-open" : "is-closed"}`}>
       <button
         className="collapsible-section-header"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
+        aria-controls={panelId}
       >
         <span className="collapsible-section-title">{title}</span>
         <span className={`collapsible-chevron ${open ? "open" : ""}`}></span>
       </button>
-      <div className="collapsible-section-body">
+      <div className="collapsible-section-body" id={panelId} role="region" aria-label={title}>
         {open && children}
       </div>
     </div>

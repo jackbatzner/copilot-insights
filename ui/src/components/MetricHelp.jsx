@@ -8,6 +8,7 @@ export function MetricHelp({ label, definition, target, action }) {
   const popRef = useRef(null);
   const idRef = useRef(++instanceCounter);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const tooltipId = useRef(`metric-help-${Math.random().toString(36).slice(2, 9)}`).current;
 
   const updateCoords = useCallback(() => {
     if (!iconRef.current) return;
@@ -59,6 +60,7 @@ export function MetricHelp({ label, definition, target, action }) {
         onClick={() => open ? setOpen(false) : openTooltip()}
         onMouseEnter={openTooltip}
         aria-label={`Info about ${label}`}
+        aria-describedby={open ? tooltipId : undefined}
       >
         ℹ️
       </button>
@@ -66,6 +68,8 @@ export function MetricHelp({ label, definition, target, action }) {
         <div
           ref={popRef}
           className="metric-help-popover"
+          id={tooltipId}
+          role="tooltip"
           style={{ position: "fixed", top: coords.top, left: coords.left, transform: "translate(-50%, -100%)" }}
           onMouseLeave={() => setOpen(false)}
         >

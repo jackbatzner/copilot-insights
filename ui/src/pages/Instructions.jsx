@@ -121,7 +121,7 @@ function GapsTab({ data }) {
                 return (
                   <div key={cat} className="category-pill" style={{ borderColor: meta.color }}>
                     <span>{meta.emoji}</span>
-                    <span style={{ color: "#e6edf3" }}>{meta.label}</span>
+                    <span style={{ color: "var(--text)" }}>{meta.label}</span>
                     <span className="pill-count" style={{ background: meta.color }}>{info.count}</span>
                   </div>
                 );
@@ -301,7 +301,7 @@ function FailuresTab({ data }) {
                     <span className="clarity-badge" style={{ background: s.signalCount > 3 ? "#f85149" : "#d29922" }}>
                       {s.signalCount}
                     </span>
-                    <span style={{ fontSize: 11, color: "#8b949e", marginLeft: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>
                       {s.repetitionCount} repeats · {s.correctionCount} corrections
                     </span>
                   </td>
@@ -346,7 +346,7 @@ function FailuresTab({ data }) {
                     <span className="clarity-badge" style={{
                       background: r.total > 20 ? "#f85149" : r.total > 5 ? "#d29922" : "#3fb950"
                     }}>{r.total}</span>
-                    <span style={{ fontSize: 11, color: "#8b949e", marginLeft: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>
                       {r.signals} signals · {r.repetitions} repeats
                     </span>
                   </td>
