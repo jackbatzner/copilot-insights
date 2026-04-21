@@ -50,6 +50,8 @@ export default function Overview() {
     return () => { cancelled = true; };
   }, [timeframe, refreshKey]);
 
+  useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
+
   if (loading) return <div className="loading">Loading analysis…</div>;
   if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
   if (!data) return null;
