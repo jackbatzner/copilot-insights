@@ -7,7 +7,48 @@ import { existsSync } from "node:fs";
 
 const DB_PATH = process.env.COPILOT_SESSION_DB || join(homedir(), ".copilot", "session-store.db");
 
+const REQUIRED_TABLES = ["sessions", "turns", "session_files"];
+const OPTIONAL_TABLES = ["session_refs", "checkpoints"];
+
 let _db = null;
+let _missingOptional = new Set();
+
+/**
+ * Validate that the DB has the expected Copilot session-store schema.
+ * Required tables cause an error; optional tables are tracked for graceful degradation.
+ */
+function validateSchema(db) {
+  const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+  const tables = new Set(rows.map((r) => r.name));
+
+  const missingRequired = REQUIRED_TABLES.filter((t) => !tables.has(t));
+  if (missingRequired.length > 0) {
+    throw new Error(
+      `Copilot session DB is missing required tables: ${missingRequired.join(", ")}.\n` +
+      `The database at ${DB_PATH} may be from an incompatible Copilot CLI version.\n` +
+      `Expected tables: ${REQUIRED_TABLES.join(", ")}\n` +
+      `Please update Copilot CLI or report this issue:\n` +
+      `  https://github.com/jackbatzner/copilot-insights/issues`
+    );
+  }
+
+  const missingOpt = OPTIONAL_TABLES.filter((t) => !tables.has(t));
+  if (missingOpt.length > 0) {
+    _missingOptional = new Set(missingOpt);
+    console.warn(
+      `[copilot-insights] Optional tables missing: ${missingOpt.join(", ")}. Some features may be limited.`
+    );
+  }
+}
+
+/**
+ * Check whether an optional table is available.
+ * @param {string} tableName
+ * @returns {boolean}
+ */
+export function hasTable(tableName) {
+  return !_missingOptional.has(tableName);
+}
 
 export function getDb() {
   if (_db) return _db;
@@ -17,6 +58,7 @@ export function getDb() {
     );
   }
   _db = new Database(DB_PATH, { readonly: true });
+  validateSchema(_db);
   return _db;
 }
 
@@ -121,6 +163,7 @@ export function getFileEditCounts(sessionId) {
  */
 export function getSessionRefs(sessionId) {
   const db = getDb();
+  if (!hasTable("session_refs")) return [];
   try {
     return db
       .prepare(

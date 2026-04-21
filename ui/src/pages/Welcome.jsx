@@ -74,6 +74,12 @@ const STEPS = [
             path="/"
           />
           <StartOption
+            icon="🧪"
+            title="Try Practice Lab ✨"
+            description="Rewrite a real prompt and watch your score improve"
+            path="/practice"
+          />
+          <StartOption
             icon="🎓"
             title="Get Coaching tips"
             description="Personalized scores for delegation, judgment, and feedback"
@@ -87,7 +93,7 @@ const STEPS = [
           />
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12, textAlign: "center" }}>
-          More pages in the sidebar: Learn, Analytics, Practice, and more.
+          More pages in the sidebar: Learn, Analytics, and more.
         </div>
       </>
     ),
