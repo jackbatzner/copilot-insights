@@ -253,7 +253,7 @@ export default function SessionDetail() {
         onTabChange={setTab}
       />
 
-      <TabPanel id="summary" activeTab={tab}><>
+      <TabPanel id="summary" activeTab={tab}>
       {/* Session grade + coaching tips from replay */}
       {replay?.summary && (() => {
         const gradeColors = { A: "#3fb950", B: "#58a6ff", C: "#d29922", D: "#f85149" };
@@ -381,9 +381,9 @@ export default function SessionDetail() {
           )}
         </div>
       </div>
-      </>}</TabPanel>
+      </TabPanel>
 
-      <TabPanel id="deep-dive" activeTab={tab}><>
+      <TabPanel id="deep-dive" activeTab={tab}>
       {/* Sprawl details */}
       {sprawl && (sprawl.scopeAdditions?.length > 0 || sprawl.topicShifts?.length > 0) && (
         <div className="card" style={{ marginBottom: 24 }}>
@@ -513,7 +513,7 @@ export default function SessionDetail() {
           </div>
         )}
       </div>
-      </>}</TabPanel>
+      </TabPanel>
     </>
   );
 }

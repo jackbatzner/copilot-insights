@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Practice Lab promoted to core nav** — Moved from the Advanced sidebar group to Core, with a "✨ New" badge and a quick-start option on the Welcome page
 - **EmptyState component** — Friendly card shown when users have fewer than 5 sessions, with progress messaging and a Practice Lab CTA; used on Overview, Analytics, Coaching, and Sessions pages
 - **Metric tooltips** — Centralized `metricTooltips.js` definitions; inline `MetricHelp` tooltips added to Coaching pillar cards, Overview tier/stats/legend, and SessionDetail complexity/thrashing cards
+- **Dark mode & theme toggle** — System-aware light/dark theme with manual toggle in sidebar; persists to localStorage; flash-free with inline `<script>` in `index.html`
+- **TabBar component** — Reusable accessible tab bar following WAI-ARIA Tabs pattern (`role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, arrow-key navigation with Home/End support)
+- **ARIA improvements** — `aria-expanded` and `aria-controls` on CollapsibleSection; `aria-describedby` on MetricHelp tooltips; `role="status"` on ScoreBadge; `aria-label` on navigation, live feed, and interactive controls; `scope="col"` on table headers
+- **Focus-visible styles** — Global `:focus-visible` outline using `var(--accent)` with refined offsets for tabs, table rows, collapsible headers, and links
+- **CSS custom properties** — ~40 hardcoded color values replaced with CSS variables (`var(--text)`, `var(--bg-card)`, `var(--border)`, etc.) enabling consistent theming
+- **Keyboard navigation** — Arrow key navigation on TimeframeSelector and all TabBar instances; `tabIndex` roving for inactive tabs; Enter/Space activation on session table rows
 - **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
 - **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
 - **Practice coaching panel** — Before asking you to rewrite a bad prompt, the Practice Lab now shows "What's Wrong" guidance:

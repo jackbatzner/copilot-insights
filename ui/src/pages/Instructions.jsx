@@ -6,6 +6,7 @@ import { PageBanner } from "../components/PageBanner.jsx";
 import { Link } from "react-router-dom";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { TabBar, TabPanel } from "../components/TabBar.jsx";
 
 const CATEGORY_LABELS = {
   convention: { label: "Style & Conventions", emoji: "🎨", color: "#bc8cff" },
@@ -63,18 +64,21 @@ export default function Instructions() {
       </PageBanner>
 
       {/* Tab switcher */}
-      <div className="tab-bar">
-        <button className={`tab-btn ${tab === "gaps" ? "active" : ""}`} onClick={() => setTab("gaps")}>
-          📝 Missing Rules
-          {gaps && <span className="tab-count">{gaps.totalGaps}</span>}
-        </button>
-        <button className={`tab-btn ${tab === "failures" ? "active" : ""}`} onClick={() => setTab("failures")}>
-          ❌ Rule Failures
-          {failures && <span className="tab-count">{failures.totalFailures}</span>}
-        </button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: "gaps", label: `📝 Missing Rules${gaps ? ` (${gaps.totalGaps})` : ""}` },
+          { id: "failures", label: `❌ Rule Failures${failures ? ` (${failures.totalFailures})` : ""}` },
+        ]}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
 
-      {tab === "gaps" ? <GapsTab data={gaps} /> : <FailuresTab data={failures} />}
+      <TabPanel id="gaps" activeTab={tab}>
+        <GapsTab data={gaps} />
+      </TabPanel>
+      <TabPanel id="failures" activeTab={tab}>
+        <FailuresTab data={failures} />
+      </TabPanel>
     </div>
   );
 }
