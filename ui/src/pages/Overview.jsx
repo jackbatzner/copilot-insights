@@ -58,7 +58,7 @@ export default function Overview() {
     <div className="empty">
       <div className="empty-icon">⚠️</div>
       <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-        {error.includes("Session store not found") || error.includes("HTTP 500")
+        {error.includes("session database") || error.includes("HTTP 500")
           ? "Couldn't connect to your session data. Make sure the Copilot Insights server is running and you've completed at least one Copilot CLI session."
           : error}
       </p>

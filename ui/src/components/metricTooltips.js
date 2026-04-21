@@ -44,10 +44,10 @@ export const METRIC_TOOLTIPS = {
     action: "Include file paths, constraints, and what success looks like.",
   },
   thrashing: {
-    label: "File Thrashing",
-    definition: "When the same file is edited many times in one session — a sign of unclear direction or incremental corrections.",
-    target: "Minimal thrashing. If a file is edited 5+ times, the initial prompt may need more detail.",
-    action: "Specify expected behavior upfront so the agent gets it right earlier.",
+    label: "Repeated File Edits",
+    definition: "When the same file is edited many times in one session — a sign of iterative refinement that could be reduced with clearer initial direction.",
+    target: "Minimal re-editing. If a file is edited 5+ times, consider providing more detail upfront.",
+    action: "Specify expected behavior and constraints in your first message.",
   },
   weight: {
     label: "Weight",

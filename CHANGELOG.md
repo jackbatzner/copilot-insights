@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests in CI** — `npm test` now runs in the CI build matrix (Node 18/20/22); tests are a merge gate for all pull requests
 - **DB schema validation** — On startup, the database layer validates that `~/.copilot/session-store.db` has the expected tables. Missing required tables produce a clear error message; missing optional tables (`session_refs`, `checkpoints`) trigger graceful degradation with a console warning
 - **Practice Lab promoted to core nav** — Moved from the Advanced sidebar group to Core, with a "✨ New" badge and a quick-start option on the Welcome page
+- **EmptyState component** — Friendly card shown when users have fewer than 5 sessions, with progress messaging and a Practice Lab CTA; used on Overview, Analytics, Coaching, and Sessions pages
+- **Metric tooltips** — Centralized `metricTooltips.js` definitions; inline `MetricHelp` tooltips added to Coaching pillar cards, Overview tier/stats/legend, and SessionDetail complexity/thrashing cards
 - **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
 - **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
 - **Practice coaching panel** — Before asking you to rewrite a bad prompt, the Practice Lab now shows "What's Wrong" guidance:
@@ -20,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ✨ How to Fix It — before/after rewrite examples for the detected issues
 - **Tag-based coaching** — Challenge library prompts tagged as vague, no-files, no-context, etc. now always show coaching content even when heuristic thresholds aren't triggered
 - `heuristics` field returned in `/api/practice/challenge` and `/api/practice/library` responses
+
+### Changed
+
+- **Reframed category labels** — Category display names updated to be constructive rather than punitive: Explicit Correction → Iterative Refinement, Frustration Signal → Clarification Needed, Repeated Instruction → Reinforced Instruction, Rollback Request → Direction Change. Internal detection keys (`explicit_correction`, `frustration`, etc.) are unchanged.
+- **Reframed UI language** — "File Thrashing" → "Repeated File Edits", "Anti-Patterns Detected" → "Improvement Opportunities", "Problems" → "Areas to Improve", "Sessions Needing Better Review" → "Sessions to Review", "Weakest Opening Prompts" → "Prompts with Room to Grow"
+- **Improved error messages** — All error states now show actionable guidance instead of raw HTTP codes. Server errors surface specific remediation steps (check server, check database, etc.). Network errors tell users to verify the server is running. `EADDRINUSE` and `EACCES` errors include numbered recovery steps.
+- **Error icons** — Replaced ❌ with ⚠️ across all page error states for a less alarming tone
+- **Category colors** — `explicit_correction` changed from red to amber; `frustration` from amber to purple; `repetition` from purple to gray to reflect reframed severity
 
 ## [0.2.0] - 2026-04-18
 
@@ -124,5 +134,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Three-pillar coaching system: Clarity, Efficiency, and Delegation
 - Dev plans, daily check-ins, and retros
 - Work-style analysis and session complexity scoring
-- File thrashing detection
+- **File thrashing detection**
 - ESLint, Dependabot, and CI/CD workflows
