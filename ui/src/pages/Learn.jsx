@@ -2,19 +2,20 @@ import { useState, useEffect } from "react";
 import { fetchDevPlan, fetchProgressCheck, fetchRetro, fetchInstructionGaps } from "../api.js";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 
 export default function Learn() {
   const { key: refreshKey } = useRefresh();
+  const { timeframe, setTimeframe } = useTimeframe();
   const [plan, setPlan] = useState(null);
   const [progress, setProgress] = useState(null);
   const [retro, setRetro] = useState(null);
   const [gaps, setGaps] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [timeframe, setTimeframe] = useState("all");
   const [tab, setTab] = useState("plan");
 
   useEffect(() => {

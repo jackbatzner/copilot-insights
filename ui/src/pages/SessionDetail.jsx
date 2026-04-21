@@ -6,6 +6,7 @@ import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
 import { MetricHelp } from "../components/MetricHelp";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
+import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -46,7 +47,14 @@ export default function SessionDetail() {
     }
   }, [id, isHidden]);
 
-  if (loading) return <div className="loading">Loading session…</div>;
+  if (loading) return (
+    <>
+      <div className="page-header"><h1>Session Detail</h1></div>
+      <SkeletonGrid count={4} />
+      <SkeletonCard lines={5} />
+      <SkeletonCard lines={3} />
+    </>
+  );
   if (error) return (
     <div className="empty">
       <div className="empty-icon">⚠️</div>

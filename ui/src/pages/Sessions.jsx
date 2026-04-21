@@ -3,20 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
+import { SkeletonTable } from "../components/SkeletonCard.jsx";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
 export default function Sessions() {
   const { key: refreshKey } = useRefresh();
+  const { timeframe, setTimeframe } = useTimeframe();
   const [data, setData] = useState(null);
   const [hiddenIds, setHiddenIds] = useState(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [repoFilter, setRepoFilter] = useState("");
-  const [timeframe, setTimeframe] = useState("all");
   const [sortField, setSortField] = useState("totalWeight");
   const [sortDir, setSortDir] = useState("desc");
   const navigate = useNavigate();
@@ -59,7 +61,12 @@ export default function Sessions() {
     }
   };
 
-  if (loading) return <div className="loading">Loading sessions…</div>;
+  if (loading) return (
+    <>
+      <div className="page-header"><h1>📋 Sessions</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
+      <SkeletonTable rows={6} />
+    </>
+  );
   if (error) return (
     <div className="empty">
       <div className="empty-icon">⚠️</div>

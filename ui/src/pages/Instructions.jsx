@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchInstructionGaps, fetchInstructionFailures } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { Link } from "react-router-dom";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
@@ -31,7 +32,7 @@ const SEVERITY_COLORS = {
 
 export default function Instructions() {
   const { key: refreshKey } = useRefresh();
-  const [timeframe, setTimeframe] = useState("all");
+  const { timeframe, setTimeframe } = useTimeframe();
   const [tab, setTab] = useState("gaps");
   const [gaps, setGaps] = useState(null);
   const [failures, setFailures] = useState(null);
