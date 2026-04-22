@@ -5,7 +5,7 @@
 // ALL SIGNALS ARE USER-DRIVEN — we only look at what the user typed/decided,
 // not what the agent chose to do.
 
-import { listSessions } from "./db.mjs";
+import { listSessions, hasTable } from "./db.mjs";
 import { getDb } from "./db.mjs";
 
 const PLAN_WORDS =
@@ -43,11 +43,9 @@ function classifySession(sessionId) {
     )
     .all(sessionId);
 
-  const checkpoints = db
-    .prepare(
-      "SELECT checkpoint_number FROM checkpoints WHERE session_id = ?"
-    )
-    .all(sessionId);
+  const checkpoints = hasTable("checkpoints")
+    ? db.prepare("SELECT checkpoint_number FROM checkpoints WHERE session_id = ?").all(sessionId)
+    : [];
 
   if (turns.length === 0) return null;
 

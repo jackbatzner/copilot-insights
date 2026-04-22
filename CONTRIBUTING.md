@@ -39,10 +39,13 @@ extension.mjs  → Copilot CLI extension entry point
 
 1. **Fork** the repo and create a feature branch
 2. Make your changes
-3. **Lint your code**: `npm run lint`
-4. **Build the UI** to verify: `cd ui && npm run build`
-5. **Test the server**: `cd server && node index.mjs` → check API endpoints
-6. Submit a **pull request** with a clear description
+3. **Run the tests**: `npm test` (must pass — tests run in CI and are a merge gate)
+4. **Lint your code**: `npm run lint`
+5. **Build the UI** to verify: `cd ui && npm run build`
+6. **Test the server**: `cd server && node index.mjs` → check API endpoints
+7. Submit a **pull request** with a clear description
+
+> **CI gate:** Pull requests run lint, tests, and builds across Node 18/20/22. All checks must pass before merging.
 
 ## Testing
 

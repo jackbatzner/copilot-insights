@@ -63,6 +63,9 @@ jobs:
         working-directory: ui
         run: npm run build
 
+      - name: Run tests
+        run: npm test
+
       - name: Verify server starts
         working-directory: server
         run: |

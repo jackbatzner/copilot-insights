@@ -4,6 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.2.x   | :white_check_mark: |
 | 0.1.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
@@ -50,6 +51,10 @@ Copilot Insights is a **local-only** development tool:
 | `tag` | `GET /api/practice/library` | Validated against a whitelist of known tags. Invalid tags silently dropped. |
 | `:id` | `/api/sessions/:id/*` | Path parameter used as a session ID lookup key. Passed to parameterized SQL queries. Returns 404 if not found. |
 | `:id` | `POST/DELETE /api/sessions/:id/hide` | Validated as a UUID v4 format (`/^[0-9a-f]{8}-…$/i`). Returns 400 if invalid. Returns 429 if hidden set cap (5,000) reached. Hidden IDs stored in-memory only — reset on server restart. |
+
+### Database schema validation
+
+On startup, `src/db.mjs` validates the session-store schema before executing queries. Required tables (`sessions`, `turns`, `session_files`) must be present or the server exits with a descriptive error. Optional tables (`session_refs`, `checkpoints`) degrade gracefully — features that depend on them return empty results and a console warning is logged. This prevents confusing SQLite errors when the database is from an incompatible Copilot CLI version.
 
 ### SQL safety
 

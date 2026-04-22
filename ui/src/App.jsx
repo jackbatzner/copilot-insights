@@ -99,6 +99,10 @@ function App() {
               <NavLink to="/coaching">
                 <span className="nav-icon">🎓</span><span className="nav-label">Coaching</span>
               </NavLink>
+              <NavLink to="/practice">
+                <span className="nav-icon">🧪</span><span className="nav-label">Practice Lab</span>
+                <span className="nav-badge">✨ New</span>
+              </NavLink>
               <NavLink to="/learn">
                 <span className="nav-icon">📚</span><span className="nav-label">Learn</span>
               </NavLink>
@@ -115,9 +119,6 @@ function App() {
               </NavLink>
               <NavLink to="/instructions">
                 <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
-              </NavLink>
-              <NavLink to="/practice">
-                <span className="nav-icon">🧪</span><span className="nav-label">Practice</span>
               </NavLink>
             </NavGroup>
             <div className="refresh-section">

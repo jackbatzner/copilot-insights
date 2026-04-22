@@ -130,6 +130,16 @@ a:hover {
   background: rgba(88, 166, 255, 0.1);
   color: var(--accent);
 }
+.nav-badge {
+  font-size: 10px;
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: auto;
+  white-space: nowrap;
+  line-height: 1.4;
+}
 
 .main-content {
   margin-left: var(--sidebar-width);
@@ -2288,6 +2298,7 @@ a:hover {
   .sidebar-logo span { font-size: 28px; }
   .sidebar a { padding: 10px; justify-content: center; flex-direction: column; gap: 2px; }
   .sidebar a .nav-label { display: none; }
+  .sidebar a .nav-badge { display: none; }
   .sidebar a .nav-icon { font-size: 20px; }
   .nav-group { display: contents; }
   .nav-group + .nav-group { border-top: none; margin-top: 0; padding-top: 0; }
