@@ -45,13 +45,13 @@ Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an
 
 | Category | Examples |
 |----------|----------|
-| 🚫 **Explicit Correction** | "no, that's wrong", "not what I asked", "this is wrong" |
+| 🔄 **Iterative Refinement** | "no, that's wrong", "not what I asked", "this is wrong" |
 | ↩️ **Course Change** | "actually, do X instead", "scratch that", "I changed my mind" |
-| 😤 **Frustration Signal** | "still broken", "I already said", "why did you do that" |
-| 🔁 **Repeated Instruction** | "like I said", "one more time", "again" |
-| ⏪ **Rollback Request** | "undo that", "go back", "revert", "change it back" |
+| 💬 **Clarification Needed** | "still broken", "I already said", "why did you do that" |
+| 🔁 **Reinforced Instruction** | "like I said", "one more time", "again" |
+| 🔀 **Direction Change** | "undo that", "go back", "revert", "change it back" |
 
-It also detects **file thrashing** — when the same file is edited 3+ times in a session, which often indicates unclear requirements.
+It also detects **repeated file edits** — when the same file is edited 3+ times in a session, which often indicates unclear requirements.
 
 ## Quick Start
 
@@ -201,7 +201,7 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 
 - **Pause/resume** — Stop and restart polling with one click
 - **Status indicator** — Green pulsing dot when active, yellow when paused
-- **Coaching alerts** — Actionable advice for explicit corrections, frustration signals, rollback requests, etc.
+- **Coaching alerts** — Actionable advice for iterative refinements, clarification needs, direction changes, etc.
 
 ## CLI Tools
 

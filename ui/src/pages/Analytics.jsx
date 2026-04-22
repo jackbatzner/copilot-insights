@@ -20,6 +20,7 @@ import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
+import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
 const TT_STYLE = {
   background: "#161b22",
@@ -81,7 +82,18 @@ export default function Analytics() {
   })();
 
   if (loading) return <div className="loading">Crunching analytics…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+        {error.includes("HTTP 500")
+          ? "Couldn't load analytics data. Make sure the Copilot Insights server is running and your session database exists."
+          : error}
+      </p>
+    </div>
+  );
+
+  const sessionCount = depth?.total ?? 0;
 
   return (
     <div className="page">
@@ -92,6 +104,10 @@ export default function Analytics() {
       <PageBanner pageId="analytics">
         Patterns in how you interact with AI — understand your working style.
       </PageBanner>
+
+      {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
+        <EmptyState sessionCount={sessionCount} feature="pattern analysis" />
+      )}
 
       {/* Hero stats */}
       <div className="stats-grid stats-grid-4">

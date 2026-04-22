@@ -54,10 +54,20 @@ export function getDb() {
   if (_db) return _db;
   if (!existsSync(DB_PATH)) {
     throw new Error(
-      `Session store not found at ${DB_PATH}. Make sure Copilot CLI has been used at least once.`
+      `Couldn't find the Copilot session database at ${DB_PATH}. ` +
+      `Make sure Copilot CLI is installed and you've completed at least one session. ` +
+      `You can set the COPILOT_SESSION_DB environment variable to point to a custom location.`
     );
   }
-  _db = new Database(DB_PATH, { readonly: true });
+  try {
+    _db = new Database(DB_PATH, { readonly: true });
+  } catch (err) {
+    throw new Error(
+      `Couldn't open the session database at ${DB_PATH}: ${err.message}. ` +
+      `The file may be corrupted or locked by another process.`,
+      { cause: err }
+    );
+  }
   validateSchema(_db);
   return _db;
 }

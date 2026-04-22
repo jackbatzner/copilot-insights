@@ -98,11 +98,19 @@ function validateTimeframe(req, res) {
 }
 
 /**
- * Standardized route error handler — logs context and sends 500.
+ * Standardized route error handler — logs context and sends user-friendly 500.
  */
 function handleRouteError(res, err, route) {
   log.error(`[${route}]`, err);
-  res.status(500).json({ error: "Internal server error" });
+
+  // Surface actionable DB errors to the user
+  if (err.message?.includes("session database") || err.message?.includes("Session store") || err.message?.includes("SQLITE")) {
+    return res.status(500).json({
+      error: "Couldn't access the Copilot session database. Make sure Copilot CLI is installed and you've completed at least one session.",
+    });
+  }
+
+  res.status(500).json({ error: "Something went wrong — check the server logs for details." });
 }
 // -- Session Hiding (in-memory) -------------------------- 
 
@@ -1028,7 +1036,13 @@ const server = app.listen(PORT, "127.0.0.1", () => {
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    log.error(`Port ${PORT} is already in use. Set PORT env variable or stop the other process.`);
+    log.error(`Port ${PORT} is already in use. Try one of these:`);
+    log.error(`  1. Stop the other process using port ${PORT}`);
+    log.error(`  2. Run with a different port: PORT=${Number(PORT) + 1} npm start`);
+    process.exit(1);
+  }
+  if (err.code === "EACCES") {
+    log.error(`Permission denied on port ${PORT}. Try a port above 1024.`);
     process.exit(1);
   }
   throw err;

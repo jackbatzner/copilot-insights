@@ -61,7 +61,7 @@ describe("formatSessionReport", () => {
 
     const result = formatSessionReport(report);
     assert.ok(result.includes("By Category"), "Should include category section");
-    assert.ok(result.includes("Explicit Correction"), "Should include category label");
+    assert.ok(result.includes("Iterative Refinement"), "Should include category label");
     assert.ok(result.includes("Course Change"), "Should include course change label");
   });
 
@@ -176,7 +176,7 @@ describe("formatTopPatterns", () => {
 
     const result = formatTopPatterns(patterns);
     assert.ok(result.includes("Direct rejection"), "Should include pattern label");
-    assert.ok(result.includes("Explicit Correction"), "Should include category name");
+    assert.ok(result.includes("Iterative Refinement"), "Should include category name");
     assert.ok(result.includes("5"), "Should include occurrence count");
     assert.ok(result.includes("Mid-course pivot"), "Should include second pattern");
   });

@@ -2774,14 +2774,29 @@ a:hover {
 /* ── Tier Hero Card ────────────────────────────────────────── */
 
 .tier-hero-card {
-  margin-bottom: 12px;
+  margin-bottom: 0;
   padding: 14px 20px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.hero-row > .top-insight-card {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .tier-hero-content {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 .tier-hero-info {

@@ -46,7 +46,18 @@ export default function SessionDetail() {
   }, [id, isHidden]);
 
   if (loading) return <div className="loading">Loading session…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
+        {error.includes("HTTP 404")
+          ? "Session not found. It may have been deleted or the ID is incorrect."
+          : error.includes("HTTP 500")
+          ? "Couldn't load session details. Make sure the Copilot Insights server is running."
+          : error}
+      </p>
+    </div>
+  );
   if (!data) return null;
 
   const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
@@ -167,7 +178,11 @@ export default function SessionDetail() {
         )}
         {complexity && (
           <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-header">Complexity</div>
+            <div className="card-header"><MetricHelp
+              label="Complexity"
+              definition="A measure of how complex this session was — based on file operations, unique files touched, and checkpoints created."
+              target="Not a target — just context. Higher complexity sessions naturally have more redirections."
+            /></div>
             <div className="stat-value">{complexity.tierEmoji} {complexity.complexityScore}</div>
             <div className="stat-label">{complexity.tier}</div>
             <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
@@ -259,7 +274,7 @@ export default function SessionDetail() {
               <div className="stat-value" style={{ color: "#f85149" }}>
                 {replay.summary.redirectionCount + replay.summary.dripFeedCount + replay.summary.rubberStampCount}
               </div>
-              <div className="stat-label">Problems</div>
+              <div className="stat-label">Areas to Improve</div>
               <div className="stat-sub">{replay.summary.redirectionCount} redirections · {replay.summary.dripFeedCount} drip-feeds · {replay.summary.rubberStampCount} rubber stamps</div>
             </div>
           </div>
@@ -330,7 +345,7 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Category breakdown + thrashing side by side */}
+      {/* Category breakdown + repeated edits side by side */}
       <div className="charts-grid" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-header">Category Breakdown</div>
@@ -338,7 +353,12 @@ export default function SessionDetail() {
         </div>
         <div className="card">
           <div className="card-header">
-            {thrashedFiles.length > 0 ? "⚠️ File Thrashing" : "File Edits"}
+            <MetricHelp
+              label={thrashedFiles.length > 0 ? "⚠️ Repeated File Edits" : "File Edits"}
+              definition="When the same file is edited many times in one session — a sign of iterative refinement that could be reduced with clearer initial direction."
+              target="Minimal re-editing. If a file is edited 5+ times, consider providing more detail upfront."
+              action="Specify expected behavior and constraints in your first message."
+            />
           </div>
           {thrashedFiles.length > 0 ? (
             <ul className="thrash-list">
@@ -351,7 +371,7 @@ export default function SessionDetail() {
             </ul>
           ) : (
             <div className="empty" style={{ padding: 30 }}>
-              <p>No file thrashing detected ✅</p>
+              <p>No repeated file edits detected ✅</p>
             </div>
           )}
         </div>
@@ -396,7 +416,7 @@ export default function SessionDetail() {
       {/* Anti-pattern signals */}
       {efficiency && (efficiency.dripFeeding?.count > 0 || efficiency.responseSkimming?.count > 0) && (
         <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">⚠️ Anti-Patterns Detected</div>
+          <div className="card-header">🔍 Improvement Opportunities</div>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {efficiency.dripFeeding?.count > 0 && (
               <div style={{ flex: 1, minWidth: 0 }}>

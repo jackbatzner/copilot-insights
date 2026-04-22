@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+let instanceCounter = 0;
+
 export function MetricHelp({ label, definition, target, action }) {
   const [open, setOpen] = useState(false);
   const iconRef = useRef(null);
   const popRef = useRef(null);
+  const idRef = useRef(++instanceCounter);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
 
   const updateCoords = useCallback(() => {
@@ -13,6 +16,20 @@ export function MetricHelp({ label, definition, target, action }) {
       top: rect.top - 8,
       left: rect.left + rect.width / 2,
     });
+  }, []);
+
+  // Close this tooltip when another one opens
+  useEffect(() => {
+    function handleOtherOpen(e) {
+      if (e.detail !== idRef.current) setOpen(false);
+    }
+    document.addEventListener("metrichelp:open", handleOtherOpen);
+    return () => document.removeEventListener("metrichelp:open", handleOtherOpen);
+  }, []);
+
+  const openTooltip = useCallback(() => {
+    document.dispatchEvent(new CustomEvent("metrichelp:open", { detail: idRef.current }));
+    setOpen(true);
   }, []);
 
   useEffect(() => {
@@ -39,8 +56,8 @@ export function MetricHelp({ label, definition, target, action }) {
       <button
         ref={iconRef}
         className="metric-help-icon"
-        onClick={() => setOpen((v) => !v)}
-        onMouseEnter={() => setOpen(true)}
+        onClick={() => open ? setOpen(false) : openTooltip()}
+        onMouseEnter={openTooltip}
         aria-label={`Info about ${label}`}
       >
         ℹ️
