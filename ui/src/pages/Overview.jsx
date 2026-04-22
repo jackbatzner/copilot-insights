@@ -8,7 +8,9 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { SinceLastVisit } from "../components/SinceLastVisit.jsx";
 import { rateColor } from "../components/ScoreBadge.jsx";
+import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { TIERS, getTier } from "@shared/tiers.mjs";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
@@ -17,6 +19,7 @@ import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.js
 
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
+  const { timeframe, setTimeframe } = useTimeframe();
   const [data, setData] = useState(null);
   const [trends, setTrends] = useState(null);
   const [insights, setInsights] = useState(null);
@@ -24,7 +27,6 @@ export default function Overview() {
   const [workStyle, setWorkStyle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [timeframe, setTimeframe] = useState("all");
 
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
@@ -53,7 +55,13 @@ export default function Overview() {
 
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
-  if (loading) return <div className="loading">Loading analysis…</div>;
+  if (loading) return (
+    <>
+      <div className="page-header"><h1>📊 Overview</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
+      <SkeletonGrid count={5} />
+      <SkeletonCard lines={4} />
+    </>
+  );
   if (error) return (
     <div className="empty">
       <div className="empty-icon">⚠️</div>

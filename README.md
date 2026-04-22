@@ -185,7 +185,9 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 - **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
 
-All pages include a **timeframe selector** (7d / 30d / 90d / All time).
+All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
+
+The dashboard is **mobile responsive**: on small screens a hamburger menu replaces the sidebar, tables scroll horizontally, and the layout adapts to narrow viewports. **API caching** (60-second TTL on GET requests) keeps navigation snappy, and the refresh button clears the cache for fresh data. **Hidden sessions** are persisted to disk (`~/.copilot/copilot-insights-hidden.json`) so they survive server restarts.
 
 ### Practice Lab
 

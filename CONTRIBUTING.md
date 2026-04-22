@@ -68,7 +68,9 @@ Before submitting a PR:
 - ES modules throughout (`.mjs` for Node, `.jsx` for React)
 - No TypeScript (yet) — keep it simple
 - Minimal dependencies — don't add packages for things Node.js handles natively
-- Dark theme CSS uses CSS variables defined in `ui/src/index.css`
+- Dark theme CSS uses CSS custom properties defined in `ui/src/index.css` — **never use hardcoded colors** (e.g., `#161b22`), always use `var(--bg-card)`, `var(--text)`, etc. so dark mode works
+- New pages should consume the shared `TimeframeContext` via `useTimeframe()` (see `ui/src/TimeframeContext.jsx`) rather than managing timeframe state locally
+- **Hooks ordering** — all `useState`, `useEffect`, `useContext`, and other hooks must be called before any conditional `return` statements. This is a React requirement (Rules of Hooks) and has been a recurring issue
 
 ## Accessibility
 

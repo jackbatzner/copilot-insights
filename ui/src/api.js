@@ -1,9 +1,38 @@
 const API_BASE = "/api";
 
+// ── TTL Cache ────────────────────────────────────────────────
+const CACHE_TTL_MS = 60_000; // 60 seconds
+const cache = new Map(); // url → { data, ts }
+
+export function clearCache() {
+  cache.clear();
+}
+
+function getCached(url) {
+  const entry = cache.get(url);
+  if (!entry) return undefined;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    cache.delete(url);
+    return undefined;
+  }
+  return entry.data;
+}
+
+function setCache(url, data) {
+  cache.set(url, { data, ts: Date.now() });
+}
+
 /**
  * Wrapper around fetch that handles HTTP errors and JSON parse failures.
+ * GET requests are cached with a 60-second TTL.
  */
 async function safeFetch(url, options) {
+  const isGet = !options || !options.method || options.method === "GET";
+  if (isGet) {
+    const hit = getCached(url);
+    if (hit !== undefined) return hit;
+  }
+
   let res;
   try {
     res = await fetch(url, options);
@@ -22,11 +51,15 @@ async function safeFetch(url, options) {
     }
     throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
   }
+  let data;
   try {
-    return await res.json();
+    data = await res.json();
   } catch {
     throw new Error("Invalid JSON response from server");
   }
+
+  if (isGet) setCache(url, data);
+  return data;
 }
 
 function tfParams(timeframe, repo) {

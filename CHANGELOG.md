@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Focus-visible styles** — Global `:focus-visible` outline using `var(--accent)` with refined offsets for tabs, table rows, collapsible headers, and links
 - **CSS custom properties** — ~40 hardcoded color values replaced with CSS variables (`var(--text)`, `var(--bg-card)`, `var(--border)`, etc.) enabling consistent theming
 - **Keyboard navigation** — Arrow key navigation on TimeframeSelector and all TabBar instances; `tabIndex` roving for inactive tabs; Enter/Space activation on session table rows
+- **Timeframe sync** — Timeframe selection (7d / 30d / 90d / All) is now shared across all pages via React Context and persisted to localStorage. Changing the timeframe on one page updates every page instantly.
+- **Skeleton loading** — Overview, Sessions, and Session Detail pages now show animated placeholder cards (shimmer effect) while data loads, replacing the plain "Loading…" text.
+- **Mobile responsive layout** — Hamburger menu toggle at 768px breakpoint, sidebar slides in as an overlay, backdrop dismisses menu, tables scroll horizontally, and the menu auto-closes on navigation.
+- **API caching** — GET requests are cached client-side with a 60-second TTL. POST requests bypass the cache. The refresh button clears the cache to force fresh data.
+- **Hidden sessions persistence** — Hidden session IDs are now saved to `~/.copilot/copilot-insights-hidden.json` and survive server restarts. Previously they were in-memory only.
 - **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
 - **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
 - **Practice coaching panel** — Before asking you to rewrite a bad prompt, the Practice Lab now shows "What's Wrong" guidance:
@@ -56,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 🙈 toggle per session row in the Sessions table, hide/unhide button in Session Detail
   - Hidden sessions are excluded from every analysis endpoint (summary, patterns, coaching, analytics, etc.)
   - `GET /api/hidden-sessions`, `POST /api/sessions/:id/hide`, `DELETE /api/sessions/:id/hide`
-  - In-memory only — resets on server restart, no file persistence
+  - Persisted to `~/.copilot/copilot-insights-hidden.json` (survives server restarts)
   - UUID validation on hide/unhide, 5,000 session cap to prevent memory exhaustion
 - **Practice Lab** dashboard page with two modes:
   - Sandbox mode for instant prompt analysis (score 0-100, pattern detection, rewrite suggestions)

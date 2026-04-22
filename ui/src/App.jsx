@@ -13,7 +13,8 @@ import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
-import { fetchSessions } from "./api.js";
+import { fetchSessions, clearCache } from "./api.js";
+import { TimeframeProvider } from "./TimeframeContext.jsx";
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -69,15 +70,22 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(() => new Date());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const showWelcome = useShowWelcome();
   const location = useLocation();
   const isWelcomePage = showWelcome || location.pathname === "/welcome";
   const refresh = useCallback(() => {
+    clearCache();
     setRefreshKey((k) => k + 1);
     setLastRefresh(new Date());
     setSpinning(true);
     setTimeout(() => setSpinning(false), 800);
   }, []);
+
+  // Close mobile menu on navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   // Show nothing while checking onboarding status
   if (showWelcome === null) {
@@ -86,10 +94,25 @@ function App() {
 
   return (
     <RefreshContext.Provider value={{ key: refreshKey, refresh, lastRefresh }}>
+      <TimeframeProvider>
       <div className="app-layout">
+        {/* Mobile hamburger toggle */}
+        {!isWelcomePage && (
+          <button
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
+        )}
+        {/* Backdrop for mobile overlay */}
+        {mobileMenuOpen && !isWelcomePage && (
+          <div className="sidebar-backdrop" onClick={() => setMobileMenuOpen(false)} />
+        )}
         {/* Hide sidebar on Welcome page */}
         {!isWelcomePage && (
-          <nav className="sidebar" aria-label="Main navigation">
+          <nav className={`sidebar${mobileMenuOpen ? " sidebar-open" : ""}`} aria-label="Main navigation">
             <div className="sidebar-logo">
               <span>💡</span> Copilot Insights
             </div>
@@ -154,6 +177,7 @@ function App() {
           </ErrorBoundary>
         </main>
       </div>
+      </TimeframeProvider>
     </RefreshContext.Provider>
   );
 }

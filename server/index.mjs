@@ -3,8 +3,10 @@
 
 import express from "express";
 import cors from "cors";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import {
   analyzeSession,
   analyzeRecent,
@@ -112,16 +114,41 @@ function handleRouteError(res, err, route) {
 
   res.status(500).json({ error: "Something went wrong — check the server logs for details." });
 }
-// -- Session Hiding (in-memory) -------------------------- 
+// -- Session Hiding (persisted to disk) ---------------------- 
 
-const hiddenSessions = new Set();
+const HIDDEN_FILE = join(homedir(), ".copilot", "copilot-insights-hidden.json");
 const MAX_HIDDEN = 5000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function loadHiddenSessions() {
+  try {
+    const raw = readFileSync(HIDDEN_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((id) => typeof id === "string" && UUID_RE.test(id));
+      return new Set(valid.slice(0, MAX_HIDDEN));
+    }
+  } catch {
+    // File missing, corrupted, or unreadable — start fresh
+  }
+  return new Set();
+}
+
+function saveHiddenSessions(set) {
+  try {
+    mkdirSync(join(homedir(), ".copilot"), { recursive: true });
+    writeFileSync(HIDDEN_FILE, JSON.stringify([...set]), "utf-8");
+  } catch (err) {
+    log.error("[hidden-sessions] Failed to save:", err.message);
+  }
+}
+
+const hiddenSessions = loadHiddenSessions();
 
 /**
  * GET /api/hidden-sessions
  * Return list of session IDs currently hidden from analysis.
- * Hidden sessions are stored in-memory only  cleared on server restart.
+ * Hidden sessions are persisted to ~/.copilot/copilot-insights-hidden.json.
  */
 app.get("/api/hidden-sessions", (_req, res) => {
   res.json({ sessionIds: [...hiddenSessions] });
@@ -129,7 +156,7 @@ app.get("/api/hidden-sessions", (_req, res) => {
 
 /**
  * POST /api/sessions/:id/hide
- * Add a session ID to the hidden set (in-memory only).
+ * Add a session ID to the hidden set and persist to disk.
  * Returns 400 if ID is not a valid UUID v4, 429 if cap reached.
  */
 app.post("/api/sessions/:id/hide", (req, res) => {
@@ -141,12 +168,13 @@ app.post("/api/sessions/:id/hide", (req, res) => {
     return res.status(429).json({ error: "Hidden sessions limit reached" });
   }
   hiddenSessions.add(id);
+  saveHiddenSessions(hiddenSessions);
   res.json({ ok: true });
 });
 
 /**
  * DELETE /api/sessions/:id/hide
- * Remove a session ID from the hidden set.
+ * Remove a session ID from the hidden set and persist to disk.
  * Returns 400 if ID is not a valid UUID v4.
  */
 app.delete("/api/sessions/:id/hide", (req, res) => {
@@ -155,6 +183,7 @@ app.delete("/api/sessions/:id/hide", (req, res) => {
     return res.status(400).json({ error: "Invalid session ID format" });
   }
   hiddenSessions.delete(id);
+  saveHiddenSessions(hiddenSessions);
   res.json({ ok: true });
 });
 

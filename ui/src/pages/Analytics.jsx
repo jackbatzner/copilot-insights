@@ -16,6 +16,7 @@ import {
   PieChart, Pie,
 } from "recharts";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp";
@@ -32,7 +33,7 @@ const TT_STYLE = {
 
 export default function Analytics() {
   const { key: refreshKey } = useRefresh();
-  const [timeframe, setTimeframe] = useState("all");
+  const { timeframe, setTimeframe } = useTimeframe();
   const [promptLen, setPromptLen] = useState(null);
   const [workStyle, setWorkStyle] = useState(null);
   const [createEdit, setCreateEdit] = useState(null);

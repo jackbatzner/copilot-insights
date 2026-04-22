@@ -4,6 +4,7 @@ import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment } from ".
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useRefresh } from "../App.jsx";
+import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
@@ -12,7 +13,7 @@ import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.js
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
-  const [timeframe, setTimeframe] = useState("all");
+  const { timeframe, setTimeframe } = useTimeframe();
   const [clarity, setClarity] = useState(null);
   const [efficiency, setEfficiency] = useState(null);
   const [delegation, setDelegation] = useState(null);
