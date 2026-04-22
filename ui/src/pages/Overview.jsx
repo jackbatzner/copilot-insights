@@ -103,16 +103,20 @@ export default function Overview() {
       {pillarTrends && (
         <div className="tier-hero-card card">
           <div className="tier-hero-content">
-            <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
-            <div className="tier-hero-info">
-              <div style={{ fontSize: 16, fontWeight: 600 }}>
-                <MetricHelp
-                  label={tier.name}
-                  definition="Your overall skill tier, derived from your combined Delegation + Judgment + Feedback pillar scores."
-                  target="Progress through tiers by improving your weakest pillar."
-                />
+            <div className="tier-hero-left">
+              <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  <MetricHelp
+                    label={tier.name}
+                    definition="Your overall skill tier, derived from your combined Delegation + Judgment + Feedback pillar scores."
+                    target="Progress through tiers by improving your weakest pillar."
+                  />
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Score: {overallScore}/100</div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Score: {overallScore}/100</div>
+            </div>
+            <div className="tier-hero-right">
               {tier.next && (
                 <div className="tier-hero-progress">
                   <div className="tier-progress-bar">

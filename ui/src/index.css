@@ -2781,7 +2781,21 @@ a:hover {
 .tier-hero-content {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tier-hero-left {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+.tier-hero-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .tier-hero-content > :first-child {
@@ -2804,7 +2818,7 @@ a:hover {
 
 .tier-progress-bar {
   height: 6px;
-  width: 200px;
+  width: 240px;
   background: var(--border);
   border-radius: 3px;
   overflow: hidden;
