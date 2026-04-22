@@ -99,13 +99,14 @@ export default function Overview() {
 
       {/* ── THE 5-MINUTE WOW ──────────────────────────────────────── */}
 
-      {/* Tier Hero — your level at a glance */}
-      {pillarTrends && (
-        <div className="tier-hero-card card">
-          <div className="tier-hero-content">
-            <div className="tier-hero-left">
+      {/* Tier + Top Insight — side by side */}
+      <div className="hero-row">
+        {/* Tier Hero — your level at a glance */}
+        {pillarTrends && (
+          <div className="tier-hero-card card">
+            <div className="tier-hero-content">
               <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
-              <div>
+              <div className="tier-hero-info">
                 <div style={{ fontSize: 16, fontWeight: 600 }}>
                   <MetricHelp
                     label={tier.name}
@@ -113,46 +114,44 @@ export default function Overview() {
                     target="Progress through tiers by improving your weakest pillar."
                   />
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Score: {overallScore}/100</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Score: {overallScore}/100</div>
+                {tier.next && (
+                  <div className="tier-hero-progress">
+                    <div className="tier-progress-bar">
+                      <div className="tier-progress-fill" style={{
+                        width: `${Math.round((overallScore - tier.min) / (tier.next.min - tier.min) * 100)}%`
+                      }} />
+                    </div>
+                    <span className="tier-progress-label">
+                      {tier.next.min - overallScore} pts to {tier.next.emoji} {tier.next.name}
+                    </span>
+                  </div>
+                )}
+                {!tier.next && (
+                  <span style={{ fontSize: 12, color: "var(--green)" }}>Max tier reached!</span>
+                )}
               </div>
             </div>
-            <div className="tier-hero-right">
-              {tier.next && (
-                <div className="tier-hero-progress">
-                  <div className="tier-progress-bar">
-                    <div className="tier-progress-fill" style={{
-                      width: `${Math.round((overallScore - tier.min) / (tier.next.min - tier.min) * 100)}%`
-                    }} />
-                  </div>
-                  <span className="tier-progress-label">
-                    {tier.next.min - overallScore} pts to {tier.next.emoji} {tier.next.name}
-                  </span>
-                </div>
-              )}
-              {!tier.next && (
-                <span style={{ fontSize: 12, color: "var(--green)" }}>Max tier reached!</span>
-              )}
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Top Insight — the ONE thing that makes you go "oh, I do that" */}
-      {insights && insights.length > 0 && (
-        <div className="top-insight-card">
-          <div className="top-insight-header">
-            💡 <strong>{insights[0].title}</strong>
-          </div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            {insights[0].body}
-          </div>
-          {insights.length > 1 && (
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-              +{insights.length - 1} more insight{insights.length > 2 ? "s" : ""} below
+        {/* Top Insight — the ONE thing that makes you go "oh, I do that" */}
+        {insights && insights.length > 0 && (
+          <div className="top-insight-card">
+            <div className="top-insight-header">
+              💡 <strong>{insights[0].title}</strong>
             </div>
-          )}
-        </div>
-      )}
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
+              {insights[0].body}
+            </div>
+            {insights.length > 1 && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                +{insights.length - 1} more insight{insights.length > 2 ? "s" : ""} below
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Quick Stats — just the headline numbers */}
       <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>

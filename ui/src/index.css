@@ -2774,34 +2774,29 @@ a:hover {
 /* ── Tier Hero Card ────────────────────────────────────────── */
 
 .tier-hero-card {
-  margin-bottom: 12px;
+  margin-bottom: 0;
   padding: 14px 20px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.hero-row > .top-insight-card {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .tier-hero-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.tier-hero-left {
-  display: flex;
-  align-items: center;
   gap: 10px;
-  flex-shrink: 0;
-}
-
-.tier-hero-right {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.tier-hero-content > :first-child {
-  flex-shrink: 0;
-  width: auto;
-  line-height: 1;
 }
 
 .tier-hero-info {
@@ -2818,7 +2813,7 @@ a:hover {
 
 .tier-progress-bar {
   height: 6px;
-  width: 240px;
+  width: 200px;
   background: var(--border);
   border-radius: 3px;
   overflow: hidden;
