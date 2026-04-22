@@ -21,12 +21,13 @@ import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
+import { TabBar, TabPanel } from "../components/TabBar.jsx";
 
 const TT_STYLE = {
-  background: "#161b22",
-  border: "1px solid #30363d",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: 8,
-  color: "#e6edf3",
+  color: "var(--text)",
 };
 
 export default function Analytics() {
@@ -134,12 +135,16 @@ export default function Analytics() {
       </div>
 
       {/* Tab bar */}
-      <div className="tab-bar">
-        <button className={`tab-btn${tab === "patterns" ? " active" : ""}`} onClick={() => setTab("patterns")}>🎨 Patterns</button>
-        <button className={`tab-btn${tab === "files" ? " active" : ""}`} onClick={() => setTab("files")}>📁 Files & Repos</button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: "patterns", label: "🎨 Patterns" },
+          { id: "files", label: "📁 Files & Repos" },
+        ]}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
 
-      {tab === "patterns" && (
+      <TabPanel id="patterns" activeTab={tab}>
         <>
           {/* Work Style */}
           <div className="card-row">
@@ -168,9 +173,9 @@ export default function Analytics() {
             </div>
           </div>
         </>
-      )}
+      </TabPanel>
 
-      {tab === "files" && (
+      <TabPanel id="files" activeTab={tab}>
         <>
           {/* Create/Edit + File Types */}
           <div className="card-row">
@@ -246,7 +251,7 @@ export default function Analytics() {
                       {f.tool_name}
                     </span>
                   </td>
-                  <td>{f.total_touches} <span style={{ fontSize: 11, color: "#8b949e" }}>in {f.sessions} sessions</span></td>
+                  <td>{f.total_touches} <span style={{ fontSize: 11, color: "var(--text-muted)" }}>in {f.sessions} sessions</span></td>
                 </tr>
               ))}
             </tbody>
@@ -254,7 +259,7 @@ export default function Analytics() {
         </CollapsibleSection>
       )}
         </>
-      )}
+      </TabPanel>
 
       <SuggestedNext to="/coaching" icon="🎓" label="Coaching" description="Personalized tips for your work style" />
     </div>
@@ -360,8 +365,8 @@ function ToolChart({ data }) {
         {data.map((d) => (
           <div key={d.tool_name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: TOOL_COLORS[d.tool_name] || "#8b949e" }} />
-            <span style={{ color: "#e6edf3" }}>{d.tool_name}</span>
-            <span style={{ color: "#8b949e", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ color: "var(--text)" }}>{d.tool_name}</span>
+            <span style={{ color: "var(--text-muted)", marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
               {d.cnt} ({total > 0 ? Math.round((d.cnt / total) * 100) : 0}%)
             </span>
           </div>
@@ -396,19 +401,19 @@ function WorkStyleChart({ data }) {
         {styles.map((s) => (
           <div key={s} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: STYLE_COLORS[s] }} />
-            <span style={{ color: "#e6edf3" }}>{STYLE_EMOJIS[s]} {s}</span>
-            <span style={{ color: "#8b949e" }}>{counts[s] || 0}</span>
+            <span style={{ color: "var(--text)" }}>{STYLE_EMOJIS[s]} {s}</span>
+            <span style={{ color: "var(--text-muted)" }}>{counts[s] || 0}</span>
           </div>
         ))}
       </div>
       {summary.dominantStyle && (
-        <p style={{ color: "#e6edf3", fontSize: 13, margin: "0 0 4px" }}>
+        <p style={{ color: "var(--text)", fontSize: 13, margin: "0 0 4px" }}>
           Dominant: {summary.dominantEmoji || ""} <strong>{summary.dominantStyle}</strong>
         </p>
       )}
       {coachingTip && (
-        <p style={{ color: "#8b949e", fontSize: 12, margin: "8px 0 0", fontStyle: "italic",
-          borderLeft: "3px solid #30363d", paddingLeft: 10 }}>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "8px 0 0", fontStyle: "italic",
+          borderLeft: "3px solid var(--border)", paddingLeft: 10 }}>
           💡 {coachingTip}
         </p>
       )}
@@ -439,22 +444,22 @@ function CreateEditChart({ data }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#3fb950" }} />
-            <span style={{ color: "#e6edf3" }}>Create</span>
-            <span style={{ color: "#8b949e", fontVariantNumeric: "tabular-nums" }}>{creates} ({Math.round(createPct)}%)</span>
+            <span style={{ color: "var(--text)" }}>Create</span>
+            <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{creates} ({Math.round(createPct)}%)</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#58a6ff" }} />
-            <span style={{ color: "#e6edf3" }}>Edit</span>
-            <span style={{ color: "#8b949e", fontVariantNumeric: "tabular-nums" }}>{edits} ({Math.round(editPct)}%)</span>
+            <span style={{ color: "var(--text)" }}>Edit</span>
+            <span style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{edits} ({Math.round(editPct)}%)</span>
           </div>
-          <div style={{ color: "#8b949e", fontSize: 12, marginTop: 4 }}>
-            Ratio: <strong style={{ color: "#e6edf3" }}>{ratio}</strong>
+          <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 4 }}>
+            Ratio: <strong style={{ color: "var(--text)" }}>{ratio}</strong>
           </div>
         </div>
       </div>
       {insight && (
-        <p style={{ color: "#8b949e", fontSize: 12, margin: 0, fontStyle: "italic",
-          borderLeft: "3px solid #30363d", paddingLeft: 10 }}>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, margin: 0, fontStyle: "italic",
+          borderLeft: "3px solid var(--border)", paddingLeft: 10 }}>
           💡 {insight}
         </p>
       )}
@@ -472,15 +477,15 @@ function FileTypeChart({ data }) {
     <div style={{ padding: "8px 0", display: "flex", flexDirection: "column", gap: 6 }}>
       {top.map((t, i) => (
         <div key={t.ext} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-          <code style={{ color: "#e6edf3", minWidth: 50, textAlign: "right" }}>{t.ext}</code>
-          <div style={{ flex: 1, height: 18, background: "#21262d", borderRadius: 4, overflow: "hidden" }}>
+          <code style={{ color: "var(--text)", minWidth: 50, textAlign: "right" }}>{t.ext}</code>
+          <div style={{ flex: 1, height: 18, background: "var(--bg-hover)", borderRadius: 4, overflow: "hidden" }}>
             <div style={{
               width: `${maxCount > 0 ? (t.count / maxCount) * 100 : 0}%`,
               height: "100%", background: TYPE_COLORS[i % TYPE_COLORS.length],
               borderRadius: 4, transition: "width 0.3s", minWidth: t.count > 0 ? 4 : 0,
             }} />
           </div>
-          <span style={{ color: "#8b949e", minWidth: 60, fontVariantNumeric: "tabular-nums" }}>
+          <span style={{ color: "var(--text-muted)", minWidth: 60, fontVariantNumeric: "tabular-nums" }}>
             {t.count} ({t.pct}%)
           </span>
         </div>

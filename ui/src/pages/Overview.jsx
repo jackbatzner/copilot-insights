@@ -258,11 +258,11 @@ export default function Overview() {
             </div>
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={pillarTrends.weeks} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
-                <XAxis dataKey="week" tick={{ fill: "#8b949e", fontSize: 11 }} axisLine={{ stroke: "#30363d" }} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "#8b949e", fontSize: 11 }} axisLine={{ stroke: "#30363d" }} tickLine={false} />
+                <XAxis dataKey="week" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
                 <Tooltip
-                  contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, color: "#e6edf3" }}
-                  labelStyle={{ color: "#8b949e" }}
+                  contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+                  labelStyle={{ color: "var(--text-muted)" }}
                   formatter={(value, name) => [`${value}`, name.charAt(0).toUpperCase() + name.slice(1)]}
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
@@ -270,7 +270,7 @@ export default function Overview() {
                 <Line type="monotone" dataKey="feedback" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "#8b949e" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)" }}>
               <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
               <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
               <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Feedback" definition="How clearly you communicate requirements and corrections to the agent." target="70+ clarity score is clear communication." /></span>
@@ -300,10 +300,10 @@ export default function Overview() {
                     return (
                       <div key={key}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ color: "#e6edf3" }}>{label}</span>
-                          <span style={{ color: "#8b949e" }}>{count} session{count !== 1 ? "s" : ""} ({pct.toFixed(0)}%)</span>
+                          <span style={{ color: "var(--text)" }}>{label}</span>
+                          <span style={{ color: "var(--text-muted)" }}>{count} session{count !== 1 ? "s" : ""} ({pct.toFixed(0)}%)</span>
                         </div>
-                        <div style={{ height: 8, borderRadius: 4, background: "#21262d", overflow: "hidden" }}>
+                        <div style={{ height: 8, borderRadius: 4, background: "var(--bg-hover)", overflow: "hidden" }}>
                           <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 4, transition: "width 0.3s" }} />
                         </div>
                       </div>
@@ -312,7 +312,7 @@ export default function Overview() {
                 })()}
               </div>
               <div style={{ textAlign: "center", padding: "8px 0", fontSize: 14 }}>
-                <span style={{ color: "#e6edf3" }}>
+                <span style={{ color: "var(--text)" }}>
                   Dominant style: {workStyle.summary.dominantEmoji} {workStyle.summary.dominantStyle}
                 </span>
               </div>
@@ -321,24 +321,24 @@ export default function Overview() {
               <div className="card-header">Session Stats</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "8px 0" }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#e6edf3" }}>{workStyle.summary.total}</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}>Total Sessions</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{workStyle.summary.total}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Total Sessions</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{workStyle.summary.vibeRate}%</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{workStyle.summary.structuredRate}%</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: "#d29922" }}>{workStyle.summary.avgFirstFileTurn.toFixed(1)}</div>
-                  <div style={{ fontSize: 11, color: "#8b949e" }}><MetricHelp label="Avg First File Turn" definition="Average turn number when the first file is created or edited in your sessions. Lower means you start coding sooner." target="Not a target per se — turn 0-1 is vibe coding, turn 3+ means you planned first. Match to your task complexity." /></div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Avg First File Turn" definition="Average turn number when the first file is created or edited in your sessions. Lower means you start coding sooner." target="Not a target per se — turn 0-1 is vibe coding, turn 3+ means you planned first. Match to your task complexity." /></div>
                 </div>
               </div>
               {workStyle.coachingTip && (
-                <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#e6edf3" }}>
+                <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "var(--text)" }}>
                   💡 <strong>Coaching Tip:</strong> {workStyle.coachingTip}
                 </div>
               )}
@@ -355,12 +355,12 @@ export default function Overview() {
                   const color = pct >= 80 ? "#3fb950" : pct >= 50 ? "#d29922" : "#f85149";
                   const itemKey = item.session || item.name || `rate-${pct}`;
                   return (
-                    <div key={itemKey} style={{ background: "#161b22", borderRadius: 8, padding: "10px 14px", border: "1px solid #30363d" }}>
-                      <div style={{ fontSize: 12, color: "#8b949e", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div key={itemKey} style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 14px", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {item.session || item.name || `Session ${i + 1}`}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ height: 6, flex: 1, borderRadius: 3, background: "#21262d", overflow: "hidden" }}>
+                        <div style={{ height: 6, flex: 1, borderRadius: 3, background: "var(--bg-hover)", overflow: "hidden" }}>
                           <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 600, color }}>{pct.toFixed(0)}%</span>

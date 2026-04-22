@@ -6,6 +6,7 @@ import { PageBanner } from "../components/PageBanner.jsx";
 import { Link } from "react-router-dom";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { TabBar, TabPanel } from "../components/TabBar.jsx";
 
 const CATEGORY_LABELS = {
   convention: { label: "Style & Conventions", emoji: "🎨", color: "#bc8cff" },
@@ -63,18 +64,21 @@ export default function Instructions() {
       </PageBanner>
 
       {/* Tab switcher */}
-      <div className="tab-bar">
-        <button className={`tab-btn ${tab === "gaps" ? "active" : ""}`} onClick={() => setTab("gaps")}>
-          📝 Missing Rules
-          {gaps && <span className="tab-count">{gaps.totalGaps}</span>}
-        </button>
-        <button className={`tab-btn ${tab === "failures" ? "active" : ""}`} onClick={() => setTab("failures")}>
-          ❌ Rule Failures
-          {failures && <span className="tab-count">{failures.totalFailures}</span>}
-        </button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: "gaps", label: `📝 Missing Rules${gaps ? ` (${gaps.totalGaps})` : ""}` },
+          { id: "failures", label: `❌ Rule Failures${failures ? ` (${failures.totalFailures})` : ""}` },
+        ]}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
 
-      {tab === "gaps" ? <GapsTab data={gaps} /> : <FailuresTab data={failures} />}
+      <TabPanel id="gaps" activeTab={tab}>
+        <GapsTab data={gaps} />
+      </TabPanel>
+      <TabPanel id="failures" activeTab={tab}>
+        <FailuresTab data={failures} />
+      </TabPanel>
     </div>
   );
 }
@@ -121,7 +125,7 @@ function GapsTab({ data }) {
                 return (
                   <div key={cat} className="category-pill" style={{ borderColor: meta.color }}>
                     <span>{meta.emoji}</span>
-                    <span style={{ color: "#e6edf3" }}>{meta.label}</span>
+                    <span style={{ color: "var(--text)" }}>{meta.label}</span>
                     <span className="pill-count" style={{ background: meta.color }}>{info.count}</span>
                   </div>
                 );
@@ -301,7 +305,7 @@ function FailuresTab({ data }) {
                     <span className="clarity-badge" style={{ background: s.signalCount > 3 ? "#f85149" : "#d29922" }}>
                       {s.signalCount}
                     </span>
-                    <span style={{ fontSize: 11, color: "#8b949e", marginLeft: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>
                       {s.repetitionCount} repeats · {s.correctionCount} corrections
                     </span>
                   </td>
@@ -346,7 +350,7 @@ function FailuresTab({ data }) {
                     <span className="clarity-badge" style={{
                       background: r.total > 20 ? "#f85149" : r.total > 5 ? "#d29922" : "#3fb950"
                     }}>{r.total}</span>
-                    <span style={{ fontSize: 11, color: "#8b949e", marginLeft: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>
                       {r.signals} signals · {r.repetitions} repeats
                     </span>
                   </td>

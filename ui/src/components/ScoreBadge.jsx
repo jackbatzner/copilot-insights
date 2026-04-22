@@ -13,9 +13,10 @@ export function ScoreBadge({ rate }) {
     color = "red";
     label = "Heavy";
   }
+  const pct = (rate * 100).toFixed(0);
   return (
-    <span className={`score-badge ${color}`}>
-      {label} ({(rate * 100).toFixed(0)}%)
+    <span className={`score-badge ${color}`} role="status" aria-label={`${label}: ${pct}% redirection rate`}>
+      {label} ({pct}%)
     </span>
   );
 }

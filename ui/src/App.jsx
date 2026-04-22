@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, useCallback } from "rea
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
+import { ThemeToggle } from "./components/ThemeToggle.jsx";
 import Overview from "./pages/Overview.jsx";
 import Welcome from "./pages/Welcome.jsx";
 import Sessions from "./pages/Sessions.jsx";
@@ -88,7 +89,7 @@ function App() {
       <div className="app-layout">
         {/* Hide sidebar on Welcome page */}
         {!isWelcomePage && (
-          <nav className="sidebar">
+          <nav className="sidebar" aria-label="Main navigation">
             <div className="sidebar-logo">
               <span>💡</span> Copilot Insights
             </div>
@@ -122,6 +123,7 @@ function App() {
               </NavLink>
             </NavGroup>
             <div className="refresh-section">
+              <ThemeToggle />
               <button className={`refresh-btn${spinning ? " spinning" : ""}`} onClick={refresh} title="Refresh data" aria-label="Refresh data">
                 🔄
               </button>

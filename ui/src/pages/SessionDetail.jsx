@@ -5,6 +5,7 @@ import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.j
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
 import { MetricHelp } from "../components/MetricHelp";
+import { TabBar, TabPanel } from "../components/TabBar.jsx";
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -243,12 +244,16 @@ export default function SessionDetail() {
         </div>
       )}
 
-      <div className="tab-bar">
-        <button className={`tab-btn${tab === "summary" ? " active" : ""}`} onClick={() => setTab("summary")}>📊 Summary</button>
-        <button className={`tab-btn${tab === "deep-dive" ? " active" : ""}`} onClick={() => setTab("deep-dive")}>🎬 Deep Dive</button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: "summary", label: "📊 Summary" },
+          { id: "deep-dive", label: "🎬 Deep Dive" },
+        ]}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
 
-      {tab === "summary" && (<>
+      <TabPanel id="summary" activeTab={tab}>
       {/* Session grade + coaching tips from replay */}
       {replay?.summary && (() => {
         const gradeColors = { A: "#3fb950", B: "#58a6ff", C: "#d29922", D: "#f85149" };
@@ -257,7 +262,7 @@ export default function SessionDetail() {
           <>
           <div className="stats-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card">
-              <div className="stat-value" style={{ color: gradeColors[grade] || "#e6edf3", fontSize: 36 }}>
+              <div className="stat-value" style={{ color: gradeColors[grade] || "var(--text)", fontSize: 36 }}>
                 {grade}
               </div>
               <div className="stat-label">Session Grade</div>
@@ -278,7 +283,7 @@ export default function SessionDetail() {
               <div className="stat-sub">{replay.summary.redirectionCount} redirections · {replay.summary.dripFeedCount} drip-feeds · {replay.summary.rubberStampCount} rubber stamps</div>
             </div>
           </div>
-          <div className="card" style={{ marginBottom: 24, borderLeft: `3px solid ${gradeColors[grade] || "#8b949e"}` }}>
+          <div className="card" style={{ marginBottom: 24, borderLeft: `3px solid ${gradeColors[grade] || "var(--text-muted)"}` }}>
             <div className="card-header">📐 Grade Breakdown</div>
             {isLearningSession && (
               <div style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid rgba(88, 166, 255, 0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "var(--accent)" }}>
@@ -299,7 +304,7 @@ export default function SessionDetail() {
           <div className="card-header">💡 Coaching Tips</div>
           <ul style={{ margin: 0, padding: "8px 0 0 20px", listStyle: "none" }}>
             {replay.summary.coachingTips.map((tip, i) => (
-              <li key={i} style={{ padding: "6px 0", color: "#e6edf3", fontSize: 14, lineHeight: 1.5 }}>
+              <li key={i} style={{ padding: "6px 0", color: "var(--text)", fontSize: 14, lineHeight: 1.5 }}>
                 <span style={{ marginRight: 8, color: "#d29922" }}>💬</span>{tip}
               </li>
             ))}
@@ -313,7 +318,7 @@ export default function SessionDetail() {
           {efficiency && (
             <>
               <div className="stat-card">
-                <div className="stat-value" style={{ color: efficiency.grade?.color || "#e6edf3" }}>
+                <div className="stat-value" style={{ color: efficiency.grade?.color || "var(--text)" }}>
                   {efficiency.grade?.emoji} {Math.round(efficiency.efficiencyRatio * 100)}%
                 </div>
                 <div className="stat-label">Turn Efficiency</div>
@@ -376,9 +381,9 @@ export default function SessionDetail() {
           )}
         </div>
       </div>
-      </>)}
+      </TabPanel>
 
-      {tab === "deep-dive" && (<>
+      <TabPanel id="deep-dive" activeTab={tab}>
       {/* Sprawl details */}
       {sprawl && (sprawl.scopeAdditions?.length > 0 || sprawl.topicShifts?.length > 0) && (
         <div className="card" style={{ marginBottom: 24 }}>
@@ -462,18 +467,18 @@ export default function SessionDetail() {
                   alignItems: "flex-start",
                   gap: 8,
                   padding: "10px 12px",
-                  borderBottom: "1px solid #30363d",
+                  borderBottom: "1px solid var(--border)",
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 12, color: "#8b949e", minWidth: 28, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: "var(--text-muted)", minWidth: 28, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
                   #{turn.turnIndex}
                 </span>
                 <span style={{ fontSize: 16, minWidth: 20, flexShrink: 0 }}>
                   {turn.speaker === "user" ? "👤" : "🤖"}
                 </span>
                 <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                  <div style={{ fontSize: 13, color: "#e6edf3", marginBottom: turn.tags?.length ? 6 : 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                  <div style={{ fontSize: 13, color: "var(--text)", marginBottom: turn.tags?.length ? 6 : 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
                     {turn.messagePreview}
                   </div>
                   {turn.tags?.length > 0 && (
@@ -508,7 +513,7 @@ export default function SessionDetail() {
           </div>
         )}
       </div>
-      </>)}
+      </TabPanel>
     </>
   );
 }

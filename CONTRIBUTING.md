@@ -70,6 +70,15 @@ Before submitting a PR:
 - Minimal dependencies — don't add packages for things Node.js handles natively
 - Dark theme CSS uses CSS variables defined in `ui/src/index.css`
 
+## Accessibility
+
+All new UI components must meet these requirements:
+
+- **ARIA attributes** — Interactive elements need appropriate ARIA roles and properties (`aria-expanded`, `aria-controls`, `aria-selected`, `aria-label`, etc.)
+- **Keyboard navigation** — All interactive elements must be reachable via Tab. Tab bars and selector groups must support arrow key navigation (see `TabBar.jsx` for the WAI-ARIA Tabs pattern)
+- **Focus styles** — Use `:focus-visible` for keyboard focus indicators. The global style in `index.css` provides a `var(--accent)` outline; override `outline-offset` as needed for specific components
+- **Dark mode support** — Use CSS custom properties (`var(--text)`, `var(--bg-card)`, `var(--border)`, etc.) instead of hardcoded colors. Both `:root` (dark) and `:root[data-theme="light"]` must have valid contrast ratios
+
 ## Adding Redirection Patterns
 
 New patterns go in `src/patterns.mjs`. Each pattern needs:

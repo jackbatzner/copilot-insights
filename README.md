@@ -38,6 +38,8 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
+- 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
+- ♿ **Accessible** — Keyboard navigation, ARIA attributes, focus-visible styles
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 

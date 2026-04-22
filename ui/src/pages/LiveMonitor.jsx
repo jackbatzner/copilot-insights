@@ -115,7 +115,7 @@ export default function LiveMonitor() {
         </div>
       )}
 
-      <div className="live-feed">
+      <div className="live-feed" aria-live="polite" aria-label="Live session feed">
         {turns.length === 0 ? (
           <div className="live-empty">
             <div className="live-empty-icon">📡</div>

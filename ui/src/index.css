@@ -54,20 +54,6 @@ a:hover {
   text-decoration: underline;
 }
 
-/* ── Accessibility ─────────────────────────────────────────── */
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* ── Layout ─────────────────────────────────────────────────── */
 
 .app-layout {
@@ -3414,4 +3400,106 @@ a:hover {
 
 .nav-group-label:first-of-type {
   padding-top: 0;
+}
+
+/* ── Global Focus Styles ──────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Refine focus for inline elements that already have styles */
+a:focus-visible {
+  border-radius: 4px;
+}
+
+.tab-btn:focus-visible,
+.tf-btn:focus-visible {
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.session-table tbody tr:focus-visible {
+  outline-offset: -2px;
+}
+
+.collapsible-section-header:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ── Theme Toggle ─────────────────────────────────────────── */
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  margin-bottom: 6px;
+}
+
+.theme-toggle:hover {
+  background: rgba(56, 139, 253, 0.1);
+  color: var(--text);
+}
+
+/* ── Light / Dark Theme ───────────────────────────────────── */
+
+/* Default is dark (current design). Light is activated via data-theme="light" */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-card: #f6f8fa;
+  --bg-hover: #eaeef2;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-muted: #656d76;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --green: #1a7f37;
+  --yellow: #9a6700;
+  --orange: #bc4c00;
+  --red: #cf222e;
+  --purple: #8250df;
+}
+
+/* Override hardcoded colors in light mode */
+:root[data-theme="light"] .snippet-block {
+  background: #f6f8fa;
+}
+
+:root[data-theme="light"] .snippet-code {
+  color: #1f2328;
+}
+
+:root[data-theme="light"] .heatmap-count {
+  color: #1f2328;
+}
+
+:root[data-theme="light"] .heatmap-hour {
+  color: rgba(31, 35, 40, 0.6);
+}
+
+/* Recharts tooltip in light mode */
+:root[data-theme="light"] .recharts-default-tooltip {
+  background: #ffffff !important;
+  border-color: #d0d7de !important;
+  color: #1f2328 !important;
+}
+
+/* Clarity badge always white text */
+.clarity-badge {
+  color: #fff;
+}
+
+/* Override inline hardcoded colors for chart legends */
+:root[data-theme="light"] .recharts-cartesian-axis-tick text {
+  fill: #656d76 !important;
 }

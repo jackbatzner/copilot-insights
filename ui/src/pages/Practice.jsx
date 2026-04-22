@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { analyzePracticePrompt, fetchPracticeChallenge, fetchLibraryChallenge, fetchWeaknesses } from "../api";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
+import { TabBar, TabPanel } from "../components/TabBar.jsx";
 
 const SCORE_COLORS = { green: "#3fb950", yellow: "#d29922", orange: "#db6d28", red: "#f85149" };
 const SEVERITY_COLORS = { ok: "#3fb950", info: "#58a6ff", warning: "#d29922" };
@@ -21,13 +22,21 @@ export default function Practice() {
         Sharpen your prompting skills — type a prompt to get instant feedback, or take a rewrite challenge.
       </p>
 
-      <div className="tab-bar">
-        <button className={`tab-btn ${tab === "sandbox" ? "active" : ""}`} onClick={() => setTab("sandbox")}>✏️ Sandbox</button>
-        <button className={`tab-btn ${tab === "challenge" ? "active" : ""}`} onClick={() => setTab("challenge")}>🏆 Rewrite Challenge</button>
-      </div>
+      <TabBar
+        tabs={[
+          { id: "sandbox", label: "✏️ Sandbox" },
+          { id: "challenge", label: "🏆 Rewrite Challenge" },
+        ]}
+        activeTab={tab}
+        onTabChange={setTab}
+      />
 
-      {tab === "sandbox" && <SandboxMode />}
-      {tab === "challenge" && <ChallengeMode />}
+      <TabPanel id="sandbox" activeTab={tab}>
+        <SandboxMode />
+      </TabPanel>
+      <TabPanel id="challenge" activeTab={tab}>
+        <ChallengeMode />
+      </TabPanel>
     </div>
   );
 }
@@ -185,9 +194,9 @@ function SandboxMode() {
               marginBottom: 12,
               borderRadius: 8,
               background: "rgba(110, 118, 129, 0.15)",
-              border: "1px solid #30363d",
+              border: "1px solid var(--border)",
               fontSize: 13,
-              color: "#8b949e",
+              color: "var(--text-muted)",
             }}>
               <span style={{ fontSize: 18 }}>🤖</span>
               <span>This looks like an auto-generated prompt (system notification, cross-session message, etc.) — scores may not be meaningful for machine-generated content.</span>
