@@ -2781,7 +2781,13 @@ a:hover {
 .tier-hero-content {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+}
+
+.tier-hero-content > :first-child {
+  flex-shrink: 0;
+  width: auto;
+  line-height: 1;
 }
 
 .tier-hero-info {

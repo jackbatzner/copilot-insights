@@ -103,7 +103,7 @@ export default function Overview() {
       {pillarTrends && (
         <div className="tier-hero-card card">
           <div className="tier-hero-content">
-            <div style={{ fontSize: 36 }}>{tier.emoji}</div>
+            <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
             <div className="tier-hero-info">
               <div style={{ fontSize: 16, fontWeight: 600 }}>
                 <MetricHelp
