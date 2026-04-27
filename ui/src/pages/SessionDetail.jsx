@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
+import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens } from "../api.js";
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
@@ -15,6 +15,7 @@ export default function SessionDetail() {
   const [efficiency, setEfficiency] = useState(null);
   const [replay, setReplay] = useState(null);
   const [complexity, setComplexity] = useState(null);
+  const [tokenInfo, setTokenInfo] = useState(null);
   const [isHidden, setIsHidden] = useState(false);
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
@@ -32,8 +33,9 @@ export default function SessionDetail() {
       fetchSessionReplay(id).catch(() => null),
       fetchSessionComplexity(id).catch(() => null),
       fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
+      fetchSessionTokens(id).catch(() => null),
     ])
-      .then(([d, s, e, r, c, h]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); })
+      .then(([d, s, e, r, c, h, t]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); setTokenInfo(t); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -256,6 +258,7 @@ export default function SessionDetail() {
         tabs={[
           { id: "summary", label: "📊 Summary" },
           { id: "deep-dive", label: "🎬 Deep Dive" },
+          { id: "tokens", label: "💰 Tokens" },
         ]}
         activeTab={tab}
         onTabChange={setTab}
@@ -521,6 +524,77 @@ export default function SessionDetail() {
           </div>
         )}
       </div>
+      </TabPanel>
+
+      <TabPanel id="tokens" activeTab={tab}>
+        {tokenInfo ? (
+          <div>
+            <div className="stats-grid" style={{ marginBottom: 16 }}>
+              <div className="card" style={{ textAlign: "center" }}>
+                <div className="card-header">Est. Input Tokens</div>
+                <div className="stat-value">{(tokenInfo.totals?.input || 0).toLocaleString()}</div>
+                <div className="stat-sub">your prompts</div>
+              </div>
+              <div className="card" style={{ textAlign: "center" }}>
+                <div className="card-header">Est. Output Tokens</div>
+                <div className="stat-value">{(tokenInfo.totals?.output || 0).toLocaleString()}</div>
+                <div className="stat-sub">agent responses</div>
+              </div>
+              <div className="card" style={{ textAlign: "center" }}>
+                <div className="card-header">Total Tokens</div>
+                <div className="stat-value">{(tokenInfo.totals?.total || 0).toLocaleString()}</div>
+              </div>
+              <div className="card" style={{ textAlign: "center" }}>
+                <div className="card-header">Est. Cost</div>
+                <div className="stat-value" style={{ color: "var(--accent)" }}>
+                  {(tokenInfo.estimatedCost || 0) < 0.01 ? "<$0.01" : `$${(tokenInfo.estimatedCost || 0).toFixed(4)}`}
+                </div>
+                <div className="stat-sub">{tokenInfo.model || "unknown model"}</div>
+              </div>
+            </div>
+
+            {tokenInfo.turns && tokenInfo.turns.length > 0 && (
+              <div className="card" style={{ marginBottom: 16 }}>
+                <div className="card-header" style={{ marginBottom: 8 }}>Per-Turn Token Breakdown</div>
+                <div style={{ maxHeight: 400, overflow: "auto" }}>
+                  <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Turn</th>
+                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Input</th>
+                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Output</th>
+                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Total</th>
+                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Preview</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tokenInfo.turns.map((t, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.05))" }}>
+                          <td style={{ padding: "6px 8px", fontWeight: 500 }}>{t.turnIndex}</td>
+                          <td style={{ padding: "6px 8px" }}>{(t.inputTokens || 0).toLocaleString()}</td>
+                          <td style={{ padding: "6px 8px" }}>{(t.outputTokens || 0).toLocaleString()}</td>
+                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{((t.inputTokens || 0) + (t.outputTokens || 0)).toLocaleString()}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--text-muted)", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {t.preview || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
+              ⚡ Token counts are estimated from message text (~4 chars/token). Actual usage may differ.
+            </div>
+          </div>
+        ) : (
+          <div className="empty" style={{ padding: 24 }}>
+            <div className="empty-icon">💰</div>
+            <p>Token data not available for this session.</p>
+          </div>
+        )}
       </TabPanel>
     </>
   );

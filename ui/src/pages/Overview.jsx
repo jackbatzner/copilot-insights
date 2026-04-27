@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle } from "../api.js";
+import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary } from "../api.js";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
@@ -25,6 +25,7 @@ export default function Overview() {
   const [insights, setInsights] = useState(null);
   const [pillarTrends, setPillarTrends] = useState(null);
   const [workStyle, setWorkStyle] = useState(null);
+  const [tokenData, setTokenData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,14 +40,16 @@ export default function Overview() {
       fetchInsights(timeframe),
       fetchPillarTrends(timeframe),
       fetchWorkStyle(timeframe),
+      fetchTokenSummary(timeframe),
     ])
-      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData]) => {
+      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary]) => {
         if (cancelled) return;
         setData(sessionsData);
         setTrends(trendsData.trends);
         setInsights(insightsData.insights);
         setPillarTrends(pillarData);
         setWorkStyle(workStyleData);
+        setTokenData(tokenSummary);
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -162,7 +165,7 @@ export default function Overview() {
       </div>
 
       {/* Quick Stats — just the headline numbers */}
-      <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 16 }}>
         <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
           <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Sessions</div>
           <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.sessionsAnalyzed}</div>
@@ -189,6 +192,36 @@ export default function Overview() {
             {(avgRate * 100).toFixed(1)}%
           </div>
         </div>
+        {tokenData && tokenData.sessionsAnalyzed > 0 && (
+          <>
+            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                <MetricHelp
+                  label="Est. Tokens"
+                  definition="Estimated total token usage across all sessions, calculated from message text length (~4 chars per token)."
+                  target="Lower is more efficient — reduce redirections to save tokens."
+                />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>
+                {tokenData.totals.total >= 1_000_000 ? `${(tokenData.totals.total / 1_000_000).toFixed(1)}M`
+                  : tokenData.totals.total >= 1_000 ? `${(tokenData.totals.total / 1_000).toFixed(1)}K`
+                  : tokenData.totals.total}
+              </div>
+            </div>
+            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                <MetricHelp
+                  label="Est. Cost"
+                  definition="Estimated cost based on token usage and model pricing. This is an approximation — actual costs depend on your plan and provider."
+                  target="Optimize by reducing redirections and choosing appropriate models for each task."
+                />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>
+                {tokenData.estimatedCost < 0.01 ? "<$0.01" : `$${tokenData.estimatedCost.toFixed(2)}`}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* What to do next — clear CTAs */}
@@ -212,6 +245,12 @@ export default function Overview() {
             icon="🧪"
             label="Practice"
             description="Rewrite a prompt, see your score improve"
+          />
+          <SuggestedNext
+            to="/tokens"
+            icon="💰"
+            label="Token Usage"
+            description="See your token spend and optimization tips"
           />
         </div>
       </div>
