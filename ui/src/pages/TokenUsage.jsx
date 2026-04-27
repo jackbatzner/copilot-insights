@@ -120,9 +120,13 @@ export default function TokenUsage() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
 
-      {summary.isEstimated && (
+      {summary.isEstimated ? (
         <div className="info-banner" style={{ margin: "0.75rem 0", padding: "0.5rem 1rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.85rem", color: "var(--text-muted)" }}>
           ℹ️ Token counts are <strong>estimated</strong> from message text (~4 chars/token). Actual usage may vary.
+        </div>
+      ) : (
+        <div className="info-banner" style={{ margin: "0.75rem 0", padding: "0.5rem 1rem", background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.3)", borderRadius: 8, fontSize: "0.85rem", color: "var(--text-muted)" }}>
+          ✅ Using <strong>real token data</strong> from Copilot session files where available. Some sessions may fall back to estimates.
         </div>
       )}
 

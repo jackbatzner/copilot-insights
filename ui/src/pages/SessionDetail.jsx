@@ -586,7 +586,12 @@ export default function SessionDetail() {
             )}
 
             <div style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
-              ⚡ Token counts are estimated from message text (~4 chars/token). Actual usage may differ.
+              {tokenInfo.source === "jsonl" 
+                ? "✅ Output tokens from real Copilot session data. Input tokens estimated from message text."
+                : tokenInfo.source === "events"
+                ? "✅ Token data from session events table."
+                : "⚡ Token counts estimated from message text (~4 chars/token). Actual usage may differ."
+              }
             </div>
           </div>
         ) : (
