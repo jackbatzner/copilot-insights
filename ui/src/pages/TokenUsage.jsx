@@ -4,7 +4,6 @@ import {
   fetchTokenSummary,
   fetchTokensByModel,
   fetchTokenTrends,
-  fetchTokenEfficiency,
   fetchTokenCorrelations,
   fetchTokenBudget,
   fetchTokenTips,
@@ -51,7 +50,6 @@ export default function TokenUsage() {
   const [summary, setSummary] = useState(null);
   const [byModel, setByModel] = useState(null);
   const [trends, setTrends] = useState(null);
-  const [efficiency, setEfficiency] = useState(null);
   const [correlations, setCorrelations] = useState(null);
   const [budget, setBudget] = useState(null);
   const [tips, setTips] = useState(null);
@@ -73,17 +71,15 @@ export default function TokenUsage() {
       fetchTokenSummary(timeframe),
       fetchTokensByModel(timeframe),
       fetchTokenTrends(timeframe),
-      fetchTokenEfficiency(timeframe),
       fetchTokenCorrelations(timeframe),
       fetchTokenBudget(timeframe),
       fetchTokenTips(timeframe),
     ])
-      .then(([s, m, t, e, c, b, tp]) => {
+      .then(([s, m, t, c, b, tp]) => {
         if (cancelled) return;
         setSummary(s);
         setByModel(m);
         setTrends(t);
-        setEfficiency(e);
         setCorrelations(c);
         setBudget(b);
         setTips(tp);
@@ -110,7 +106,6 @@ export default function TokenUsage() {
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "models", label: "Models" },
-    { id: "efficiency", label: "Efficiency" },
     { id: "correlations", label: "Cost Insights" },
     { id: "budget", label: "Budget" },
     { id: "tips", label: "Optimization" },
@@ -155,10 +150,6 @@ export default function TokenUsage() {
 
       <TabPanel id="models" activeTab={tab}>
         <ModelsTab data={byModel} />
-      </TabPanel>
-
-      <TabPanel id="efficiency" activeTab={tab}>
-        <EfficiencyTab data={efficiency} redirData={correlations?.byRedirection} />
       </TabPanel>
 
       <TabPanel id="correlations" activeTab={tab}>
@@ -331,51 +322,6 @@ function ModelsTab({ data }) {
 }
 
 // ── Efficiency Tab ──────────────────────────────────────────
-
-function EfficiencyTab({ data, redirData }) {
-  if (!data) return <EmptyState message="No efficiency data available." />;
-
-  return (
-    <>
-      <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
-        <StatCard label="Tokens per File Op" value={formatTokens(data.tokensPerFileOp)} sub={`${data.totalFileOps} file operations`} />
-        <StatCard label="Token ROI" value={`${data.tokenROI}`} sub="file ops per 1K tokens" />
-        <StatCard label="Productive Token %" value={`${data.productiveTokenRatio}%`} sub={`${data.totalProductiveTurns} productive / ${data.totalRedirectionTurns} redirect`} />
-        <StatCard label="Total Tokens" value={formatTokens(data.totalTokens)} sub={`across ${data.sessionsAnalyzed} sessions`} />
-      </div>
-
-      {redirData && (
-        <CollapsibleSection title={`Token Waste — ${redirData.wasteRate}% spent on redirections`} defaultOpen>
-          <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
-            <StatCard label="Productive Tokens" value={formatTokens(redirData.productiveTokens)} sub={`${redirData.productiveCount} turns`} />
-            <StatCard label="Redirection Tokens" value={formatTokens(redirData.redirectionTokens)} sub={`${redirData.redirectionCount} turns`} />
-            <StatCard label="Avg per Redirect" value={formatTokens(redirData.avgTokensPerRedirection)} sub="tokens per redirection" />
-          </div>
-
-          {redirData.byCategory.length > 0 && (
-            <div className="table-container" style={{ marginTop: "0.75rem" }}>
-              <table className="data-table">
-                <thead>
-                  <tr><th>Category</th><th>Tokens Wasted</th><th>Occurrences</th><th>Avg Tokens</th></tr>
-                </thead>
-                <tbody>
-                  {redirData.byCategory.map((c) => (
-                    <tr key={c.category}>
-                      <td>{c.category.replace(/_/g, " ")}</td>
-                      <td>{formatTokens(c.tokens)}</td>
-                      <td>{c.count}</td>
-                      <td>{formatTokens(c.avgTokens)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CollapsibleSection>
-      )}
-    </>
-  );
-}
 
 // ── Correlations Tab ────────────────────────────────────────
 
