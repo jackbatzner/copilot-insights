@@ -496,7 +496,12 @@ function BudgetTab({ data }) {
 // ── Tips Tab ────────────────────────────────────────────────
 
 function TipsTab({ data }) {
-  if (!data || !data.tips || data.tips.length === 0) {
+  const hasTips = data?.tips?.length > 0;
+  const hasRecs = data?.modelRecommendations?.length > 0;
+  const hasGuide = data?.modelGuide?.length > 0;
+  const complexity = data?.sessionComplexity;
+
+  if (!hasTips && !hasRecs && !hasGuide) {
     return (
       <div className="card" style={{ padding: "1.5rem", textAlign: "center" }}>
         <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>✨</div>
@@ -508,34 +513,143 @@ function TipsTab({ data }) {
     );
   }
 
+  const tierColors = { powerful: "#ef4444", versatile: "#6366f1", lightweight: "#22c55e" };
+  const tierLabels = { powerful: "Powerful", versatile: "Versatile", lightweight: "Lightweight" };
+
   return (
     <>
-      <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
-        <StatCard label="Waste Rate" value={`${data.summary.wasteRate}%`} sub="tokens on redirections" />
-        <StatCard label="Productive %" value={`${data.summary.productiveRatio}%`} sub="of turns are productive" />
-        <StatCard label="Token ROI" value={data.summary.tokenROI} sub="file ops / 1K tokens" />
-      </div>
+      {data?.summary && (
+        <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
+          <StatCard label="Waste Rate" value={`${data.summary.wasteRate}%`} sub="tokens on redirections" />
+          <StatCard label="Productive %" value={`${data.summary.productiveRatio}%`} sub="of turns are productive" />
+          <StatCard label="Token ROI" value={data.summary.tokenROI} sub="file ops / 1K tokens" />
+        </div>
+      )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        {data.tips.map((tip) => (
-          <div key={tip.id} className="card" style={{ padding: "1rem", borderLeft: "4px solid #6366f1" }}>
-            <div style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
-              {tip.icon} {tip.title}
-            </div>
-            <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-              {tip.impact}
-            </div>
-            <div style={{ fontSize: "0.85rem" }}>
-              💡 {tip.suggestion}
-            </div>
-            {tip.savings && (
-              <div style={{ fontSize: "0.8rem", color: "#22c55e", marginTop: "0.25rem" }}>
-                📊 {tip.savings}
+      {/* Session complexity breakdown */}
+      {complexity && complexity.total > 0 && (
+        <CollapsibleSection title="Your Session Complexity" defaultOpen>
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+            {[
+              { label: "Simple", count: complexity.simple, desc: "≤3 turns, ≤2 files", color: "#22c55e", rec: "Lightweight models" },
+              { label: "Moderate", count: complexity.moderate, desc: "4-10 turns, 3-8 files", color: "#6366f1", rec: "Versatile models" },
+              { label: "Complex", count: complexity.complex, desc: "10+ turns, 8+ files", color: "#ef4444", rec: "Powerful models" },
+            ].map((c) => (
+              <div key={c.label} className="card" style={{ flex: "1 1 140px", padding: "0.75rem", textAlign: "center", borderTop: `3px solid ${c.color}` }}>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{c.count}</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{c.label}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{c.desc}</div>
+                <div style={{ fontSize: "0.75rem", color: c.color, marginTop: 4 }}>→ {c.rec}</div>
               </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Model recommendations based on usage */}
+      {hasRecs && (
+        <CollapsibleSection title="🤖 Model Recommendations" defaultOpen>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {data.modelRecommendations.map((rec) => (
+              <div key={rec.id} className="card" style={{ padding: "1rem", borderLeft: `4px solid ${rec.id.includes("lightweight") ? "#22c55e" : rec.id.includes("powerful") ? "#ef4444" : "#6366f1"}` }}>
+                <div style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                  {rec.icon} {rec.title}
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                  {rec.detail}
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: rec.potentialSavings ? "0.25rem" : 0 }}>
+                  {rec.models.map((m) => (
+                    <span key={m} style={{ fontSize: "0.8rem", padding: "2px 8px", borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--border)" }}>{m}</span>
+                  ))}
+                </div>
+                {rec.potentialSavings && (
+                  <div style={{ fontSize: "0.8rem", color: "#22c55e", marginTop: "0.25rem" }}>
+                    💰 {rec.potentialSavings}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Optimization tips */}
+      {hasTips && (
+        <CollapsibleSection title="💡 Optimization Tips" defaultOpen>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {data.tips.map((tip) => (
+              <div key={tip.id} className="card" style={{ padding: "1rem", borderLeft: "4px solid #f59e0b" }}>
+                <div style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                  {tip.icon} {tip.title}
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                  {tip.impact}
+                </div>
+                <div style={{ fontSize: "0.85rem" }}>
+                  💡 {tip.suggestion}
+                </div>
+                {tip.savings && (
+                  <div style={{ fontSize: "0.8rem", color: "#22c55e", marginTop: "0.25rem" }}>
+                    📊 {tip.savings}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Model Guide — what's best for what */}
+      {hasGuide && (
+        <CollapsibleSection title="📖 Model Guide — What's Best for What">
+          {["powerful", "versatile", "lightweight"].map((tier) => {
+            const models = data.modelGuide.filter((m) => m.tier === tier);
+            if (models.length === 0) return null;
+            return (
+              <div key={tier} style={{ marginBottom: "1rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: tierColors[tier] }} />
+                  <strong style={{ fontSize: "0.9rem" }}>{tierLabels[tier]}</strong>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                    {tier === "powerful" ? "— complex tasks, architecture, multi-file" : tier === "versatile" ? "— day-to-day coding, balanced cost" : "— quick fixes, simple edits, cheapest"}
+                  </span>
+                </div>
+                <div className="table-container">
+                  <table className="data-table" style={{ fontSize: "0.85rem" }}>
+                    <thead>
+                      <tr>
+                        <th>Model</th>
+                        <th>Vendor</th>
+                        <th>Best For</th>
+                        <th>Input $/M</th>
+                        <th>Output $/M</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {models.map((m) => (
+                        <tr key={m.model} style={data.currentModels?.includes(m.model) ? { background: "rgba(99, 102, 241, 0.08)" } : {}}>
+                          <td>
+                            <strong>{m.model}</strong>
+                            {data.currentModels?.includes(m.model) && <span style={{ fontSize: "0.7rem", marginLeft: 6, color: "#6366f1" }}>✦ in use</span>}
+                          </td>
+                          <td>{m.vendor}</td>
+                          <td style={{ maxWidth: 250 }}>{m.bestFor}</td>
+                          <td>${m.inputCost?.toFixed(2) ?? "—"}</td>
+                          <td>${m.outputCost?.toFixed(2) ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+            Pricing from <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot docs</a>. 1 AI credit = $0.01. Actual cost depends on plan.
+          </div>
+        </CollapsibleSection>
+      )}
     </>
   );
 }
