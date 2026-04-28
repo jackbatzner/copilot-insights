@@ -138,32 +138,32 @@ export default function TokenUsage() {
         <StatCard label="Total Tokens" value={formatTokens(summary.totals.total)} sub={`${formatTokens(summary.totals.input)} in / ${formatTokens(summary.totals.output)} out`} />
         <StatCard label="Est. Cost" value={formatCost(summary.estimatedCost)} sub={`${formatCost(summary.avgCostPerSession)} / session avg`} />
         <StatCard label="Sessions" value={summary.sessionsAnalyzed} sub={`${formatTokens(summary.avgTokensPerSession)} tokens / session`} />
-        <StatCard label="Models Used" value={summary.byModel.length} sub={summary.byModel.map((m) => m.model).join(", ") || "unknown"} />
+        <StatCard label="Models Used" value={summary.byModel.filter(m => m.model !== "unknown").length || summary.byModel.length} sub={summary.byModel.filter(m => m.model !== "unknown").map((m) => m.model === "auto" ? "auto" : m.model).join(", ") || "no model data"} />
       </div>
 
-      <TabBar tabs={tabs} active={tab} onChange={setTab} />
+      <TabBar tabs={tabs} activeTab={tab} onTabChange={setTab} />
 
-      <TabPanel id="overview" active={tab}>
+      <TabPanel id="overview" activeTab={tab}>
         <OverviewTab trends={trends} summary={summary} />
       </TabPanel>
 
-      <TabPanel id="models" active={tab}>
+      <TabPanel id="models" activeTab={tab}>
         <ModelsTab data={byModel} />
       </TabPanel>
 
-      <TabPanel id="efficiency" active={tab}>
+      <TabPanel id="efficiency" activeTab={tab}>
         <EfficiencyTab data={efficiency} redirData={correlations?.byRedirection} />
       </TabPanel>
 
-      <TabPanel id="correlations" active={tab}>
+      <TabPanel id="correlations" activeTab={tab}>
         <CorrelationsTab data={correlations} />
       </TabPanel>
 
-      <TabPanel id="budget" active={tab}>
+      <TabPanel id="budget" activeTab={tab}>
         <BudgetTab data={budget} />
       </TabPanel>
 
-      <TabPanel id="tips" active={tab}>
+      <TabPanel id="tips" activeTab={tab}>
         <TipsTab data={tips} />
       </TabPanel>
     </>
@@ -264,8 +264,14 @@ function ModelsTab({ data }) {
     return <EmptyState message="No model data available." />;
   }
 
+  const modelLabel = (name) => {
+    if (name === "unknown") return "Unknown (no model data)";
+    if (name === "auto") return "Auto (Copilot default)";
+    return name;
+  };
+
   const chartData = data.models.map((m) => ({
-    name: m.model,
+    name: modelLabel(m.model),
     tokens: m.total,
     cost: m.cost,
     sessions: m.sessions,
@@ -302,7 +308,7 @@ function ModelsTab({ data }) {
             <tbody>
               {data.models.map((m) => (
                 <tr key={m.model}>
-                  <td><strong>{m.model}</strong></td>
+                  <td><strong>{modelLabel(m.model)}</strong></td>
                   <td>{m.sessions}</td>
                   <td>{formatTokens(m.total)}</td>
                   <td>{formatTokens(m.avgTokensPerSession)}</td>
