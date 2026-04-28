@@ -334,6 +334,8 @@ export function analyzeTokensBatch({ repo, since, excludeIds } = {}) {
   let totalOutput = 0;
   let totalCached = 0;
   let totalCost = 0;
+  let totalInputCost = 0;
+  let totalOutputCost = 0;
   let anyEstimated = false;
   const byModel = {};
   const sessionResults = [];
@@ -347,6 +349,12 @@ export function analyzeTokensBatch({ repo, since, excludeIds } = {}) {
     totalOutput += result.tokens.output;
     totalCached += result.tokens.cached;
     totalCost += result.estimatedCost;
+
+    // Track input vs output cost per session using its actual model pricing
+    const pricing = getModelPricing(result.model);
+    const freshIn = result.tokens.input - result.tokens.cached;
+    totalInputCost += (freshIn / 1_000_000) * pricing.input + (result.tokens.cached / 1_000_000) * pricing.cachedInput;
+    totalOutputCost += (result.tokens.output / 1_000_000) * pricing.output;
 
     const m = result.model || "unknown";
     if (!byModel[m]) {
@@ -381,6 +389,7 @@ export function analyzeTokensBatch({ repo, since, excludeIds } = {}) {
     isEstimated: anyEstimated,
     totals: { input: totalInput, output: totalOutput, cached: totalCached, total },
     estimatedCost: totalCost,
+    costBreakdown: { input: totalInputCost, output: totalOutputCost },
     avgTokensPerSession: analyzed > 0 ? Math.round(total / analyzed) : 0,
     avgCostPerSession: analyzed > 0 ? totalCost / analyzed : 0,
     byModel: Object.values(byModel).sort((a, b) => b.total - a.total),

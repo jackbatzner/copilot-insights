@@ -111,10 +111,9 @@ export default function TokenUsage() {
 
   return (
     <>
-      <PageBanner
-        title="💰 Token Usage & Cost"
-        subtitle="Understand your token consumption, model costs, and optimization opportunities."
-      />
+      <PageBanner pageId="token-usage">
+        Understand your token consumption, model costs, and optimization opportunities.
+      </PageBanner>
       <div className="page-header" style={{ marginBottom: 0 }}>
         <div />
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
@@ -136,7 +135,7 @@ export default function TokenUsage() {
       {/* Hero Stats */}
       <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.75rem", marginBottom: "1.5rem" }}>
         <StatCard label="Total Tokens" value={formatTokens(summary.totals.total)} sub={`${formatTokens(summary.totals.input)} in / ${formatTokens(summary.totals.output)} out`} />
-        <StatCard label="Est. Cost" value={formatCost(summary.estimatedCost)} sub={`${formatCost(summary.avgCostPerSession)} / session avg`} />
+        <StatCard label="Est. Cost" value={formatCost(summary.estimatedCost)} sub={summary.costBreakdown ? `${formatCost(summary.costBreakdown.input)} input / ${formatCost(summary.costBreakdown.output)} output` : `${formatCost(summary.avgCostPerSession)} / session avg`} />
         <StatCard label="Sessions" value={summary.sessionsAnalyzed} sub={`${formatTokens(summary.avgTokensPerSession)} tokens / session`} />
         <StatCard label="Models Used" value={summary.byModel.filter(m => m.model !== "unknown").length || summary.byModel.length} sub={summary.byModel.filter(m => m.model !== "unknown").map((m) => m.model === "auto" ? "auto" : m.model).join(", ") || "no model data"} />
       </div>
