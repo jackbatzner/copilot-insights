@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const MOCK_DB = resolve(ROOT, "mock-session-store.db");
+const MOCK_SESSION_STATE = resolve(ROOT, "mock-session-state");
 const SCREENSHOTS_DIR = resolve(ROOT, "docs", "screenshots");
 const PORT = 3099; // avoid clashing with a running dev server
 
@@ -59,6 +60,7 @@ const server = spawn(process.execPath, ["index.mjs"], {
   env: {
     ...process.env,
     COPILOT_SESSION_DB: MOCK_DB,
+    COPILOT_SESSION_STATE_PATH: MOCK_SESSION_STATE,
     PORT: String(PORT),
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -93,6 +95,7 @@ try {
     { path: "/practice",      name: "practice" },
     { path: "/instructions",  name: "instructions" },
     { path: "/live",          name: "live" },
+    { path: "/tokens",        name: "token-usage" },
   ];
 
   const filtered = pageFilter
@@ -129,6 +132,39 @@ try {
       }
 
       const outPath = resolve(SCREENSHOTS_DIR, `${p.name}.png`);
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+      continue;
+    }
+
+    // Token Usage page: capture Overview tab + Optimization tab
+    if (p.name === "token-usage") {
+      console.log("📸 Capturing token-usage (Overview tab)…");
+      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(2500);
+      let outPath = resolve(SCREENSHOTS_DIR, "token-usage.png");
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+
+      // Capture the Optimization tab
+      console.log("📸 Capturing token-optimization (Optimization tab)…");
+      const optimTab = page.locator("button", { hasText: "Optimization" });
+      if (await optimTab.count()) {
+        await optimTab.click();
+        await page.waitForTimeout(2000);
+      }
+      outPath = resolve(SCREENSHOTS_DIR, "token-optimization.png");
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+
+      // Capture the Models tab
+      console.log("📸 Capturing token-models (Models tab)…");
+      const modelsTab = page.locator("button", { hasText: "Models" });
+      if (await modelsTab.count()) {
+        await modelsTab.click();
+        await page.waitForTimeout(2000);
+      }
+      outPath = resolve(SCREENSHOTS_DIR, "token-models.png");
       await page.screenshot({ path: outPath, fullPage: false });
       console.log(`   → ${outPath}`);
       continue;
@@ -256,7 +292,18 @@ async function recordFullDemoGif(browser, baseUrl) {
     console.warn("⚠️  Practice textarea not found — skipping typing scene");
   }
 
-  // ── Scene 7: Live Monitor ─────────────────────────────────────
+  // ── Scene 7: Token Usage ───────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/tokens`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2500);
+
+  // Switch to Optimization tab
+  const optimTab = gifPage.locator("button", { hasText: "Optimization" });
+  if (await optimTab.count()) {
+    await optimTab.click();
+    await gifPage.waitForTimeout(2000);
+  }
+
+  // ── Scene 8: Live Monitor ─────────────────────────────────────
   await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 

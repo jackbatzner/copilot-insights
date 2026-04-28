@@ -38,6 +38,7 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
+- 💰 **Token usage & cost** — Track spend by model, get optimization tips, budget projections
 - 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
 - ♿ **Accessible** — Keyboard navigation, ARIA attributes, focus-visible styles
 
@@ -125,7 +126,7 @@ First-time users are greeted with a **Welcome walkthrough** that explains what t
   <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
 </p>
 
-The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Practice Lab, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions) groups:
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Practice Lab, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions, Token Usage) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
@@ -170,6 +171,18 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
 
+**Token Usage** — track spend by model, estimated costs, and usage trends
+
+<img src="docs/screenshots/token-usage.png" alt="Token Usage overview" width="800" />
+
+**Token Optimization** — personalized cost-saving tips, model recommendations, and savings plan
+
+<img src="docs/screenshots/token-optimization.png" alt="Token Optimization" width="800" />
+
+**Token Models** — per-model breakdown with costs and usage distribution
+
+<img src="docs/screenshots/token-models.png" alt="Token Models" width="800" />
+
 </details>
 
 ### Pages
@@ -184,6 +197,7 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
 - **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
+- **Token Usage** — 5-tab dashboard (Overview, Models, Cost Insights, Budget, Optimization) tracking token spend by model, personalized cost-saving insights, model recommendations, budget projections, and live pricing from GitHub docs
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
 
@@ -221,13 +235,19 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 
 ## How It Works
 
-The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results.
+The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads JSONL event files from `~/.copilot/session-state/` which contain real model and token count data.
 
 ```
 ~/.copilot/session-store.db (read-only)
   → Read user messages from turns table
   → Match against 30+ correction patterns
   → Categorize and aggregate
+
+~/.copilot/session-state/*/events.jsonl (read-only)
+  → Read real token usage & model data
+  → Estimate costs using official GitHub Copilot pricing
+  → Generate personalized optimization tips
+
   → Serve via Express API → React dashboard
 ```
 
@@ -263,13 +283,16 @@ This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Ac
 graph LR
     subgraph "Data Source"
         DB[(~/.copilot/session-store.db)]
+        JSONL[(~/.copilot/session-state/*.jsonl)]
     end
 
     subgraph "Analysis Engine"
         DB -->|read-only| Analyzer[analyzer.mjs]
+        JSONL -->|token data| Tokens[tokens.mjs]
         Analyzer --> Patterns[30+ regex patterns]
         Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
+        Tokens --> TokenAnalytics[token-analytics.mjs]
         Patterns --> Practice[practice.mjs]
         DB -->|polling| LiveFeed[/api/live/feed]
         LiveFeed --> Patterns
@@ -279,6 +302,7 @@ graph LR
         Analyzer --> API[Express API :3002]
         Practice --> API
         LiveFeed --> API
+        TokenAnalytics --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
         CLI --> Tools[7 insights_* tools]
@@ -299,11 +323,13 @@ copilot-insights/
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
 │   ├── dev-plan.mjs       # Personalized coaching
+│   ├── tokens.mjs         # Token usage estimation, JSONL reader, model pricing, live pricing fetch
+│   ├── token-analytics.mjs # Cost insights, model recommendations, personalized savings plan
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
 │   └── index.mjs          # Express API + static UI
 ├── ui/src/
-│   ├── pages/             # Welcome, Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor
+│   ├── pages/             # Welcome, Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor, TokenUsage
 │   └── components/        # Charts, badges, timeline, insights, CollapsibleSection, NavGroup, SinceLastVisit
 ├── docs/
 │   └── prompting-resources.md  # Official guides, academic papers, scoring reference
