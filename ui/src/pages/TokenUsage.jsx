@@ -474,8 +474,14 @@ function TipsTab({ data, livePricing }) {
   const hasRecs = data?.modelRecommendations?.length > 0;
   const hasGuide = data?.modelGuide?.length > 0 || (livePricing?.models && Object.keys(livePricing.models).length > 0);
   const complexity = data?.sessionComplexity;
+  const insights = data?.personalInsights;
+  const hasSavingsActions = insights?.savingsActions?.length > 0;
+  const hasModelMismatches = insights?.modelMismatches?.length > 0;
+  const hasHighCost = insights?.highCostSessions?.length > 0;
+  const hasContextBloat = insights?.contextBloat?.length > 0;
+  const hasInsights = hasSavingsActions || hasModelMismatches || hasHighCost || hasContextBloat;
 
-  if (!hasTips && !hasRecs && !hasGuide) {
+  if (!hasTips && !hasRecs && !hasGuide && !hasInsights) {
     return (
       <div className="card" style={{ padding: "1.5rem", textAlign: "center" }}>
         <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>✨</div>
@@ -492,17 +498,164 @@ function TipsTab({ data, livePricing }) {
 
   return (
     <>
+      {/* Summary stats */}
       {data?.summary && (
         <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.75rem", marginBottom: "1rem" }}>
           <StatCard label="Waste Rate" value={`${data.summary.wasteRate}%`} sub="tokens on redirections" />
           <StatCard label="Productive %" value={`${data.summary.productiveRatio}%`} sub="of turns are productive" />
           <StatCard label="Token ROI" value={data.summary.tokenROI} sub="file ops / 1K tokens" />
+          {insights?.totalPotentialSavings > 0 && (
+            <StatCard label="Potential Savings" value={formatCost(insights.totalPotentialSavings)} sub={`across ${insights.savingsActions?.length || 0} actions`} />
+          )}
         </div>
+      )}
+
+      {/* Personalized Savings Action Plan — the headline section */}
+      {hasSavingsActions && (
+        <CollapsibleSection title="💰 Your Savings Plan" defaultOpen>
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+            Based on your usage, here are specific actions to reduce cost — ordered by impact.
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {insights.savingsActions.map((action, i) => (
+              <div key={i} className="card" style={{ padding: "1rem", borderLeft: "4px solid #22c55e" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.25rem" }}>
+                    {action.icon} {action.action}
+                  </div>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#22c55e", whiteSpace: "nowrap", marginLeft: "1rem" }}>
+                    Save ~{formatCost(action.estimatedSavings)}
+                  </div>
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                  {action.detail}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                  Affects {action.sessions} session(s)
+                </div>
+              </div>
+            ))}
+          </div>
+          {insights.totalPotentialSavings > 0 && (
+            <div className="card" style={{ padding: "0.75rem 1rem", marginTop: "0.75rem", background: "rgba(34, 197, 94, 0.06)", border: "1px solid rgba(34, 197, 94, 0.2)", textAlign: "center" }}>
+              <strong style={{ color: "#22c55e" }}>Total potential savings: {formatCost(insights.totalPotentialSavings)}</strong>
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
+
+      {/* Model mismatch detection */}
+      {hasModelMismatches && (
+        <CollapsibleSection title={`⚠️ Model Mismatch — ${insights.modelMismatches.length} Session(s)`}>
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+            These sessions used an expensive model for a task that a cheaper one could handle.
+          </div>
+          <div className="table-container">
+            <table className="data-table" style={{ fontSize: "0.85rem" }}>
+              <thead>
+                <tr>
+                  <th>Session</th>
+                  <th>Used Model</th>
+                  <th>Cost</th>
+                  <th>Recommended</th>
+                  <th>Would Cost</th>
+                  <th>Savings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.modelMismatches.map((m) => (
+                  <tr key={m.sessionId}>
+                    <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <a href={`/sessions/${m.sessionId}`}>{m.summary}</a>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{m.turnCount} turns, {m.fileCount} files</div>
+                    </td>
+                    <td><span style={{ color: "#ef4444" }}>{m.currentModel}</span></td>
+                    <td>{formatCost(m.currentCost)}</td>
+                    <td><span style={{ color: "#22c55e" }}>{m.recommendedModel}</span></td>
+                    <td>{formatCost(m.potentialCost)}</td>
+                    <td style={{ color: "#22c55e", fontWeight: 600 }}>{formatCost(m.savings)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* High-cost sessions */}
+      {hasHighCost && (
+        <CollapsibleSection title={`🔥 High-Cost Sessions — Top ${insights.highCostSessions.length}`}>
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+            Your most expensive sessions and why they cost so much.
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {insights.highCostSessions.map((s) => (
+              <div key={s.sessionId} className="card" style={{ padding: "0.75rem 1rem", borderLeft: "4px solid #f59e0b" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <a href={`/sessions/${s.sessionId}`} style={{ fontWeight: 600 }}>{s.summary}</a>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 2 }}>
+                      {s.turnCount} turns · {formatTokens(s.tokens)} tokens · {s.model !== "unknown" ? s.model : "unknown model"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "1rem", fontWeight: 700, color: "#f59e0b", whiteSpace: "nowrap" }}>
+                    {formatCost(s.cost)}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+                  {s.reasons.map((r, i) => (
+                    <span key={i} style={{ fontSize: "0.75rem", padding: "2px 8px", borderRadius: 12, background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#f59e0b" }}>
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Context growth detection */}
+      {hasContextBloat && (
+        <CollapsibleSection title="📈 Context Growth Detected">
+          <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+            These sessions show token usage growing significantly as the conversation progressed — a sign of context accumulation.
+            Consider starting new sessions for new subtasks to keep context lean.
+          </div>
+          <div className="table-container">
+            <table className="data-table" style={{ fontSize: "0.85rem" }}>
+              <thead>
+                <tr>
+                  <th>Session</th>
+                  <th>Turns</th>
+                  <th>Early Avg</th>
+                  <th>Late Avg</th>
+                  <th>Growth</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.contextBloat.map((s) => (
+                  <tr key={s.sessionId}>
+                    <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <a href={`/sessions/${s.sessionId}`}>{s.summary}</a>
+                    </td>
+                    <td>{s.turnCount}</td>
+                    <td>{formatTokens(s.firstQuarterAvg)}/turn</td>
+                    <td>{formatTokens(s.lastQuarterAvg)}/turn</td>
+                    <td style={{ color: "#ef4444", fontWeight: 600 }}>{s.growthRatio}×</td>
+                    <td>{formatCost(s.cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CollapsibleSection>
       )}
 
       {/* Session complexity breakdown */}
       {complexity && complexity.total > 0 && (
-        <CollapsibleSection title="Your Session Complexity" defaultOpen>
+        <CollapsibleSection title="Your Session Complexity" defaultOpen={!hasInsights}>
           <div style={{ display: "flex", gap: "1rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
             {[
               { label: "Simple", count: complexity.simple, desc: "≤3 turns, ≤2 files", color: "#22c55e", rec: "Lightweight models" },
@@ -522,7 +675,7 @@ function TipsTab({ data, livePricing }) {
 
       {/* Model recommendations based on usage */}
       {hasRecs && (
-        <CollapsibleSection title="🤖 Model Recommendations" defaultOpen>
+        <CollapsibleSection title="🤖 Model Recommendations" defaultOpen={!hasInsights}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {data.modelRecommendations.map((rec) => (
               <div key={rec.id} className="card" style={{ padding: "1rem", borderLeft: `4px solid ${rec.id.includes("lightweight") ? "#22c55e" : rec.id.includes("powerful") ? "#ef4444" : "#6366f1"}` }}>
@@ -550,7 +703,7 @@ function TipsTab({ data, livePricing }) {
 
       {/* Optimization tips */}
       {hasTips && (
-        <CollapsibleSection title="💡 Optimization Tips" defaultOpen>
+        <CollapsibleSection title="💡 Optimization Tips" defaultOpen={!hasInsights}>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {data.tips.map((tip) => (
               <div key={tip.id} className="card" style={{ padding: "1rem", borderLeft: "4px solid #f59e0b" }}>
