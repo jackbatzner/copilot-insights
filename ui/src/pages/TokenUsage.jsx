@@ -129,6 +129,9 @@ export default function TokenUsage() {
           ✅ Using <strong>real token data</strong> from Copilot session files where available. Some sessions may fall back to estimates.
         </div>
       )}
+      <div style={{ margin: "0 0 0.75rem", padding: "0.5rem 1rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
+        💰 Cost estimates use <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot per-token pricing</a> (1 AI credit = $0.01). Your actual spend depends on your plan&apos;s included allowance.
+      </div>
 
       {/* Hero Stats */}
       <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.75rem", marginBottom: "1.5rem" }}>

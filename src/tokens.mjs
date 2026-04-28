@@ -100,39 +100,54 @@ export function estimateTokens(text) {
 }
 
 // ── Model Pricing ────────────────────────────────────────────
-// Prices per 1M tokens (USD). Based on publicly listed API pricing.
-// These are approximate and may change — used for directional estimates only.
+// Prices per 1M tokens (USD) — from GitHub Copilot official pricing:
+// https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing
+// 1 AI credit = $0.01 USD. These are the per-token rates for usage-based billing.
 
 export const MODEL_PRICING = {
-  // Claude models
-  "claude-opus-4.7":       { input: 15.00, output: 75.00, cachedInput: 1.50 },
-  "claude-opus-4.6":       { input: 15.00, output: 75.00, cachedInput: 1.50 },
-  "claude-opus-4.5":       { input: 15.00, output: 75.00, cachedInput: 1.50 },
-  "claude-sonnet-4.6":     { input: 3.00,  output: 15.00, cachedInput: 0.30 },
-  "claude-sonnet-4.5":     { input: 3.00,  output: 15.00, cachedInput: 0.30 },
-  "claude-sonnet-4":       { input: 3.00,  output: 15.00, cachedInput: 0.30 },
-  "claude-haiku-4.5":      { input: 0.80,  output: 4.00,  cachedInput: 0.08 },
-  // GPT models
-  "gpt-5.4":               { input: 2.50,  output: 10.00, cachedInput: 0.63 },
-  "gpt-5.4-mini":          { input: 0.40,  output: 1.60,  cachedInput: 0.10 },
-  "gpt-5.3-codex":         { input: 2.50,  output: 10.00, cachedInput: 0.63 },
-  "gpt-5.2-codex":         { input: 2.50,  output: 10.00, cachedInput: 0.63 },
-  "gpt-5.2":               { input: 2.50,  output: 10.00, cachedInput: 0.63 },
-  "gpt-5-mini":            { input: 0.40,  output: 1.60,  cachedInput: 0.10 },
-  "gpt-4.1":               { input: 2.00,  output: 8.00,  cachedInput: 0.50 },
+  // OpenAI models
+  "gpt-4.1":               { input: 2.00,  output: 8.00,   cachedInput: 0.50 },
+  "gpt-5-mini":            { input: 0.25,  output: 2.00,   cachedInput: 0.025 },
+  "gpt-5.2":               { input: 1.75,  output: 14.00,  cachedInput: 0.175 },
+  "gpt-5.2-codex":         { input: 1.75,  output: 14.00,  cachedInput: 0.175 },
+  "gpt-5.3-codex":         { input: 1.75,  output: 14.00,  cachedInput: 0.175 },
+  "gpt-5.4":               { input: 2.50,  output: 15.00,  cachedInput: 0.25 },
+  "gpt-5.4-mini":          { input: 0.75,  output: 4.50,   cachedInput: 0.075 },
+  "gpt-5.4-nano":          { input: 0.20,  output: 1.25,   cachedInput: 0.02 },
+  "gpt-5.5":               { input: 5.00,  output: 30.00,  cachedInput: 0.50 },
+  // Anthropic models (also have cacheWrite cost, tracked separately)
+  "claude-haiku-4.5":      { input: 1.00,  output: 5.00,   cachedInput: 0.10, cacheWrite: 1.25 },
+  "claude-sonnet-4":       { input: 3.00,  output: 15.00,  cachedInput: 0.30, cacheWrite: 3.75 },
+  "claude-sonnet-4.5":     { input: 3.00,  output: 15.00,  cachedInput: 0.30, cacheWrite: 3.75 },
+  "claude-sonnet-4.6":     { input: 3.00,  output: 15.00,  cachedInput: 0.30, cacheWrite: 3.75 },
+  "claude-opus-4.5":       { input: 5.00,  output: 25.00,  cachedInput: 0.50, cacheWrite: 6.25 },
+  "claude-opus-4.6":       { input: 5.00,  output: 25.00,  cachedInput: 0.50, cacheWrite: 6.25 },
+  "claude-opus-4.7":       { input: 5.00,  output: 25.00,  cachedInput: 0.50, cacheWrite: 6.25 },
+  // Google models
+  "gemini-2.5-pro":        { input: 1.25,  output: 10.00,  cachedInput: 0.125 },
+  "gemini-3-flash":        { input: 0.50,  output: 3.00,   cachedInput: 0.05 },
+  "gemini-3.1-pro":        { input: 2.00,  output: 12.00,  cachedInput: 0.20 },
+  // xAI models
+  "grok-code-fast-1":      { input: 0.20,  output: 1.50,   cachedInput: 0.02 },
+  // Fine-tuned (GitHub) models
+  "raptor-mini":           { input: 0.25,  output: 2.00,   cachedInput: 0.025 },
+  "goldeneye":             { input: 1.25,  output: 10.00,  cachedInput: 0.125 },
 };
 
-// Fallback pricing for unknown models (mid-tier estimate)
+// Fallback for unknown models — uses mid-tier Sonnet-class pricing
 const DEFAULT_PRICING = { input: 3.00, output: 15.00, cachedInput: 0.30 };
 
 /**
  * Get pricing for a model, with fallback for unknown models.
+ * "auto" resolves to default pricing since the actual model isn't known.
  */
 export function getModelPricing(model) {
-  if (!model) return DEFAULT_PRICING;
-  // Try exact match, then prefix match (e.g., "claude-sonnet-4.6" matches "claude-sonnet-4.6")
-  if (MODEL_PRICING[model]) return MODEL_PRICING[model];
-  const key = Object.keys(MODEL_PRICING).find((k) => model.startsWith(k));
+  if (!model || model === "auto" || model === "unknown") return DEFAULT_PRICING;
+  // Normalize: lowercase, trim
+  const normalized = model.toLowerCase().trim();
+  if (MODEL_PRICING[normalized]) return MODEL_PRICING[normalized];
+  // Prefix match (e.g., "claude-sonnet-4.6-xxx" matches "claude-sonnet-4.6")
+  const key = Object.keys(MODEL_PRICING).find((k) => normalized.startsWith(k));
   return key ? MODEL_PRICING[key] : DEFAULT_PRICING;
 }
 
