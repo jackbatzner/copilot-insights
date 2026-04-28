@@ -34,7 +34,7 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
-import { analyzeSessionTokens, analyzeTokensBatch } from "../src/tokens.mjs";
+import { analyzeSessionTokens, analyzeTokensBatch, fetchLivePricing, getLivePricingOrFallback } from "../src/tokens.mjs";
 import {
   tokensByModel,
   tokensPerRedirection,
@@ -1006,6 +1006,19 @@ function generateInsights(analysisResult, topPatterns) {
 }
 
 // -- Token Usage & Cost endpoints ---------------------------
+
+/**
+ * GET /api/tokens/pricing
+ * Live pricing from GitHub Copilot docs (cached 1h), falls back to hardcoded.
+ */
+app.get("/api/tokens/pricing", async (req, res) => {
+  try {
+    await fetchLivePricing(); // populate cache if stale
+    res.json(getLivePricingOrFallback());
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/pricing");
+  }
+});
 
 /**
  * GET /api/tokens/summary

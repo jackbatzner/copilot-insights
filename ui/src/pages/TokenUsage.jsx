@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+  fetchTokenPricing,
   fetchTokenSummary,
   fetchTokensByModel,
   fetchTokenTrends,
@@ -54,9 +55,15 @@ export default function TokenUsage() {
   const [correlations, setCorrelations] = useState(null);
   const [budget, setBudget] = useState(null);
   const [tips, setTips] = useState(null);
+  const [livePricing, setLivePricing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
+
+  // Fetch live pricing once on mount (not per timeframe change)
+  useEffect(() => {
+    fetchTokenPricing().then(setLivePricing).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,7 +170,7 @@ export default function TokenUsage() {
       </TabPanel>
 
       <TabPanel id="tips" activeTab={tab}>
-        <TipsTab data={tips} />
+        <TipsTab data={tips} livePricing={livePricing} />
       </TabPanel>
     </>
   );
@@ -380,9 +387,15 @@ function CorrelationsTab({ data }) {
     name: `${s.emoji} ${s.style}`,
     avgTokens: s.avgTokensPerSession,
     avgCost: s.avgCostPerSession,
+    totalCost: s.totalCost,
+    totalTokens: s.totalTokens,
     sessions: s.sessions,
     avgRedirections: s.avgRedirectionsPerSession,
   })) || [];
+
+  const classifiedSessions = styleChartData.reduce((sum, s) => sum + s.sessions, 0);
+  const classifiedCost = styleChartData.reduce((sum, s) => sum + s.totalCost, 0);
+  const classifiedTokens = styleChartData.reduce((sum, s) => sum + s.totalTokens, 0);
 
   return (
     <>
@@ -415,7 +428,8 @@ function CorrelationsTab({ data }) {
                 <tr>
                   <th>Style</th>
                   <th>Sessions</th>
-                  <th>Avg Tokens</th>
+                  <th>Total Tokens</th>
+                  <th>Total Cost</th>
                   <th>Avg Cost</th>
                   <th>Avg Redirections</th>
                 </tr>
@@ -425,14 +439,28 @@ function CorrelationsTab({ data }) {
                   <tr key={s.name}>
                     <td><strong>{s.name}</strong></td>
                     <td>{s.sessions}</td>
-                    <td>{formatTokens(s.avgTokens)}</td>
+                    <td>{formatTokens(s.totalTokens)}</td>
+                    <td>{formatCost(s.totalCost)}</td>
                     <td>{formatCost(s.avgCost)}</td>
                     <td>{s.avgRedirections}</td>
                   </tr>
                 ))}
+                <tr style={{ borderTop: "2px solid var(--border)", fontWeight: 600 }}>
+                  <td>Total (classified)</td>
+                  <td>{classifiedSessions}</td>
+                  <td>{formatTokens(classifiedTokens)}</td>
+                  <td>{formatCost(classifiedCost)}</td>
+                  <td>{formatCost(classifiedSessions > 0 ? classifiedCost / classifiedSessions : 0)}</td>
+                  <td>—</td>
+                </tr>
               </tbody>
             </table>
           </div>
+          {classifiedSessions < (data.totalSessions || 0) && (
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+              ℹ️ {(data.totalSessions || 0) - classifiedSessions} sessions with &lt;2 turns were excluded from work style classification. They account for the remaining cost difference from the Overview total.
+            </div>
+          )}
         </CollapsibleSection>
       )}
     </>
@@ -495,10 +523,10 @@ function BudgetTab({ data }) {
 
 // ── Tips Tab ────────────────────────────────────────────────
 
-function TipsTab({ data }) {
+function TipsTab({ data, livePricing }) {
   const hasTips = data?.tips?.length > 0;
   const hasRecs = data?.modelRecommendations?.length > 0;
-  const hasGuide = data?.modelGuide?.length > 0;
+  const hasGuide = data?.modelGuide?.length > 0 || (livePricing?.models && Object.keys(livePricing.models).length > 0);
   const complexity = data?.sessionComplexity;
 
   if (!hasTips && !hasRecs && !hasGuide) {
@@ -601,55 +629,95 @@ function TipsTab({ data }) {
       )}
 
       {/* Model Guide — what's best for what */}
-      {hasGuide && (
-        <CollapsibleSection title="📖 Model Guide — What's Best for What">
-          {["powerful", "versatile", "lightweight"].map((tier) => {
-            const models = data.modelGuide.filter((m) => m.tier === tier);
-            if (models.length === 0) return null;
-            return (
-              <div key={tier} style={{ marginBottom: "1rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: tierColors[tier] }} />
-                  <strong style={{ fontSize: "0.9rem" }}>{tierLabels[tier]}</strong>
-                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                    {tier === "powerful" ? "— complex tasks, architecture, multi-file" : tier === "versatile" ? "— day-to-day coding, balanced cost" : "— quick fixes, simple edits, cheapest"}
-                  </span>
-                </div>
-                <div className="table-container">
-                  <table className="data-table" style={{ fontSize: "0.85rem" }}>
-                    <thead>
-                      <tr>
-                        <th>Model</th>
-                        <th>Vendor</th>
-                        <th>Best For</th>
-                        <th>Input $/M</th>
-                        <th>Output $/M</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {models.map((m) => (
-                        <tr key={m.model} style={data.currentModels?.includes(m.model) ? { background: "rgba(99, 102, 241, 0.08)" } : {}}>
-                          <td>
-                            <strong>{m.model}</strong>
-                            {data.currentModels?.includes(m.model) && <span style={{ fontSize: "0.7rem", marginLeft: 6, color: "#6366f1" }}>✦ in use</span>}
-                          </td>
-                          <td>{m.vendor}</td>
-                          <td style={{ maxWidth: 250 }}>{m.bestFor}</td>
-                          <td>${m.inputCost?.toFixed(2) ?? "—"}</td>
-                          <td>${m.outputCost?.toFixed(2) ?? "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+      {hasGuide && (() => {
+        // Build model list: merge guide info with live pricing when available
+        const liveModels = livePricing?.models || {};
+        const guideModels = data?.modelGuide || [];
+
+        // Create merged entries: start from live pricing if available, overlay guide metadata
+        const guideBySlug = Object.fromEntries(guideModels.map((m) => [m.model?.toLowerCase().replace(/\s+/g, "-"), m]));
+        const allSlugs = new Set([
+          ...Object.keys(liveModels),
+          ...guideModels.map((m) => m.model?.toLowerCase().replace(/\s+/g, "-")),
+        ]);
+
+        const merged = [...allSlugs].map((slug) => {
+          const live = liveModels[slug];
+          const guide = guideBySlug[slug];
+          return {
+            slug,
+            model: guide?.model || slug,
+            vendor: live?.vendor || guide?.vendor || "—",
+            tier: (live?.category || guide?.tier || "versatile").toLowerCase(),
+            bestFor: guide?.bestFor || guide?.strengths || "—",
+            input: live?.input ?? guide?.inputCost,
+            output: live?.output ?? guide?.outputCost,
+            cachedInput: live?.cachedInput,
+            cacheWrite: live?.cacheWrite,
+          };
+        });
+
+        const isLive = livePricing?.source === "live";
+        const fetchedAt = livePricing?.fetchedAt ? new Date(livePricing.fetchedAt).toLocaleString() : null;
+
+        return (
+          <CollapsibleSection title="📖 Model Guide — What's Best for What">
+            {isLive && (
+              <div style={{ fontSize: "0.8rem", color: "#22c55e", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
+                Live pricing ({merged.length} models) · updated {fetchedAt}
               </div>
-            );
-          })}
-          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
-            Pricing from <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot docs</a>. 1 AI credit = $0.01. Actual cost depends on plan.
-          </div>
-        </CollapsibleSection>
-      )}
+            )}
+            {["powerful", "versatile", "lightweight"].map((tier) => {
+              const models = merged.filter((m) => m.tier === tier);
+              if (models.length === 0) return null;
+              return (
+                <div key={tier} style={{ marginBottom: "1rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: tierColors[tier] }} />
+                    <strong style={{ fontSize: "0.9rem" }}>{tierLabels[tier]}</strong>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                      {tier === "powerful" ? "— complex tasks, architecture, multi-file" : tier === "versatile" ? "— day-to-day coding, balanced cost" : "— quick fixes, simple edits, cheapest"}
+                    </span>
+                  </div>
+                  <div className="table-container">
+                    <table className="data-table" style={{ fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr>
+                          <th>Model</th>
+                          <th>Vendor</th>
+                          <th>Best For</th>
+                          <th>Input $/M</th>
+                          <th>Cached $/M</th>
+                          <th>Output $/M</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {models.map((m) => (
+                          <tr key={m.slug} style={data?.currentModels?.includes(m.slug) ? { background: "rgba(99, 102, 241, 0.08)" } : {}}>
+                            <td>
+                              <strong>{m.model}</strong>
+                              {data?.currentModels?.includes(m.slug) && <span style={{ fontSize: "0.7rem", marginLeft: 6, color: "#6366f1" }}>✦ in use</span>}
+                            </td>
+                            <td>{m.vendor}</td>
+                            <td style={{ maxWidth: 250 }}>{m.bestFor}</td>
+                            <td>{m.input != null ? `$${m.input.toFixed(2)}` : "—"}</td>
+                            <td>{m.cachedInput != null ? `$${m.cachedInput.toFixed(3)}` : "—"}</td>
+                            <td>{m.output != null ? `$${m.output.toFixed(2)}` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+              {isLive ? "Live pricing" : "Hardcoded pricing"} from <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot docs</a>. 1 AI credit = $0.01. Actual cost depends on plan.
+            </div>
+          </CollapsibleSection>
+        );
+      })()}
     </>
   );
 }

@@ -103,6 +103,7 @@ export function estimateTokens(text) {
 // Prices per 1M tokens (USD) — from GitHub Copilot official pricing:
 // https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing
 // 1 AI credit = $0.01 USD. These are the per-token rates for usage-based billing.
+// Hardcoded as fallback; fetchLivePricing() fetches live data on page load.
 
 export const MODEL_PRICING = {
   // OpenAI models
@@ -136,6 +137,198 @@ export const MODEL_PRICING = {
 
 // Fallback for unknown models — uses mid-tier Sonnet-class pricing
 const DEFAULT_PRICING = { input: 3.00, output: 15.00, cachedInput: 0.30 };
+
+// ── Live Pricing Fetcher ─────────────────────────────────────
+// Fetches current pricing from GitHub Copilot docs on page load.
+// Caches for 1 hour. Falls back to hardcoded MODEL_PRICING on failure.
+
+const PRICING_URL = "https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing";
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+let livePricingCache = null;
+let livePricingFetchedAt = 0;
+
+/**
+ * Normalize a display model name to a slug (e.g., "Claude Sonnet 4.6" → "claude-sonnet-4.6").
+ */
+function normalizeModelName(displayName) {
+  return displayName
+    .replace(/\[.*?\]/g, "")   // remove footnote refs like [1]
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
+/**
+ * Parse pricing tables from the GitHub docs page (HTML or simplified text).
+ * Handles both raw HTML (<td>$2.50</td>) and simplified markdown text.
+ * Standard columns: Model | Release status | Category | Input | Cached input | Output
+ * Anthropic adds: Cache write between Cached input and Output.
+ */
+function parsePricingFromPage(text) {
+  const models = {};
+
+  // Normalize HTML entities: $ → $, etc.
+  const normalized = text
+    .replace(/&#?\w+;/g, (m) => {
+      if (m === "$" || m === "$") return "$";
+      if (m === "&amp;") return "&";
+      if (m === "&lt;") return "<";
+      if (m === "&gt;") return ">";
+      return m;
+    });
+
+  // Find the pricing tables section — use heading ids to skip nav sidebars
+  let pricingStart = normalized.indexOf('id="pricing-tables"');
+  if (pricingStart === -1) pricingStart = normalized.lastIndexOf("Pricing tables");
+  if (pricingStart === -1) return null;
+  let pricingEnd = normalized.indexOf('id="code-completions"', pricingStart);
+  if (pricingEnd === -1) pricingEnd = normalized.indexOf("Code completions", pricingStart + 100);
+  const section = normalized.slice(pricingStart, pricingEnd > 0 ? pricingEnd : undefined);
+
+  const vendors = [
+    { name: "OpenAI", hasCacheWrite: false },
+    { name: "Anthropic", hasCacheWrite: true },
+    { name: "Google", hasCacheWrite: false },
+    { name: "xAI", hasCacheWrite: false },
+    { name: "Fine-tuned", hasCacheWrite: false },
+  ];
+
+  // Extract table rows — works for both HTML <tr>...</tr> and text lines
+  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellPattern = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+
+  for (const vendor of vendors) {
+    const vendorIdx = section.indexOf(vendor.name);
+    if (vendorIdx === -1) continue;
+
+    let endIdx = section.length;
+    for (const other of vendors) {
+      if (other.name === vendor.name) continue;
+      const otherIdx = section.indexOf(other.name, vendorIdx + vendor.name.length);
+      if (otherIdx > 0 && otherIdx < endIdx) endIdx = otherIdx;
+    }
+
+    const vendorSection = section.slice(vendorIdx, endIdx);
+
+    // Try HTML table parsing first
+    const rows = [...vendorSection.matchAll(rowPattern)];
+    if (rows.length > 0) {
+      for (const row of rows) {
+        const cells = [...row[1].matchAll(cellPattern)].map(
+          (c) => c[1].replace(/<sup[\s\S]*?<\/sup>/gi, "").replace(/<[^>]+>/g, "").trim()
+        );
+        if (cells.length < 6) continue;
+
+        const modelName = cells[0];
+        const category = cells[2];
+        const prices = cells.slice(3).map((c) => {
+          const m = c.match(/\$?([\d.]+)/);
+          return m ? parseFloat(m[1]) : null;
+        }).filter((p) => p !== null);
+
+        if (prices.length < 3 || !modelName || modelName.length < 3) continue;
+        const slug = normalizeModelName(modelName);
+        const cat = ["powerful", "versatile", "lightweight"].includes(category?.toLowerCase())
+          ? category.toLowerCase() : null;
+
+        if (vendor.hasCacheWrite && prices.length >= 4) {
+          models[slug] = { input: prices[0], cachedInput: prices[1], cacheWrite: prices[2], output: prices[3], vendor: vendor.name, category: cat };
+        } else {
+          models[slug] = { input: prices[0], cachedInput: prices[1], output: prices[2], vendor: vendor.name, category: cat };
+        }
+      }
+    } else {
+      // Fallback: text-based parsing (simplified markdown)
+      const pricePattern = /\$(\d+\.?\d*)/g;
+      for (const line of vendorSection.split("\n")) {
+        const prices = [];
+        let match;
+        while ((match = pricePattern.exec(line)) !== null) prices.push(parseFloat(match[1]));
+        pricePattern.lastIndex = 0;
+        if (prices.length < 3) continue;
+
+        const statusWords = ["GA", "Public preview", "Preview", "Beta"];
+        let mn = line;
+        for (const sw of statusWords) { const idx = mn.indexOf(sw); if (idx > 0) { mn = mn.slice(0, idx); break; } }
+        mn = mn.replace(/\[.*?\]/g, "").replace(/\d+$/, "").trim();
+        if (!mn || mn.length < 3) continue;
+
+        const slug = normalizeModelName(mn);
+        const categories = ["Powerful", "Versatile", "Lightweight"];
+        let cat = null;
+        for (const c of categories) { if (line.includes(c)) { cat = c.toLowerCase(); break; } }
+
+        if (vendor.hasCacheWrite && prices.length >= 4) {
+          models[slug] = { input: prices[0], cachedInput: prices[1], cacheWrite: prices[2], output: prices[3], vendor: vendor.name, category: cat };
+        } else {
+          models[slug] = { input: prices[0], cachedInput: prices[1], output: prices[2], vendor: vendor.name, category: cat };
+        }
+      }
+    }
+  }
+
+  return Object.keys(models).length > 0 ? models : null;
+}
+
+/**
+ * Fetch live pricing from GitHub docs. Returns parsed models or null on failure.
+ * Results are cached for 1 hour.
+ */
+export async function fetchLivePricing() {
+  const now = Date.now();
+  if (livePricingCache && (now - livePricingFetchedAt) < CACHE_TTL_MS) {
+    return livePricingCache;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const resp = await fetch(PRICING_URL, {
+      signal: controller.signal,
+      headers: { "Accept": "text/html", "User-Agent": "copilot-insights/1.0" },
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    const parsed = parsePricingFromPage(html);
+    if (parsed && Object.keys(parsed).length >= 5) {
+      livePricingCache = {
+        models: parsed,
+        fetchedAt: new Date().toISOString(),
+        source: PRICING_URL,
+        modelCount: Object.keys(parsed).length,
+      };
+      livePricingFetchedAt = now;
+      return livePricingCache;
+    }
+  } catch { /* fetch failed — use fallback */ }
+  return null;
+}
+
+/**
+ * Get the current effective pricing table.
+ * Returns live pricing if available, otherwise the hardcoded fallback.
+ */
+export function getLivePricingOrFallback() {
+  if (livePricingCache) {
+    return {
+      models: livePricingCache.models,
+      source: "live",
+      fetchedAt: livePricingCache.fetchedAt,
+      url: PRICING_URL,
+    };
+  }
+  return {
+    models: MODEL_PRICING,
+    source: "hardcoded",
+    fetchedAt: null,
+    url: PRICING_URL,
+  };
+}
 
 /**
  * Get pricing for a model, with fallback for unknown models.

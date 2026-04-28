@@ -211,6 +211,10 @@ export async function fetchLiveFeed(since) {
 
 // -- Token Usage & Cost -----------------------------------
 
+export async function fetchTokenPricing() {
+  return safeFetch(`${API_BASE}/tokens/pricing`);
+}
+
 export async function fetchTokenSummary(timeframe, repo) {
   return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`);
 }
