@@ -143,7 +143,7 @@ const DEFAULT_PRICING = { input: 3.00, output: 15.00, cachedInput: 0.30 };
 // Caches for 1 hour. Falls back to hardcoded MODEL_PRICING on failure.
 
 const PRICING_URL = "https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing";
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 let livePricingCache = null;
 let livePricingFetchedAt = 0;
