@@ -34,6 +34,17 @@ import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 
+import { analyzeSessionTokens, analyzeTokensBatch, fetchLivePricing, getLivePricingOrFallback } from "../src/tokens.mjs";
+import {
+  tokensByModel,
+  tokensPerRedirection,
+  tokensByWorkStyle,
+  tokenEfficiencyMetrics,
+  tokenTrends,
+  budgetProjection,
+  promptOptimizationTips,
+} from "../src/token-analytics.mjs";
+
 import { listSessions, getSessionTurns, getSessionRefs, getDb } from "../src/db.mjs";
 import { matchPatterns, REDIRECTION_CATEGORIES } from "../src/patterns.mjs";
 import { analyzePrompt } from "../src/practice.mjs";
@@ -993,6 +1004,153 @@ function generateInsights(analysisResult, topPatterns) {
 
   return insights;
 }
+
+// -- Token Usage & Cost endpoints ---------------------------
+
+/**
+ * GET /api/tokens/pricing
+ * Live pricing from GitHub Copilot docs (cached 1h), falls back to hardcoded.
+ */
+app.get("/api/tokens/pricing", async (req, res) => {
+  try {
+    await fetchLivePricing(); // populate cache if stale
+    res.json(getLivePricingOrFallback());
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/pricing");
+  }
+});
+
+/**
+ * GET /api/tokens/summary
+ * Aggregate token usage: total in/out, by model, estimated cost.
+ */
+app.get("/api/tokens/summary", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(analyzeTokensBatch({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/summary");
+  }
+});
+
+/**
+ * GET /api/tokens/by-model
+ * Per-model token breakdown with costs.
+ */
+app.get("/api/tokens/by-model", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(tokensByModel({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/by-model");
+  }
+});
+
+/**
+ * GET /api/tokens/trends
+ * Weekly token usage trends.
+ */
+app.get("/api/tokens/trends", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(tokenTrends({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/trends");
+  }
+});
+
+/**
+ * GET /api/tokens/efficiency
+ * Token efficiency metrics: tokens per file op, per redirection, ROI.
+ */
+app.get("/api/tokens/efficiency", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(tokenEfficiencyMetrics({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/efficiency");
+  }
+});
+
+/**
+ * GET /api/tokens/correlations
+ * Token cost correlated with work style, delegation, sprawl, redirections.
+ */
+app.get("/api/tokens/correlations", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    const opts = { repo, since, excludeIds: hiddenSessions };
+    res.json({
+      byWorkStyle: tokensByWorkStyle(opts),
+      byRedirection: tokensPerRedirection(opts),
+    });
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/correlations");
+  }
+});
+
+/**
+ * GET /api/tokens/budget
+ * Budget projection and usage alerts.
+ */
+app.get("/api/tokens/budget", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(budgetProjection({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/budget");
+  }
+});
+
+/**
+ * GET /api/tokens/tips
+ * Prompt optimization tips based on token patterns.
+ */
+app.get("/api/tokens/tips", (req, res) => {
+  try {
+    const repo = validateRepo(req, res);
+    if (repo === null) return;
+    const since = validateTimeframe(req, res);
+    if (since === null) return;
+    res.json(promptOptimizationTips({ repo, since, excludeIds: hiddenSessions }));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/tips");
+  }
+});
+
+/**
+ * GET /api/sessions/:id/tokens
+ * Per-session token breakdown (turn-by-turn).
+ */
+app.get("/api/sessions/:id/tokens", (req, res) => {
+  try {
+    const result = analyzeSessionTokens(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Session not found or has no turns" });
+    }
+    res.json(result);
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/sessions/:id/tokens");
+  }
+});
 
 // -- Live Feed ---------------------------------------------
 /**

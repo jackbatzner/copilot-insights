@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 const DB_PATH = process.env.COPILOT_SESSION_DB || join(homedir(), ".copilot", "session-store.db");
 
 const REQUIRED_TABLES = ["sessions", "turns", "session_files"];
-const OPTIONAL_TABLES = ["session_refs", "checkpoints"];
+const OPTIONAL_TABLES = ["session_refs", "checkpoints", "events"];
 
 let _db = null;
 let _missingOptional = new Set();

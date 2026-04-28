@@ -209,6 +209,44 @@ export async function fetchLiveFeed(since) {
   return safeFetch(`${API_BASE}/live/feed?${params}`);
 }
 
+// -- Token Usage & Cost -----------------------------------
+
+export async function fetchTokenPricing() {
+  return safeFetch(`${API_BASE}/tokens/pricing`);
+}
+
+export async function fetchTokenSummary(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokensByModel(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/by-model?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokenTrends(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/trends?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokenEfficiency(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/efficiency?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokenCorrelations(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/correlations?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokenBudget(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/budget?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchTokenTips(timeframe, repo) {
+  return safeFetch(`${API_BASE}/tokens/tips?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchSessionTokens(id) {
+  return safeFetch(`${API_BASE}/sessions/${id}/tokens`);
+}
+
 export async function fetchHiddenSessions() {
   return safeFetch(`${API_BASE}/hidden-sessions`);
 }

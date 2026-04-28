@@ -13,6 +13,7 @@ import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
+import TokenUsage from "./pages/TokenUsage.jsx";
 import { fetchSessions, clearCache } from "./api.js";
 import { TimeframeProvider } from "./TimeframeContext.jsx";
 
@@ -138,6 +139,10 @@ function App() {
               <NavLink to="/analytics">
                 <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
               </NavLink>
+              <NavLink to="/tokens">
+                <span className="nav-icon">💰</span><span className="nav-label">Token Usage</span>
+                <span className="nav-badge">✨ New</span>
+              </NavLink>
               <NavLink to="/live">
                 <span className="nav-icon">📡</span><span className="nav-label">Live</span>
               </NavLink>
@@ -167,6 +172,7 @@ function App() {
                 <Route path="/learn" element={<Learn />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/live" element={<LiveMonitor />} />
+                <Route path="/tokens" element={<TokenUsage />} />
                 <Route path="/instructions" element={<Instructions />} />
                 <Route path="/sessions" element={<Sessions />} />
                 <Route path="/sessions/:id" element={<SessionDetail />} />

@@ -1,16 +1,19 @@
 #!/usr/bin/env node
-// Generates a mock session-store.db with realistic Copilot CLI session data.
+// Generates a mock session-store.db with realistic Copilot CLI session data
+// and mock JSONL session-state files for token usage screenshots.
 
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, unlinkSync } from "node:fs";
+import { existsSync, unlinkSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = resolve(__dirname, "..", "mock-session-store.db");
+const MOCK_SESSION_STATE = resolve(__dirname, "..", "mock-session-state");
 
 if (existsSync(DB_PATH)) unlinkSync(DB_PATH);
+if (existsSync(MOCK_SESSION_STATE)) rmSync(MOCK_SESSION_STATE, { recursive: true, force: true });
 const db = new Database(DB_PATH);
 
 // ── Schema ──────────────────────────────────────────────────────
@@ -380,4 +383,66 @@ const seedAll = db.transaction(() => {
 seedAll();
 db.close();
 
+// ── Generate mock JSONL session-state files ─────────────────
+// Creates events.jsonl files with realistic token data and model assignments
+// so the Token Usage dashboard shows populated charts and costs.
+
+const models = [
+  "claude-sonnet-4.6",
+  "claude-sonnet-4.5",
+  "claude-haiku-4.5",
+  "claude-opus-4.7",
+  "gpt-5.4",
+  "gpt-5.2",
+  "gpt-5-mini",
+  "gpt-4.1",
+];
+
+// Weight distribution: most sessions use sonnet/gpt-5 class models
+const modelWeights = [0.25, 0.15, 0.10, 0.05, 0.20, 0.10, 0.10, 0.05];
+function pickWeighted(arr, weights) {
+  const r = Math.random();
+  let sum = 0;
+  for (let i = 0; i < weights.length; i++) {
+    sum += weights[i];
+    if (r < sum) return arr[i];
+  }
+  return arr[arr.length - 1];
+}
+
+mkdirSync(MOCK_SESSION_STATE, { recursive: true });
+
+for (const sid of sessionIds) {
+  const sessionDir = resolve(MOCK_SESSION_STATE, sid);
+  mkdirSync(sessionDir, { recursive: true });
+
+  const model = pickWeighted(models, modelWeights);
+  const lines = [];
+
+  // Model change event
+  lines.push(JSON.stringify({
+    type: "session.model_change",
+    data: { newModel: model },
+    timestamp: new Date().toISOString(),
+  }));
+
+  // Generate assistant message events with realistic token counts
+  // Token ranges vary by model tier
+  const isLarge = model.includes("opus") || model.includes("gpt-5.4");
+  const isMini = model.includes("mini") || model.includes("haiku") || model.includes("gpt-4.1");
+  const turnCount = randInt(3, 12);
+
+  for (let t = 0; t < turnCount; t++) {
+    const baseOutput = isMini ? randInt(200, 800) : isLarge ? randInt(800, 3500) : randInt(400, 2000);
+    lines.push(JSON.stringify({
+      type: "assistant.message",
+      data: { outputTokens: baseOutput },
+      timestamp: new Date(Date.now() - (turnCount - t) * 60000).toISOString(),
+    }));
+  }
+
+  writeFileSync(resolve(sessionDir, "events.jsonl"), lines.join("\n") + "\n");
+}
+
 console.log(`✅ Seeded ${sessionCount} sessions → ${DB_PATH}`);
+console.log(`✅ Generated ${sessionIds.length} mock JSONL files → ${MOCK_SESSION_STATE}`);
