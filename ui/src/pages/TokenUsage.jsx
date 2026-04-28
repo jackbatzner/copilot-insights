@@ -734,10 +734,11 @@ function TipsTab({ data, livePricing }) {
         const guideModels = data?.modelGuide || [];
 
         // Create merged entries: start from live pricing if available, overlay guide metadata
-        const guideBySlug = Object.fromEntries(guideModels.map((m) => [m.model?.toLowerCase().replace(/\s+/g, "-"), m]));
+        const validGuideModels = guideModels.filter((m) => m.model);
+        const guideBySlug = Object.fromEntries(validGuideModels.map((m) => [m.model.toLowerCase().replace(/\s+/g, "-"), m]));
         const allSlugs = new Set([
           ...Object.keys(liveModels),
-          ...guideModels.map((m) => m.model?.toLowerCase().replace(/\s+/g, "-")),
+          ...validGuideModels.map((m) => m.model.toLowerCase().replace(/\s+/g, "-")),
         ]);
 
         const merged = [...allSlugs].map((slug) => {

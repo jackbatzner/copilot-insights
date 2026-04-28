@@ -582,7 +582,7 @@ export function personalizedCostInsights({ repo, since, excludeIds } = {}) {
 
   // ── 2. Model mismatch detection ──
   // Flag sessions using expensive models (powerful tier) for simple tasks
-  const modelMismatches = [];
+  let modelMismatches = [];
   for (const sd of sessionDetails) {
     if (sd.complexity !== "simple" && sd.complexity !== "moderate") continue;
     if (!sd.model || sd.model === "unknown" || sd.model === "auto") continue;
@@ -645,12 +645,12 @@ export function personalizedCostInsights({ repo, since, excludeIds } = {}) {
       }
     }
   }
-  modelMismatches.sort((a, b) => b.savings - a.savings);
+  modelMismatches = [...modelMismatches].sort((a, b) => b.savings - a.savings);
 
   // ── 3. High-cost session callouts ──
   const sortedByCost = [...sessionDetails].sort((a, b) => b.estimatedCost - a.estimatedCost);
   const medianCost = sessionDetails.length > 0
-    ? sessionDetails.sort((a, b) => a.estimatedCost - b.estimatedCost)[Math.floor(sessionDetails.length / 2)].estimatedCost
+    ? [...sessionDetails].sort((a, b) => a.estimatedCost - b.estimatedCost)[Math.floor(sessionDetails.length / 2)].estimatedCost
     : 0;
   const highCostThreshold = Math.max(medianCost * 3, 0.05);
   const highCostSessions = sortedByCost
@@ -695,7 +695,7 @@ export function personalizedCostInsights({ repo, since, excludeIds } = {}) {
     }));
 
   // ── 5. Build prioritized savings action plan ──
-  const savingsActions = [];
+  let savingsActions = [];
 
   // Action: model downgrade savings
   const mismatchSavings = modelMismatches.reduce((s, m) => s + m.savings, 0);
@@ -783,7 +783,7 @@ export function personalizedCostInsights({ repo, since, excludeIds } = {}) {
     }
   }
 
-  savingsActions.sort((a, b) => a.priority - b.priority);
+  savingsActions = [...savingsActions].sort((a, b) => a.priority - b.priority);
   const totalPotentialSavings = savingsActions.reduce((s, a) => s + a.estimatedSavings, 0);
 
   return {
