@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchDevPlan, fetchProgressCheck, fetchRetro, fetchInstructionGaps } from "../api.js";
+import { fetchDevPlan, fetchProgressCheck, fetchRetro, fetchInstructionGaps, fetchChronicleTips } from "../api.js";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { useRefresh } from "../App.jsx";
 import { useTimeframe } from "../TimeframeContext.jsx";
@@ -14,6 +14,7 @@ export default function Learn() {
   const [progress, setProgress] = useState(null);
   const [retro, setRetro] = useState(null);
   const [gaps, setGaps] = useState(null);
+  const [tips, setTips] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("plan");
@@ -25,8 +26,9 @@ export default function Learn() {
       fetchProgressCheck(timeframe),
       fetchRetro(timeframe),
       fetchInstructionGaps(timeframe).catch(() => null),
+      fetchChronicleTips(timeframe).catch(() => null),
     ])
-      .then(([p, pr, r, g]) => { setPlan(p); setProgress(pr); setRetro(r); setGaps(g); })
+      .then(([p, pr, r, g, t]) => { setPlan(p); setProgress(pr); setRetro(r); setGaps(g); setTips(t); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [timeframe, refreshKey]);
@@ -36,6 +38,7 @@ export default function Learn() {
 
   const tabs = [
     { id: "plan", label: "🎯 Dev Plan" },
+    { id: "tips", label: "💡 Chronicle Tips" },
     { id: "check", label: "📊 Daily Check" },
     { id: "retro", label: "🔄 Retro" },
     { id: "learn", label: "📚 Resources" },
@@ -53,10 +56,11 @@ export default function Learn() {
 
       {/* Pillar score hero */}
       {plan && (
-        <div className="stats-grid stats-grid-4">
+        <div className="stats-grid stats-grid-5">
           <ScoreCard emoji="🤝" label="Delegation" score={plan.pillarScores.delegation} />
           <ScoreCard emoji="🧠" label="Judgment" score={plan.pillarScores.judgment} />
-          <ScoreCard emoji="💬" label="Feedback" score={plan.pillarScores.feedback} />
+          <ScoreCard emoji="💬" label="Specification" score={plan.pillarScores.specification} />
+          <ScoreCard emoji="⚡" label="Efficiency" score={plan.pillarScores.efficiency} />
           <ScoreCard emoji="⭐" label="Overall" score={plan.pillarScores.overall} highlight />
         </div>
       )}
@@ -70,6 +74,7 @@ export default function Learn() {
       </div>
 
       {tab === "plan" && plan && <DevPlanTab plan={plan} gaps={gaps} />}
+      {tab === "tips" && <ChronicleTipsTab tips={tips} />}
       {tab === "check" && progress && <DailyCheckTab progress={progress} />}
       {tab === "retro" && retro && <RetroTab retro={retro} />}
       {tab === "learn" && plan && <ResourcesTab plan={plan} />}
@@ -91,7 +96,7 @@ function ScoreCard({ emoji, label, score, highlight }) {
       <div className="stat-value" style={{ color, fontSize: 36 }}>{score}</div>
       <div className="stat-label">{label}</div>
       <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-        {label === "Overall" ? "Average of 3 pillars" : "Score out of 100"}
+        {label === "Overall" ? "Average of 4 pillars" : "Score out of 100"}
       </div>
       {score < 80 && <div style={{ fontSize: 10, color: "var(--yellow)" }}>→ Target: 80</div>}
     </div>
@@ -200,6 +205,50 @@ function DevPlanTab({ plan, gaps }) {
   );
 }
 
+/* ── Chronicle Tips Tab ─────────────────────────────────────────── */
+function ChronicleTipsTab({ tips }) {
+  if (!tips || tips.length === 0) {
+    return (
+      <div className="card">
+        <div className="card-header">💡 Chronicle Tips</div>
+        <p style={{ color: "var(--text-muted)", padding: 16 }}>
+          No tips yet — keep using Copilot and check back when you have more sessions.
+        </p>
+      </div>
+    );
+  }
+
+  const pillarEmoji = { specification: "💬", delegation: "🤝", judgment: "🧠", efficiency: "⚡" };
+  const impactColor = { high: "var(--red)", medium: "var(--yellow)", low: "var(--green)" };
+
+  return (
+    <>
+      <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
+        <div className="card-header">💡 Personalized Tips from Chronicle</div>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, padding: "0 16px" }}>
+          Evidence-based suggestions derived from your actual session patterns.
+        </p>
+      </div>
+      {tips.map((tip) => (
+        <div key={tip.id} className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${impactColor[tip.impact] || "var(--border)"}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span>{pillarEmoji[tip.pillar] || "📌"}</span>
+            <span className="pillar-pill" data-pillar={tip.pillar}>{tip.pillar}</span>
+            <strong>{tip.title}</strong>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: impactColor[tip.impact], fontWeight: 600 }}>
+              {tip.impact} impact
+            </span>
+          </div>
+          <p style={{ fontSize: 13, margin: "4px 0" }}>{tip.description}</p>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>
+            📊 {tip.evidence}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 /* ── Daily Check Tab ───────────────────────────────────────────── */
 function DailyCheckTab({ progress }) {
   const { today, baseline, deltas, momentum, tips } = progress;
@@ -216,10 +265,11 @@ function DailyCheckTab({ progress }) {
           </div>
         ) : (
           <>
-            <div className="stats-grid stats-grid-3" style={{ gap: 12, marginBottom: 16 }}>
+            <div className="stats-grid stats-grid-4" style={{ gap: 12, marginBottom: 16 }}>
               <DeltaCard label="Delegation" current={today.delegationScore} delta={deltas.delegation} />
               <DeltaCard label="Judgment" current={today.judgmentScore} delta={deltas.judgment} />
-              <DeltaCard label="Feedback" current={today.feedbackScore} delta={deltas.feedback} />
+              <DeltaCard label="Specification" current={today.specificationScore} delta={deltas.specification} />
+              <DeltaCard label="Efficiency" current={today.efficiencyScore} delta={deltas.efficiency} />
             </div>
             <div className="check-stats">
               <span>📋 {today.sessionCount} sessions</span>

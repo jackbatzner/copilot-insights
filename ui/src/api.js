@@ -258,3 +258,19 @@ export async function hideSession(id) {
 export async function unhideSession(id) {
   return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
 }
+
+// Chronicle
+export async function fetchChronicleTips(timeframe, repo) {
+  return safeFetch(`${API_BASE}/chronicle/tips?${tfParams(timeframe, repo)}`);
+}
+export async function fetchChronicleImprove(sessionId) {
+  return safeFetch(`${API_BASE}/chronicle/improve/${sessionId}`);
+}
+
+// VS Code sessions
+export async function fetchVSCodeSessions() {
+  return safeFetch(`${API_BASE}/vscode/sessions`);
+}
+export async function fetchVSCodeSummary() {
+  return safeFetch(`${API_BASE}/vscode/summary`);
+}

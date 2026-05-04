@@ -238,3 +238,27 @@ describe("GET /api/practice/library", () => {
     }
   });
 });
+
+describe("GET /api/chronicle/tips", () => {
+  it("returns 200 with a tips array", async () => {
+    const { status, body } = await getJSON("/api/chronicle/tips");
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body), "tips response should be an array");
+  });
+});
+
+describe("GET /api/chronicle/improve/:sessionId", () => {
+  it("returns 200 with improve suggestions for a known session", async () => {
+    const { status, body } = await getJSON("/api/chronicle/improve/sess-redirect-1");
+    assert.equal(status, 200);
+    assert.equal(body.sessionId, "sess-redirect-1");
+    assert.ok(Array.isArray(body.suggestions), "suggestions should be an array");
+    assert.equal(typeof body.overallAdvice, "string");
+  });
+
+  it("returns 404 for an unknown session", async () => {
+    const { status, body } = await getJSON("/api/chronicle/improve/does-not-exist");
+    assert.equal(status, 404);
+    assert.ok("error" in body);
+  });
+});

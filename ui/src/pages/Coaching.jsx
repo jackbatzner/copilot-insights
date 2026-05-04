@@ -57,19 +57,19 @@ export default function Coaching() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="coaching">
-        Delegation, Judgment, Feedback — your three AI leadership skills.
+        Specification, Delegation, Judgment, Efficiency — your four AI leadership skills.
       </PageBanner>
 
       {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
         <EmptyState sessionCount={sessionCount} feature="coaching insights" />
       )}
 
-      {/* Three pillars hero */}
-      <div className="stats-grid stats-grid-3">
+      {/* Four pillars hero */}
+      <div className="stats-grid stats-grid-4">
         <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
           <div className="stat-label"><MetricHelp label="🤝 Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." action="Describe WHAT you want, not HOW to do it." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Create Clarity</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>How much autonomy you give</div>
           <div className="stat-sub">work handed off to agent</div>
           <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {delegation?.overallDelegationRatio >= 60 ? "✅ Good delegation" : delegation?.overallDelegationRatio >= 30 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60%+
@@ -79,19 +79,28 @@ export default function Coaching() {
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
           <div className="stat-label"><MetricHelp label="🧠 Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping, avoiding costly late rollbacks." target="70+ is good, 80+ is excellent." action="Review each agent change carefully before approving." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Deliver Success</div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of review decisions</div>
           <div className="stat-sub">review quality / 100</div>
           <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {judgment?.avgScore >= 80 ? "✅ Excellent" : judgment?.avgScore >= 70 ? "✅ Good" : judgment?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
           </div>
         </div>
-        <div className={`stat-card pillar-card ${tab === "feedback" ? "pillar-active" : ""}`} onClick={() => setTab("feedback")} style={{ cursor: "pointer" }}>
+        <div className={`stat-card pillar-card ${tab === "specification" ? "pillar-active" : ""}`} onClick={() => setTab("specification")} style={{ cursor: "pointer" }}>
           <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
-          <div className="stat-label"><MetricHelp label="💬 Feedback" definition="How clearly you communicate requirements and corrections to the agent. Clear feedback = fewer iterations." target="70+ clarity score is clear communication." action="Include file paths, constraints, and what success looks like." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Generate Energy</div>
+          <div className="stat-label"><MetricHelp label="💬 Specification" definition="How clearly and completely you communicate requirements — the quality of the 'ticket' you write for the agent." target="70+ clarity score is clear specification." action="Include file paths, constraints, acceptance criteria, and what success looks like." /></div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of your prompts</div>
           <div className="stat-sub">clarity score / 100</div>
           <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
             {clarity?.avgScore >= 80 ? "✅ Excellent" : clarity?.avgScore >= 70 ? "✅ Good" : clarity?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          </div>
+        </div>
+        <div className={`stat-card pillar-card ${tab === "efficiency" ? "pillar-active" : ""}`} onClick={() => setTab("efficiency")} style={{ cursor: "pointer" }}>
+          <div className="stat-value" style={{ color: (efficiency?.aggregate?.avgEfficiency ?? 0) >= 70 ? "#3fb950" : "#d29922" }}>{efficiency?.aggregate?.avgEfficiency ?? "—"}%</div>
+          <div className="stat-label"><MetricHelp label="⚡ Efficiency" definition="How productively you use agent turns — productive turn ratio, session completion, and context hygiene." target="80%+ is excellent, 60%+ is good." action="Front-load context, avoid drip-feeding, keep sessions focused." /></div>
+          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Productive use of turns</div>
+          <div className="stat-sub">efficiency score / 100</div>
+          <div className="stat-sub" style={{ color: (efficiency?.aggregate?.avgEfficiency ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {(efficiency?.aggregate?.avgEfficiency ?? 0) >= 80 ? "✅ Excellent" : (efficiency?.aggregate?.avgEfficiency ?? 0) >= 60 ? "✅ Good" : "📐 Needs work"} · Target: 80%+
           </div>
         </div>
       </div>
@@ -101,13 +110,13 @@ export default function Coaching() {
         <button className={`tab-btn ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>📊 Overview</button>
         <button className={`tab-btn ${tab === "delegation" ? "active" : ""}`} onClick={() => setTab("delegation")}>🤝 Delegation</button>
         <button className={`tab-btn ${tab === "judgment" ? "active" : ""}`} onClick={() => setTab("judgment")}>🧠 Judgment</button>
-        <button className={`tab-btn ${tab === "feedback" ? "active" : ""}`} onClick={() => setTab("feedback")}>💬 Feedback</button>
+        <button className={`tab-btn ${tab === "specification" ? "active" : ""}`} onClick={() => setTab("specification")}>💬 Specification</button>
       </div>
 
       {tab === "overview" && <OverviewTab clarity={clarity} efficiency={efficiency} delegation={delegation} judgment={judgment} />}
       {tab === "delegation" && <DelegationTab data={delegation} />}
       {tab === "judgment" && <JudgmentTab data={judgment} />}
-      {tab === "feedback" && <FeedbackTab clarity={clarity} efficiency={efficiency} />}
+      {tab === "specification" && <FeedbackTab clarity={clarity} efficiency={efficiency} />}
       <SuggestedNext
         to="/learn"
         icon="📚"

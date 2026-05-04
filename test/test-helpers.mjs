@@ -80,10 +80,19 @@ export function setupTestDb(opts = {}) {
   // Seed sessions
   if (opts.sessions) {
     const ins = db.prepare(
-      "INSERT INTO sessions (id, repository, branch, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO sessions (id, repository, branch, summary, created_at, updated_at, host_type, cwd) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     );
     for (const s of opts.sessions) {
-      ins.run(s.id, s.repository || null, s.branch || null, s.summary || null, s.created_at || new Date().toISOString(), s.updated_at || new Date().toISOString());
+      ins.run(
+        s.id,
+        s.repository || null,
+        s.branch || null,
+        s.summary || null,
+        s.created_at || new Date().toISOString(),
+        s.updated_at || new Date().toISOString(),
+        s.host_type || null,
+        s.cwd || null
+      );
     }
   }
 

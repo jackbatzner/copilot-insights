@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary } from "../api.js";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
@@ -16,6 +17,25 @@ import { PageBanner } from "../components/PageBanner.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
+
+function formatTokens(n) {
+  if (n == null) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatCost(n) {
+  if (n == null || n === 0) return "$0.00";
+  if (n < 0.01) return "<$0.01";
+  return `$${n.toFixed(2)}`;
+}
+
+function formatModelName(model) {
+  if (!model || model === "unknown") return "Unknown";
+  if (model === "auto") return "Auto";
+  return model;
+}
 
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
@@ -83,6 +103,7 @@ export default function Overview() {
   const { aggregate } = data;
   const sessionCount = aggregate.sessionsAnalyzed || 0;
   const avgRate = aggregate.avgRedirectionRate || 0;
+  const topModel = tokenData?.byModel?.find((model) => model.model !== "unknown") || tokenData?.byModel?.[0] || null;
 
   // Derive tier from latest pillar score
   const overallScore = pillarTrends?.weeks?.length
@@ -203,9 +224,7 @@ export default function Overview() {
                 />
               </div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {tokenData.totals.total >= 1_000_000 ? `${(tokenData.totals.total / 1_000_000).toFixed(1)}M`
-                  : tokenData.totals.total >= 1_000 ? `${(tokenData.totals.total / 1_000).toFixed(1)}K`
-                  : tokenData.totals.total}
+                {formatTokens(tokenData.totals.total)}
               </div>
             </div>
             <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
@@ -217,12 +236,40 @@ export default function Overview() {
                 />
               </div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {tokenData.estimatedCost < 0.01 ? "<$0.01" : `$${tokenData.estimatedCost.toFixed(2)}`}
+                {formatCost(tokenData.estimatedCost)}
               </div>
             </div>
           </>
         )}
       </div>
+
+      {tokenData && tokenData.sessionsAnalyzed > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span>💰 Token Usage</span>
+            <Link to="/tokens" style={{ color: "var(--accent)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+              View Details →
+            </Link>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Est. Cost</div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>{formatCost(tokenData.estimatedCost)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Total Tokens</div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>{formatTokens(tokenData.totals.total)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Top Model</div>
+              <div style={{ fontSize: 24, fontWeight: 600, overflowWrap: "anywhere" }}>{formatModelName(topModel?.model)}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                {topModel ? `${formatTokens(topModel.total)} tokens` : "No model data"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* What to do next — clear CTAs */}
       <div className="card next-steps-card" style={{ padding: "12px 16px" }}>

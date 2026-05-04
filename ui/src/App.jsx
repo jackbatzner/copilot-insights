@@ -134,14 +134,13 @@ function App() {
               <NavLink to="/sessions">
                 <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
               </NavLink>
+              <NavLink to="/tokens">
+                <span className="nav-icon">💰</span><span className="nav-label">Token Usage</span>
+              </NavLink>
             </NavGroup>
             <NavGroup label="ADVANCED">
               <NavLink to="/analytics">
                 <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
-              </NavLink>
-              <NavLink to="/tokens">
-                <span className="nav-icon">💰</span><span className="nav-label">Token Usage</span>
-                <span className="nav-badge">✨ New</span>
               </NavLink>
               <NavLink to="/live">
                 <span className="nav-icon">📡</span><span className="nav-label">Live</span>

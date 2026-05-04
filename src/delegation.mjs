@@ -8,7 +8,7 @@ import { matchPatterns } from "./patterns.mjs";
 /**
  * Classify a user message by delegation style.
  */
-function classifyMessage(msg) {
+export function classifyMessage(msg) {
   if (!msg) return null;
 
   const cleaned = msg
@@ -71,6 +71,7 @@ function cleanUserMessage(msg) {
  */
 function analyzeSessionDelegation(session, turns, files, refs) {
   const msgTypes = { approval: 0, delegation: 0, guided: 0, correction: 0, question: 0, collaborative: 0, detailed_spec: 0 };
+  const exampleTurns = { guided: [], collaborative: [], delegation: [] };
   let totalUserChars = 0;
   let totalAgentChars = 0;
 
@@ -79,7 +80,12 @@ function analyzeSessionDelegation(session, turns, files, refs) {
     if (type) msgTypes[type]++;
     // Count only user-typed content, not system-injected XML
     const cleaned = cleanUserMessage(t.user_message);
-    if (cleaned.length > 0) totalUserChars += cleaned.length;
+    if (cleaned.length > 0) {
+      totalUserChars += cleaned.length;
+      if (exampleTurns[type] && exampleTurns[type].length < 2) {
+        exampleTurns[type].push(cleaned);
+      }
+    }
     if (t.assistant_response) totalAgentChars += t.assistant_response.length;
   }
 
@@ -127,6 +133,7 @@ function analyzeSessionDelegation(session, turns, files, refs) {
     hasCommit,
     hasPR,
     style,
+    exampleTurns,
   };
 }
 
@@ -137,6 +144,7 @@ export function analyzeDelegation({ repo, since, excludeIds } = {}) {
   const sessions = listSessions({ repo, since, excludeIds });
   const sessionResults = [];
   const styleCounts = {};
+  const examples = { guided: [], collaborative: [], delegation: [] };
   let totalUserChars = 0;
   let totalAgentChars = 0;
   let totalFileOps = 0;
@@ -162,6 +170,13 @@ export function analyzeDelegation({ repo, since, excludeIds } = {}) {
     sessionResults.push(result);
 
     styleCounts[result.style] = (styleCounts[result.style] || 0) + 1;
+    for (const type of Object.keys(examples)) {
+      for (const example of result.exampleTurns[type] || []) {
+        if (examples[type].length < 4 && !examples[type].includes(example)) {
+          examples[type].push(example);
+        }
+      }
+    }
     totalUserChars += result.totalUserChars;
     totalAgentChars += result.totalAgentChars;
     totalFileOps += result.totalFileOps;
@@ -230,5 +245,6 @@ export function analyzeDelegation({ repo, since, excludeIds } = {}) {
     styleDistribution,
     topDelegated,
     styleCounts,
+    examples,
   };
 }
