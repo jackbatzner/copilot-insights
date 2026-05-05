@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens } from "../api.js";
+import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens, fetchChronicleImprove } from "../api.js";
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
@@ -16,6 +16,7 @@ export default function SessionDetail() {
   const [replay, setReplay] = useState(null);
   const [complexity, setComplexity] = useState(null);
   const [tokenInfo, setTokenInfo] = useState(null);
+  const [improve, setImprove] = useState(null);
   const [isHidden, setIsHidden] = useState(false);
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
@@ -34,8 +35,9 @@ export default function SessionDetail() {
       fetchSessionComplexity(id).catch(() => null),
       fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
       fetchSessionTokens(id).catch(() => null),
+      fetchChronicleImprove(id).catch(() => null),
     ])
-      .then(([d, s, e, r, c, h, t]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); setTokenInfo(t); })
+      .then(([d, s, e, r, c, h, t, imp]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); setTokenInfo(t); setImprove(imp); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -258,6 +260,7 @@ export default function SessionDetail() {
         tabs={[
           { id: "summary", label: "📊 Summary" },
           { id: "deep-dive", label: "🎬 Deep Dive" },
+          { id: "improve", label: "💡 Improve" },
           { id: "tokens", label: "💰 Tokens" },
         ]}
         activeTab={tab}
@@ -526,23 +529,59 @@ export default function SessionDetail() {
       </div>
       </TabPanel>
 
+      <TabPanel id="improve" activeTab={tab}>
+        {improve && improve.suggestions && improve.suggestions.length > 0 ? (
+          <div>
+            <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
+              <div className="card-header">💡 What could be better next time</div>
+              <p style={{ color: "var(--text-muted)", fontSize: 12, padding: "0 16px" }}>
+                {improve.overallAdvice}
+              </p>
+            </div>
+            {improve.suggestions.map((s, i) => (
+              <div key={i} className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--yellow)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span className="pillar-pill" data-pillar={s.pillar}>{s.pillar}</span>
+                  <strong>{s.issue}</strong>
+                </div>
+                <div style={{ fontSize: 13, marginBottom: 8 }}>
+                  <div style={{ color: "var(--text-muted)", marginBottom: 4 }}>
+                    <strong>What happened:</strong> {s.whatHappened}
+                  </div>
+                  <div style={{ color: "var(--green)" }}>
+                    <strong>Better approach:</strong> {s.whatWouldBeBetter}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 24, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+            <p style={{ color: "var(--text-muted)" }}>
+              {improve?.overallAdvice || "This session was already well-scoped — no specific improvements identified."}
+            </p>
+          </div>
+        )}
+      </TabPanel>
+
       <TabPanel id="tokens" activeTab={tab}>
         {tokenInfo ? (
           <div>
             <div className="stats-grid" style={{ marginBottom: 16 }}>
               <div className="card" style={{ textAlign: "center" }}>
                 <div className="card-header">Est. Input Tokens</div>
-                <div className="stat-value">{(tokenInfo.totals?.input || 0).toLocaleString()}</div>
+                <div className="stat-value">{(tokenInfo.tokens?.input || tokenInfo.totals?.input || 0).toLocaleString()}</div>
                 <div className="stat-sub">your prompts</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div className="card-header">Est. Output Tokens</div>
-                <div className="stat-value">{(tokenInfo.totals?.output || 0).toLocaleString()}</div>
+                <div className="stat-value">{(tokenInfo.tokens?.output || tokenInfo.totals?.output || 0).toLocaleString()}</div>
                 <div className="stat-sub">agent responses</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div className="card-header">Total Tokens</div>
-                <div className="stat-value">{(tokenInfo.totals?.total || 0).toLocaleString()}</div>
+                <div className="stat-value">{(tokenInfo.tokens?.total || tokenInfo.totals?.total || 0).toLocaleString()}</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div className="card-header">Est. Cost</div>
