@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment } from "../api";
+import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment, fetchDevPlan } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useRefresh } from "../App.jsx";
@@ -18,6 +18,7 @@ export default function Coaching() {
   const [efficiency, setEfficiency] = useState(null);
   const [delegation, setDelegation] = useState(null);
   const [judgment, setJudgment] = useState(null);
+  const [pillarScores, setPillarScores] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
@@ -30,8 +31,9 @@ export default function Coaching() {
       fetchEfficiency(timeframe),
       fetchDelegation(timeframe),
       fetchJudgment(timeframe),
+      fetchDevPlan(timeframe),
     ])
-      .then(([c, e, d, j]) => { setClarity(c); setEfficiency(e); setDelegation(d); setJudgment(j); })
+      .then(([c, e, d, j, plan]) => { setClarity(c); setEfficiency(e); setDelegation(d); setJudgment(j); setPillarScores(plan?.pillarScores || null); })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [timeframe, refreshKey]);
@@ -67,41 +69,43 @@ export default function Coaching() {
       {/* Four pillars hero */}
       <div className="stats-grid stats-grid-4">
         <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: "#58a6ff" }}>{delegation?.overallDelegationRatio ?? "—"}%</div>
+          <div className="stat-value" style={{ color: "#58a6ff" }}>{pillarScores?.delegation ?? delegation?.overallDelegationRatio ?? "—"}</div>
           <div className="stat-label"><MetricHelp label="🤝 Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." action="Describe WHAT you want, not HOW to do it." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>How much autonomy you give</div>
-          <div className="stat-sub">work handed off to agent</div>
-          <div className="stat-sub" style={{ color: delegation?.overallDelegationRatio >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {delegation?.overallDelegationRatio >= 60 ? "✅ Good delegation" : delegation?.overallDelegationRatio >= 30 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60%+
+          <div className="stat-sub">score / 100</div>
+          <div className="stat-sub" style={{ color: (pillarScores?.delegation ?? 0) >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {(pillarScores?.delegation ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.delegation ?? 0) >= 60 ? "✅ Good" : (pillarScores?.delegation ?? 0) >= 40 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60+
           </div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Ratio: {delegation?.overallDelegationRatio}% → Score: {Math.round(delegation?.delegationScore || 0)}/100</div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Delegation ratio: {delegation?.overallDelegationRatio ?? 0}% · Leverage: {delegation?.overallLeverage ?? 0}x</div>
         </div>
         <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: judgment?.avgScore >= 70 ? "#3fb950" : "#d29922" }}>{judgment?.avgScore ?? "—"}</div>
+          <div className="stat-value" style={{ color: (pillarScores?.judgment ?? judgment?.avgScore ?? 0) >= 70 ? "#3fb950" : "#d29922" }}>{pillarScores?.judgment ?? judgment?.avgScore ?? "—"}</div>
           <div className="stat-label"><MetricHelp label="🧠 Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping, avoiding costly late rollbacks." target="70+ is good, 80+ is excellent." action="Review each agent change carefully before approving." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of review decisions</div>
-          <div className="stat-sub">review quality / 100</div>
-          <div className="stat-sub" style={{ color: judgment?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {judgment?.avgScore >= 80 ? "✅ Excellent" : judgment?.avgScore >= 70 ? "✅ Good" : judgment?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          <div className="stat-sub">score / 100</div>
+          <div className="stat-sub" style={{ color: (pillarScores?.judgment ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {(pillarScores?.judgment ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.judgment ?? 0) >= 70 ? "✅ Good" : (pillarScores?.judgment ?? 0) >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
           </div>
         </div>
         <div className={`stat-card pillar-card ${tab === "specification" ? "pillar-active" : ""}`} onClick={() => setTab("specification")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: clarity?.avgScore >= 60 ? "#3fb950" : "#d29922" }}>{clarity?.avgScore ?? "—"}</div>
+          <div className="stat-value" style={{ color: (pillarScores?.specification ?? clarity?.avgScore ?? 0) >= 60 ? "#3fb950" : "#d29922" }}>{pillarScores?.specification ?? clarity?.avgScore ?? "—"}</div>
           <div className="stat-label"><MetricHelp label="💬 Specification" definition="How clearly and completely you communicate requirements — the quality of the 'ticket' you write for the agent." target="70+ clarity score is clear specification." action="Include file paths, constraints, acceptance criteria, and what success looks like." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of your prompts</div>
-          <div className="stat-sub">clarity score / 100</div>
-          <div className="stat-sub" style={{ color: clarity?.avgScore >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {clarity?.avgScore >= 80 ? "✅ Excellent" : clarity?.avgScore >= 70 ? "✅ Good" : clarity?.avgScore >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
+          <div className="stat-sub">score / 100</div>
+          <div className="stat-sub" style={{ color: (pillarScores?.specification ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {(pillarScores?.specification ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.specification ?? 0) >= 70 ? "✅ Good" : (pillarScores?.specification ?? 0) >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
           </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Clarity: {clarity?.avgScore ?? 0} · Efficiency: {efficiency?.aggregate?.avgEfficiency ?? 0}%</div>
         </div>
         <div className={`stat-card pillar-card ${tab === "efficiency" ? "pillar-active" : ""}`} onClick={() => setTab("efficiency")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: (efficiency?.aggregate?.avgEfficiency ?? 0) >= 70 ? "#3fb950" : "#d29922" }}>{efficiency?.aggregate?.avgEfficiency ?? "—"}%</div>
+          <div className="stat-value" style={{ color: (pillarScores?.efficiency ?? 0) >= 60 ? "#3fb950" : "#d29922" }}>{pillarScores?.efficiency ?? efficiency?.aggregate?.avgEfficiency ?? "—"}</div>
           <div className="stat-label"><MetricHelp label="⚡ Efficiency" definition="How productively you use agent turns — productive turn ratio, session completion, and context hygiene." target="80%+ is excellent, 60%+ is good." action="Front-load context, avoid drip-feeding, keep sessions focused." /></div>
           <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Productive use of turns</div>
-          <div className="stat-sub">efficiency score / 100</div>
-          <div className="stat-sub" style={{ color: (efficiency?.aggregate?.avgEfficiency ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {(efficiency?.aggregate?.avgEfficiency ?? 0) >= 80 ? "✅ Excellent" : (efficiency?.aggregate?.avgEfficiency ?? 0) >= 60 ? "✅ Good" : "📐 Needs work"} · Target: 80%+
+          <div className="stat-sub">score / 100</div>
+          <div className="stat-sub" style={{ color: (pillarScores?.efficiency ?? 0) >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
+            {(pillarScores?.efficiency ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.efficiency ?? 0) >= 60 ? "✅ Good" : "📐 Needs work"} · Target: 60+
           </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Turn efficiency: {efficiency?.aggregate?.avgEfficiency ?? 0}%</div>
         </div>
       </div>
 
