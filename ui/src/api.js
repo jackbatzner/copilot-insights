@@ -288,6 +288,37 @@ export async function fetchAllIntents() {
   return safeFetch(`${API_BASE}/session-intents`);
 }
 
+// Dev Plan Goals
+export async function fetchDevPlanGoals(withProgress = false) {
+  return safeFetch(`${API_BASE}/devplan/goals${withProgress ? "?progress=true" : ""}`);
+}
+
+export async function addDevPlanGoal({ pillar, title, description, source, baselineScore }) {
+  const res = await fetch(`${API_BASE}/devplan/goals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pillar, title, description, source, baselineScore }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function updateDevPlanGoalStatus(id, status) {
+  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function deleteDevPlanGoal(id) {
+  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 // VS Code sessions
 export async function fetchVSCodeSessions() {
   return safeFetch(`${API_BASE}/vscode/sessions`);

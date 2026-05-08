@@ -207,7 +207,7 @@ function getDominantStyle(styleCounts = {}) {
 function computeEfficiencyMetrics(delegation, efficiency, sessionsData = []) {
   const productiveTurnRatio = efficiency.aggregate?.avgEfficiency || 0;
   const sessionCompletionRate = delegation.sessionsAnalyzed > 0
-    ? ((delegation.sessionsWithCommits + delegation.sessionsWithPRs) / delegation.sessionsAnalyzed) * 100
+    ? (Math.max(delegation.sessionsWithCommits + delegation.sessionsWithPRs, delegation.sessionsWithFiles) / delegation.sessionsAnalyzed) * 100
     : 0;
   const tokenEfficiencyScores = sessionsData
     .map(({ session }) => computeTokenEfficiencyScore(session.id))
@@ -456,7 +456,7 @@ Example from your session: "${example.substring(0, 120)}..." — this could have
       pillar: "efficiency",
       type: "quick_win",
       title: "Improve session setup",
-      description: `Context hygiene is ${contextHygiene}/100. Launch Copilot from inside repo directories, keep repository context attached, and move recurring conventions into instruction files instead of pasting oversized setup into chat.`,
+      description: `Workspace setup is ${contextHygiene}/100. Launch Copilot from inside repo directories, keep repository context attached, and move recurring conventions into instruction files instead of pasting oversized setup into chat.`,
       impact: 7,
       effort: "low",
       metric: `${contextHygiene}/100 → target 90+`,
@@ -827,19 +827,25 @@ export function generateProgressCheck({ repo, since, excludeIds } = {}) {
 export function generateRetro({ repo, since, excludeIds } = {}) {
   const data = gatherMetrics({ repo, since, excludeIds });
   const { sessions, delegation, judgment, efficiency } = data;
+  const resourcePillarMap = {
+    workDesign: "delegation",
+    qualityControl: "judgment",
+    intent: "specification",
+    evaluation: "efficiency",
+  };
 
   if (sessions.length === 0) {
     return { empty: true, message: "No sessions in this timeframe to review." };
   }
 
   const wins = [];
-  if (data.delegationScore >= 60) wins.push({ pillar: "delegation", emoji: "🤝", text: `Delegation score: ${data.delegationScore}/100 — solid trust in the agent.` });
-  if (data.judgmentScore >= 70) wins.push({ pillar: "judgment", emoji: "🧠", text: `Judgment score: ${data.judgmentScore}/100 — good quality review.` });
-  if (data.specificationScore >= 70) wins.push({ pillar: "specification", emoji: "💬", text: `Specification score: ${data.specificationScore}/100 — clear communication.` });
-  if (data.efficiencyScore >= 70) wins.push({ pillar: "efficiency", emoji: "⚡", text: `Efficiency score: ${data.efficiencyScore}/100 — productive sessions with clean setup.` });
-  if (delegation.overallLeverage >= 1.5) wins.push({ pillar: "delegation", emoji: "📐", text: `${delegation.overallLeverage}x leverage — the agent is doing more than you type.` });
-  if (judgment.rubberStampRate < 5) wins.push({ pillar: "judgment", emoji: "🔍", text: `Only ${judgment.rubberStampRate}% rubber-stamp rate — careful reviewer.` });
-  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "specification", emoji: "��", text: "Zero drip-feeds — front-loading context well." });
+  if (data.delegationScore >= 60) wins.push({ pillar: "workDesign", emoji: "🤝", text: `Work Design score: ${data.delegationScore}/100 — solid trust in the agent.` });
+  if (data.judgmentScore >= 70) wins.push({ pillar: "qualityControl", emoji: "🧠", text: `Quality Control score: ${data.judgmentScore}/100 — good quality review.` });
+  if (data.specificationScore >= 70) wins.push({ pillar: "intent", emoji: "💬", text: `Intent score: ${data.specificationScore}/100 — clear communication.` });
+  if (data.efficiencyScore >= 70) wins.push({ pillar: "evaluation", emoji: "⚡", text: `Evaluation score: ${data.efficiencyScore}/100 — productive sessions with clean setup.` });
+  if (delegation.overallLeverage >= 1.5) wins.push({ pillar: "workDesign", emoji: "📐", text: `${delegation.overallLeverage}x leverage — the agent is doing more than you type.` });
+  if (judgment.rubberStampRate < 5) wins.push({ pillar: "qualityControl", emoji: "🔍", text: `Only ${judgment.rubberStampRate}% rubber-stamp rate — careful reviewer.` });
+  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "intent", emoji: "��", text: "Zero drip-feeds — front-loading context well." });
 
   const cleanSessions = sessions.filter((s) => {
     const eff = efficiency.sessions?.find((e) => e.sessionId === s.id);
@@ -848,14 +854,14 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
   if (cleanSessions > 0) wins.push({ pillar: "all", emoji: "✨", text: `${cleanSessions} clean sessions with minimal redirections.` });
 
   const misses = [];
-  if (data.delegationScore < 40) misses.push({ pillar: "delegation", emoji: "⚠️", text: `Delegation score ${data.delegationScore}/100 — too much hand-holding.` });
-  if (data.judgmentScore < 50) misses.push({ pillar: "judgment", emoji: "⚠️", text: `Judgment score ${data.judgmentScore}/100 — review quality needs work.` });
-  if (data.specificationScore < 40) misses.push({ pillar: "specification", emoji: "⚠️", text: `Specification score ${data.specificationScore}/100 — prompts could be clearer.` });
-  if (data.efficiencyScore < 50) misses.push({ pillar: "efficiency", emoji: "⚠️", text: `Efficiency score ${data.efficiencyScore}/100 — too much setup friction or wasted motion.` });
-  if (judgment.rubberStampRate > 20) misses.push({ pillar: "judgment", emoji: "🔴", text: `${judgment.rubberStampRate}% rubber-stamp rate — approving without reviewing.` });
-  if ((efficiency.aggregate?.totalDripFeeds || 0) > 10) misses.push({ pillar: "specification", emoji: "🔴", text: `${efficiency.aggregate.totalDripFeeds} drip-feeds — context dribbled out over many turns.` });
-  if (data.contextHygiene < 70) misses.push({ pillar: "efficiency", emoji: "🔴", text: `Context hygiene ${data.contextHygiene}/100 — launch from repo dirs and avoid oversized opening prompts.` });
-  if (judgment.totalLateCatches > 10) misses.push({ pillar: "judgment", emoji: "⚠️", text: `${judgment.totalLateCatches} late catches — issues found too late in sessions.` });
+  if (data.delegationScore < 40) misses.push({ pillar: "workDesign", emoji: "⚠️", text: `Work Design score ${data.delegationScore}/100 — too much hand-holding.` });
+  if (data.judgmentScore < 50) misses.push({ pillar: "qualityControl", emoji: "⚠️", text: `Quality Control score ${data.judgmentScore}/100 — review quality needs work.` });
+  if (data.specificationScore < 40) misses.push({ pillar: "intent", emoji: "⚠️", text: `Intent score ${data.specificationScore}/100 — prompts could be clearer.` });
+  if (data.efficiencyScore < 50) misses.push({ pillar: "evaluation", emoji: "⚠️", text: `Evaluation score ${data.efficiencyScore}/100 — too much setup friction or wasted motion.` });
+  if (judgment.rubberStampRate > 20) misses.push({ pillar: "qualityControl", emoji: "🔴", text: `${judgment.rubberStampRate}% rubber-stamp rate — approving without reviewing.` });
+  if ((efficiency.aggregate?.totalDripFeeds || 0) > 10) misses.push({ pillar: "intent", emoji: "🔴", text: `${efficiency.aggregate.totalDripFeeds} drip-feeds — context dribbled out over many turns.` });
+  if (data.contextHygiene < 70) misses.push({ pillar: "evaluation", emoji: "🔴", text: `Workspace setup ${data.contextHygiene}/100 — launch from repo dirs and avoid oversized opening prompts.` });
+  if (judgment.totalLateCatches > 10) misses.push({ pillar: "qualityControl", emoji: "⚠️", text: `${judgment.totalLateCatches} late catches — issues found too late in sessions.` });
 
   const trends = [];
   if (sessions.length >= 6) {
@@ -882,23 +888,23 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
   }
 
   const weakest = [
-    { pillar: "delegation", score: data.delegationScore },
-    { pillar: "judgment", score: data.judgmentScore },
-    { pillar: "specification", score: data.specificationScore },
-    { pillar: "efficiency", score: data.efficiencyScore },
+    { pillar: "workDesign", score: data.delegationScore },
+    { pillar: "qualityControl", score: data.judgmentScore },
+    { pillar: "intent", score: data.specificationScore },
+    { pillar: "evaluation", score: data.efficiencyScore },
   ].sort((a, b) => a.score - b.score)[0];
 
   const nextFocus = {
     pillar: weakest.pillar,
     score: weakest.score,
-    recommendation: weakest.pillar === "delegation"
+    recommendation: weakest.pillar === "workDesign"
       ? "Next period: practice giving full feature specs in a single prompt. Trust the agent."
-      : weakest.pillar === "judgment"
+      : weakest.pillar === "qualityControl"
         ? "Next period: read every agent change before approving. Check edge cases."
-        : weakest.pillar === "specification"
+        : weakest.pillar === "intent"
           ? "Next period: include file paths, constraints, and examples in every opening prompt."
           : "Next period: launch from repo directories, keep sessions focused, and front-load the full task context.",
-    resources: (LEARNING_RESOURCES[weakest.pillar] || []).slice(0, 2),
+    resources: (LEARNING_RESOURCES[resourcePillarMap[weakest.pillar]] || []).slice(0, 2),
   };
 
   const overallScore = Math.round((data.delegationScore + data.judgmentScore + data.specificationScore + data.efficiencyScore) / 4);
@@ -911,6 +917,10 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
       since: since || sessions[sessions.length - 1]?.created_at || "all time",
     },
     pillarScores: {
+      workDesign: data.delegationScore,
+      qualityControl: data.judgmentScore,
+      intent: data.specificationScore,
+      evaluation: data.efficiencyScore,
       delegation: data.delegationScore,
       judgment: data.judgmentScore,
       specification: data.specificationScore,

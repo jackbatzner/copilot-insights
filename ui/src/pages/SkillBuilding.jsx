@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment,
   fetchDevPlan, fetchChronicleTips, fetchVSCodeSummary,
   fetchProgressCheck, fetchRetro, fetchInstructionGaps,
-  fetchTokenEfficiency,
+  fetchTokenEfficiency, fetchDevPlanGoals, addDevPlanGoal, updateDevPlanGoalStatus, deleteDevPlanGoal,
 } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
@@ -37,6 +37,8 @@ export default function SkillBuilding() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
+  const [addedGoals, setAddedGoals] = useState(new Set());
+  const [addingGoal, setAddingGoal] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -53,8 +55,9 @@ export default function SkillBuilding() {
       fetchRetro(timeframe),
       fetchInstructionGaps(timeframe).catch(() => null),
       fetchTokenEfficiency(timeframe).catch(() => null),
+      fetchDevPlanGoals().catch(() => ({ goals: [] })),
     ])
-      .then(([c, e, d, j, p, chronicleTips, vscode, prog, ret, g, te]) => {
+      .then(([c, e, d, j, p, chronicleTips, vscode, prog, ret, g, te, devplanData]) => {
         setClarity(c);
         setEfficiency(e);
         setDelegation(d);
@@ -66,6 +69,8 @@ export default function SkillBuilding() {
         setRetro(ret);
         setGaps(g);
         setTokenEff(te);
+        const existingGoals = devplanData?.goals?.filter((goal) => goal.status === "active").map((goal) => goal.title) || [];
+        setAddedGoals(new Set(existingGoals));
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -140,7 +145,10 @@ export default function SkillBuilding() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="skills">
-        Build your AI leadership skills: Intent, Work Design, Quality Control, and Evaluation.
+        Build your AI leadership skills: Intent, Work Design, Quality Control, and Evaluation.{" "}
+        <a href="https://www.microsoft.com/en-us/worklab/work-trend-index/agents-human-agency-and-the-opportunity-for-every-organization" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+          Grounded in Microsoft's 2026 Work Trends Index →
+        </a>
       </PageBanner>
 
       {vscodeSummary?.totalSessions > 0 && (
@@ -217,6 +225,19 @@ export default function SkillBuilding() {
                 <span className="pillar-pill" data-pillar={getPillarBadgeKey(w.pillar)}>{getPillarLabel(w.pillar)}</span>
                 <strong>{w.title}</strong>
                 {w.source === "chronicle" && <span style={{ fontSize: 10, color: "var(--purple)", marginLeft: 6 }}>💡 Chronicle</span>}
+                <span style={{ marginLeft: "auto" }}>
+                  <AddToDevPlanButton
+                    pillar={w.pillar}
+                    title={w.title}
+                    description={w.description}
+                    source={w.source === "chronicle" ? "chronicle-tip" : "quick-win"}
+                    baselineScore={pillarScoresByKey[w.pillar] ?? pillarFallbacks[w.pillar]}
+                    addedGoals={addedGoals}
+                    setAddedGoals={setAddedGoals}
+                    addingGoal={addingGoal}
+                    setAddingGoal={setAddingGoal}
+                  />
+                </span>
               </div>
               <p className="opp-desc">{w.description}</p>
               {w.metric && <div className="opp-metric">{w.metric}</div>}
@@ -235,10 +256,10 @@ export default function SkillBuilding() {
       </div>
 
       {/* Tab content */}
-      {tab === "overview" && <OverviewTab clarity={clarity} efficiency={efficiency} delegation={delegation} judgment={judgment} tips={tips} />}
-      {tab === "specification" && <IntentTab clarity={clarity} efficiency={efficiency} />}
+      {tab === "overview" && <OverviewTab clarity={clarity} efficiency={efficiency} delegation={delegation} judgment={judgment} tips={tips} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
+      {tab === "specification" && <IntentTab clarity={clarity} efficiency={efficiency} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
       {tab === "delegation" && <WorkDesignTab data={delegation} />}
-      {tab === "judgment" && <QualityControlTab data={judgment} />}
+      {tab === "judgment" && <QualityControlTab data={judgment} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
       {tab === "efficiency" && <EvaluationTab efficiency={efficiency} tokenEff={tokenEff} delegation={delegation} />}
       {tab === "retro" && retro && <RetroTab retro={retro} />}
       {tab === "plan" && plan && <DevPlanTab plan={plan} gaps={gaps} />}
@@ -248,24 +269,38 @@ export default function SkillBuilding() {
 
 /* ── Overview Tab ──────────────────────────────────────────── */
 
-function OverviewTab({ clarity, efficiency, delegation, judgment, tips }) {
+function OverviewTab({ clarity, efficiency, delegation, judgment, tips, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
   const allSuggestions = [
-    ...(judgment?.suggestions || []),
-    ...(delegation ? buildDelegationSuggestions(delegation) : []),
+    ...((judgment?.suggestions || []).map((suggestion) => ({
+      ...suggestion,
+      pillar: suggestion.pillar || "qualityControl",
+      source: suggestion.source || "coaching-suggestion",
+      baselineScore: suggestion.baselineScore ?? judgment?.avgScore,
+    }))),
+    ...(delegation ? buildDelegationSuggestions(delegation).map((suggestion) => ({
+      ...suggestion,
+      pillar: suggestion.pillar || "workDesign",
+      source: suggestion.source || "coaching-suggestion",
+      baselineScore: suggestion.baselineScore ?? delegation?.overallDelegationRatio,
+    })) : []),
     ...(efficiency?.aggregate?.totalDripFeeds > 5 ? [{
       priority: "medium", emoji: "💧", title: "Reduce Drip-Feeding",
       body: `${efficiency.aggregate.totalDripFeeds} times you added context piecemeal. Front-load all requirements in your first message.`,
+      pillar: "intent",
+      source: "coaching-suggestion",
+      baselineScore: clarity?.avgScore,
     }] : []),
     ...(clarity?.avgScore < 50 ? [{
       priority: "high", emoji: "📝", title: "Improve Opening Prompts",
       body: `Average Intent score of ${clarity.avgScore}/100. Include file paths, constraints, and expected behavior upfront.`,
+      pillar: "intent",
+      source: "coaching-suggestion",
+      baselineScore: clarity?.avgScore,
     }] : []),
   ].sort((a, b) => {
     const p = { high: 0, medium: 1, low: 2, info: 3 };
     return (p[a.priority] ?? 3) - (p[b.priority] ?? 3);
   });
-
-  const tipItems = tips?.tips || [];
 
   return (
     <>
@@ -279,25 +314,17 @@ function OverviewTab({ clarity, efficiency, delegation, judgment, tips }) {
         </div>
       </div>
 
-      {tipItems.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
-          <div className="card-header">💡 Chronicle Coaching Tips</div>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-            Personalized tips based on patterns across your recent sessions.
-          </p>
-          {tipItems.slice(0, 3).map((tip, i) => (
-            <div key={i} style={{ padding: "6px 0", borderTop: i > 0 ? "1px solid var(--border-color)" : "none" }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{tip.title || tip.category}</div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{tip.suggestion || tip.description}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {allSuggestions.length > 0 && (
         <div className="card">
           <div className="card-header">💡 Top Coaching Tips</div>
-          <SuggestionsStack suggestions={allSuggestions.slice(0, 5)} />
+          <SuggestionsStack
+            suggestions={allSuggestions.slice(0, 5)}
+            showAddButton
+            addedGoals={addedGoals}
+            setAddedGoals={setAddedGoals}
+            addingGoal={addingGoal}
+            setAddingGoal={setAddingGoal}
+          />
         </div>
       )}
     </>
@@ -306,7 +333,7 @@ function OverviewTab({ clarity, efficiency, delegation, judgment, tips }) {
 
 /* ── Intent Tab (was FeedbackTab / Specification) ──────────── */
 
-function IntentTab({ clarity, efficiency }) {
+function IntentTab({ clarity, efficiency, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
   return (
     <>
       <p className="page-intro">
@@ -336,10 +363,23 @@ function IntentTab({ clarity, efficiency }) {
           </div>
           <div className="tips-list">
             {clarity.topTips.map((t, i) => (
-              <div key={i} className="tip-row">
+              <div key={i} className="tip-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div className="tip-bar-track"><div className="tip-bar-fill" style={{ width: `${t.pct}%` }} /></div>
                 <span className="tip-pct">{t.pct}%</span>
                 <span className="tip-text">{t.tip}</span>
+                <span style={{ marginLeft: "auto", flexShrink: 0 }}>
+                  <AddToDevPlanButton
+                    pillar="intent"
+                    title={`Improve: ${t.tip}`}
+                    description={`${t.pct}% of prompts are missing this element.`}
+                    source="coaching-suggestion"
+                    baselineScore={clarity?.avgScore}
+                    addedGoals={addedGoals}
+                    setAddedGoals={setAddedGoals}
+                    addingGoal={addingGoal}
+                    setAddingGoal={setAddingGoal}
+                  />
+                </span>
               </div>
             ))}
           </div>
@@ -484,7 +524,7 @@ function WorkDesignTab({ data }) {
 
 /* ── Quality Control Tab (was JudgmentTab) ─────────────────── */
 
-function QualityControlTab({ data }) {
+function QualityControlTab({ data, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
   if (!data) return null;
 
   return (
@@ -524,7 +564,17 @@ function QualityControlTab({ data }) {
       {data.suggestions?.length > 0 && (
         <div className="card">
           <div className="card-header">💡 How to Improve</div>
-          <SuggestionsStack suggestions={data.suggestions} />
+          <SuggestionsStack
+            suggestions={data.suggestions}
+            showAddButton
+            defaultPillar="qualityControl"
+            defaultSource="coaching-suggestion"
+            defaultBaselineScore={data.avgScore}
+            addedGoals={addedGoals}
+            setAddedGoals={setAddedGoals}
+            addingGoal={addingGoal}
+            setAddingGoal={setAddingGoal}
+          />
         </div>
       )}
 
@@ -568,7 +618,7 @@ function QualityControlTab({ data }) {
 
 function EvaluationTab({ efficiency, tokenEff, delegation }) {
   const completionRate = delegation?.sessionsAnalyzed > 0
-    ? Math.round(((delegation?.sessionsWithCommits + delegation?.sessionsWithPRs) / delegation.sessionsAnalyzed) * 100)
+    ? Math.round((Math.max((delegation?.sessionsWithCommits || 0) + (delegation?.sessionsWithPRs || 0), delegation?.sessionsWithFiles || 0) / delegation.sessionsAnalyzed) * 100)
     : 0;
 
   return (
@@ -580,7 +630,7 @@ function EvaluationTab({ efficiency, tokenEff, delegation }) {
 
       <div className="stats-grid stats-grid-4">
         <MiniStat label={<MetricHelp label="Productive Turns" definition="Percentage of turns that are productive (not corrections)." target="90%+ excellent, 75%+ good." action="Provide clearer upfront context." />} value={`${efficiency?.aggregate?.avgEfficiency ?? 0}%`} sub="non-redirect turns" />
-        <MiniStat label={<MetricHelp label="Session Completion" definition="Sessions that produce commits or PRs." target="Higher = more productive sessions." />} value={`${completionRate}%`} sub="sessions with outcomes" />
+        <MiniStat label={<MetricHelp label="Session Completion" definition="Sessions that produce file changes, commits, or PRs." target="Higher = more productive sessions." />} value={`${completionRate}%`} sub="sessions with outcomes" />
         <MiniStat label={<MetricHelp label="Token Efficiency" definition="How efficiently you use tokens — based on output/input ratio and tokens per productive turn." target="Higher score = less waste." />} value={tokenEff ? `${tokenEff.productiveTokenRatio}%` : "—"} sub="productive token use" />
         <MiniStat label={<MetricHelp label="Token ROI" definition="File operations per 1K tokens — how much real work per token spent." target="Higher = better return on token investment." />} value={tokenEff ? tokenEff.tokenROI : "—"} sub="file ops per 1K tokens" />
       </div>
@@ -706,46 +756,128 @@ function RetroTab({ retro }) {
 /* ── Dev Plan Tab ──────────────────────────────────────────── */
 
 function DevPlanTab({ plan, gaps }) {
-  const highImpact = plan.opportunities.filter((o) => o.type === "high_impact");
+  const [goals, setGoals] = useState(null);
+  const [goalsLoading, setGoalsLoading] = useState(true);
+
+  const loadGoals = useCallback(() => {
+    setGoalsLoading(true);
+    fetchDevPlanGoals(true)
+      .then(data => setGoals(data?.goals || []))
+      .catch(() => setGoals([]))
+      .finally(() => setGoalsLoading(false));
+  }, []);
+
+  useEffect(() => { loadGoals(); }, [loadGoals]);
+
+  const handleMarkSufficient = async (id) => {
+    await updateDevPlanGoalStatus(id, "sufficient");
+    loadGoals();
+  };
+
+  const handleRemove = async (id) => {
+    await deleteDevPlanGoal(id);
+    loadGoals();
+  };
+
+  const handleReactivate = async (id) => {
+    await updateDevPlanGoalStatus(id, "active");
+    loadGoals();
+  };
+
+  const activeGoals = (goals || []).filter(g => g.status === "active");
+  const completedGoals = (goals || []).filter(g => g.status === "sufficient");
 
   return (
     <>
-      {plan.quickWins.length > 0 && <QuickWinsCard wins={plan.quickWins} />}
-
-      {highImpact.length > 0 && (
-        <CollapsibleSection title="🚀 High-Impact Opportunities & Weekly Goals" id="skills-high-impact" defaultOpen={false}>
-          {highImpact.map((o, i) => {
-            const relatedGoals = plan.weeklyGoals.filter((g) => g.pillar === o.pillar);
-            return (
-              <div key={i} className="opportunity-item">
-                <div className="opp-header">
-                  <span className="pillar-pill" data-pillar={getPillarBadgeKey(o.pillar)}>{getPillarLabel(o.pillar)}</span>
-                  <strong>{o.title}</strong>
-                  <span className="impact-badge">Impact: {o.impact}/10</span>
-                </div>
-                <p className="opp-desc">{o.description}</p>
-                <div className="opp-metric">{o.metric}</div>
-                <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
-                  🎯 <strong>This week:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {getPillarLabel(o.pillar)} score improves.
-                </div>
-                {relatedGoals.length > 0 && (
-                  <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "2px solid var(--border)" }}>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4, fontWeight: 600 }}>Related weekly goals:</div>
-                    {relatedGoals.map((g, gi) => (
-                      <div key={gi} style={{ fontSize: 12, color: "var(--text-muted)", padding: "4px 0" }}>
-                        {g.emoji} <strong style={{ color: "var(--text)" }}>{g.goal}</strong>
-                        <span style={{ marginLeft: 8, fontSize: 11 }}>{g.description}</span>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">🎯 Your Development Goals</div>
+        {goalsLoading ? (
+          <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>Loading goals…</div>
+        ) : activeGoals.length === 0 ? (
+          <div style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
+            <p style={{ fontSize: 13, marginBottom: 4 }}>No development goals yet.</p>
+            <p style={{ fontSize: 12 }}>Add tips from the skill tabs or Quick Wins using the <strong>➕ Add to Dev Plan</strong> button.</p>
+          </div>
+        ) : (
+          <div>
+            {activeGoals.map((goal) => {
+              const improved = goal.baselineScore != null && goal.latestScore != null && goal.latestScore > goal.baselineScore;
+              const declined = goal.baselineScore != null && goal.latestScore != null && goal.latestScore < goal.baselineScore;
+              return (
+                <div key={goal.id} style={{ padding: "12px 12px", borderTop: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span className="pillar-pill" data-pillar={getPillarBadgeKey(goal.pillar)}>{getPillarLabel(goal.pillar)}</span>
+                        <strong style={{ fontSize: 13 }}>{goal.title}</strong>
                       </div>
-                    ))}
+                      {goal.description && (
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0" }}>{goal.description}</p>
+                      )}
+                      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                        <span>Added {new Date(goal.addedAt).toLocaleDateString()}</span>
+                        {goal.baselineScore != null && goal.latestScore != null && (
+                          <span style={{ color: improved ? "var(--green)" : declined ? "var(--red)" : "var(--text-muted)" }}>
+                            {improved ? "📈" : declined ? "📉" : "➡️"} Score: {goal.baselineScore} → {goal.latestScore}
+                          </span>
+                        )}
+                        {goal.baselineScore != null && goal.latestScore == null && (
+                          <span>Baseline: {goal.baselineScore}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleMarkSufficient(goal.id)}
+                        style={{ background: "none", border: "1px solid var(--green)", borderRadius: 6, color: "var(--green)", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}
+                        title="Mark as development sufficient"
+                      >
+                        ✅ Sufficient
+                      </button>
+                      <button
+                        onClick={() => handleRemove(goal.id)}
+                        style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}
+                        title="Remove from dev plan"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
-                )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {completedGoals.length > 0 && (
+        <CollapsibleSection title={`✅ Development Sufficient (${completedGoals.length})`} id="skills-completed-goals" defaultOpen={false}>
+          <div className="card">
+            {completedGoals.map((goal) => (
+              <div key={goal.id} style={{ padding: "8px 12px", borderTop: "1px solid var(--border)", opacity: 0.7 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span className="pillar-pill" data-pillar={getPillarBadgeKey(goal.pillar)}>{getPillarLabel(goal.pillar)}</span>
+                    <span style={{ fontSize: 13, marginLeft: 8 }}>{goal.title}</span>
+                    {goal.baselineScore != null && goal.latestScore != null && (
+                      <span style={{ fontSize: 11, color: "var(--green)", marginLeft: 8 }}>
+                        {goal.baselineScore} → {goal.latestScore}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleReactivate(goal.id)}
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "3px 8px", cursor: "pointer" }}
+                  >
+                    Reactivate
+                  </button>
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </CollapsibleSection>
       )}
-
-      <WeeklyGoals goals={plan.weeklyGoals} />
 
       {gaps && gaps.totalGaps > 0 && (
         <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
@@ -799,6 +931,52 @@ function DevPlanTab({ plan, gaps }) {
 
 /* ── Shared Components ─────────────────────────────────────── */
 
+function AddToDevPlanButton({ pillar, title, description, source, baselineScore, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
+  const isAdded = addedGoals.has(title);
+  const isAdding = addingGoal === title;
+
+  const handleAdd = async () => {
+    setAddingGoal(title);
+    try {
+      await addDevPlanGoal({ pillar, title, description, source, baselineScore });
+      setAddedGoals((prev) => new Set([...prev, title]));
+    } catch (err) {
+      if (String(err?.message || err).includes("409")) {
+        setAddedGoals((prev) => new Set([...prev, title]));
+      }
+    } finally {
+      setAddingGoal(null);
+    }
+  };
+
+  if (isAdded) {
+    return <span style={{ fontSize: 11, color: "var(--green)", fontWeight: 500 }}>✓ In Dev Plan</span>;
+  }
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        handleAdd();
+      }}
+      disabled={isAdding}
+      style={{
+        background: "none",
+        border: "1px solid var(--accent)",
+        borderRadius: 6,
+        color: "var(--accent)",
+        fontSize: 11,
+        padding: "3px 8px",
+        cursor: isAdding ? "wait" : "pointer",
+        opacity: isAdding ? 0.6 : 1,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {isAdding ? "Adding…" : "➕ Add to Dev Plan"}
+    </button>
+  );
+}
+
 function MiniStat({ label, value, sub }) {
   return (
     <div className="stat-card" style={{ padding: "12px 16px" }}>
@@ -809,7 +987,17 @@ function MiniStat({ label, value, sub }) {
   );
 }
 
-function SuggestionsStack({ suggestions }) {
+function SuggestionsStack({
+  suggestions,
+  addedGoals,
+  setAddedGoals,
+  addingGoal,
+  setAddingGoal,
+  showAddButton = false,
+  defaultPillar,
+  defaultSource,
+  defaultBaselineScore,
+}) {
   const PRIORITY_COLORS = { high: "#f85149", medium: "#d29922", low: "#58a6ff", info: "#3fb950" };
   return (
     <div className="suggestions-stack">
@@ -819,6 +1007,21 @@ function SuggestionsStack({ suggestions }) {
             <span className="suggestion-emoji">{s.emoji}</span>
             <span className="suggestion-title">{s.title}</span>
             <span className="priority-tag" style={{ background: PRIORITY_COLORS[s.priority] }}>{s.priority}</span>
+            {showAddButton && (
+              <span style={{ marginLeft: 8 }}>
+                <AddToDevPlanButton
+                  pillar={s.pillar || defaultPillar || "intent"}
+                  title={s.title}
+                  description={s.body}
+                  source={s.source || defaultSource || "coaching-suggestion"}
+                  baselineScore={s.baselineScore ?? defaultBaselineScore}
+                  addedGoals={addedGoals}
+                  setAddedGoals={setAddedGoals}
+                  addingGoal={addingGoal}
+                  setAddingGoal={setAddingGoal}
+                />
+              </span>
+            )}
           </div>
           <p className="suggestion-body">{s.body}</p>
         </div>
@@ -850,97 +1053,6 @@ function ClarityBar({ distribution }) {
           </span>
         ))}
       </div>
-    </div>
-  );
-}
-
-function QuickWinsCard({ wins }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? wins : wins.slice(0, 1);
-  return (
-    <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--green)" }}>
-      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>⚡ Quick Wins</span>
-        {wins.length > 1 && (
-          <button onClick={() => setExpanded(!expanded)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "3px 8px", cursor: "pointer" }}>
-            {expanded ? "Show less" : `Show all ${wins.length}`}
-          </button>
-        )}
-      </div>
-      {shown.map((w, i) => (
-        <div key={i} className="opportunity-item quick-win">
-          <div className="opp-header">
-            <span className="pillar-pill" data-pillar={getPillarBadgeKey(w.pillar)}>{getPillarLabel(w.pillar)}</span>
-            <strong>{w.title}</strong>
-          </div>
-          <p className="opp-desc">{w.description}</p>
-          <div className="opp-metric">{w.metric}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function WeeklyGoals({ goals }) {
-  const storageKey = "insights-focus-goals";
-  const [focused, setFocused] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey)) || []; } catch { return []; }
-  });
-  const [showAll, setShowAll] = useState(false);
-
-  const toggleFocus = (idx) => {
-    setFocused((prev) => {
-      if (prev.includes(idx)) return prev.filter((i) => i !== idx);
-      if (prev.length < 2) return [...prev, idx];
-      return prev;
-    });
-  };
-
-  useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(focused)); } catch { /* storage unavailable */ }
-  }, [focused, storageKey]);
-
-  const hasFocused = focused.length > 0;
-  const displayGoals = hasFocused && !showAll
-    ? goals.map((g, i) => ({ ...g, _idx: i })).filter((_, i) => focused.includes(i))
-    : goals.map((g, i) => ({ ...g, _idx: i }));
-
-  return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>🎯 Weekly Goals</span>
-        {hasFocused && (
-          <button onClick={() => setShowAll(!showAll)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", fontSize: 11, padding: "3px 8px", cursor: "pointer" }}>
-            {showAll ? "Show focused only" : `Show all ${goals.length}`}
-          </button>
-        )}
-      </div>
-      {!hasFocused && (
-        <div style={{ background: "rgba(88, 166, 255, 0.06)", border: "1px solid rgba(88, 166, 255, 0.15)", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: "var(--accent)" }}>
-          💡 <strong>Habit stacking tip:</strong> Pick 1-2 goals to focus on this week. Click ⭐ to mark focus goals.
-        </div>
-      )}
-      {displayGoals.map((g) => (
-        <div key={g._idx} className="goal-item" style={{ opacity: hasFocused && !focused.includes(g._idx) && showAll ? 0.5 : 1 }}>
-          <div className="goal-header">
-            <button
-              onClick={() => toggleFocus(g._idx)}
-              title={focused.includes(g._idx) ? "Remove focus" : focused.length >= 2 ? "Max 2 focus goals" : "Set as focus goal"}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, padding: 0, marginRight: 6, filter: focused.includes(g._idx) ? "none" : "grayscale(1) opacity(0.4)" }}
-            >⭐</button>
-            <span className="goal-emoji">{g.emoji}</span>
-            <div>
-              <strong>{g.goal}</strong>
-              {focused.includes(g._idx) && <span style={{ fontSize: 10, color: "var(--accent)", marginLeft: 6, fontWeight: 600 }}>FOCUS</span>}
-              <p className="goal-desc">{g.description}</p>
-            </div>
-          </div>
-          <div className="goal-progress-row">
-            <div className="goal-progress-bar"><div className="goal-progress-fill" style={{ width: `${g.progress}%` }} /></div>
-            <span className="goal-target">{Math.round(g.progress)}% → {g.target}</span>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

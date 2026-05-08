@@ -5,7 +5,7 @@ import express from "express";
 import cors from "cors";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import {
   analyzeSession,
@@ -155,6 +155,21 @@ function buildFilterOpts(req, res) {
   }
 
   return { repo, since, excludeIds };
+}
+
+function parseTimeframeQuery(query) {
+  const repo = typeof query.repo === "string" && query.repo !== "" ? query.repo : undefined;
+  if (typeof query.since === "string" && query.since !== "") {
+    const parsed = new Date(query.since);
+    return {
+      repo,
+      since: Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString(),
+    };
+  }
+  if (typeof query.timeframe === "string" && query.timeframe !== "" && query.timeframe !== "all") {
+    return { repo, since: parseSince(query.timeframe) };
+  }
+  return { repo, since: undefined };
 }
 
 /**
@@ -341,6 +356,127 @@ app.get("/api/sessions/:id/intent-suggestion", (req, res) => {
     res.json(result);
   } catch (err) {
     handleRouteError(res, err, "GET /api/sessions/:id/intent-suggestion");
+  }
+});
+
+// ── Dev Plan Goals ──────────────────────────────────────────
+const DEVPLAN_FILE = join(homedir(), ".copilot", "copilot-insights-devplan.json");
+
+function readDevPlan() {
+  try {
+    if (!existsSync(DEVPLAN_FILE)) return { goals: [] };
+    const parsed = JSON.parse(readFileSync(DEVPLAN_FILE, "utf-8"));
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.goals)) return { goals: [] };
+    return parsed;
+  } catch {
+    return { goals: [] };
+  }
+}
+
+function writeDevPlan(data) {
+  const dir = dirname(DEVPLAN_FILE);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(DEVPLAN_FILE, JSON.stringify(data, null, 2), "utf-8");
+}
+
+// GET /api/devplan/goals — list all goals
+app.get("/api/devplan/goals", (req, res) => {
+  try {
+    const plan = readDevPlan();
+    const includeProgress = req.query.progress === "true";
+    if (includeProgress) {
+      const { since, repo } = parseTimeframeQuery(req.query);
+      const devPlan = generateDevPlan({ repo, since, excludeIds: hiddenSessions, sessionIntents: sessionTags });
+      const currentScores = devPlan.pillarScores || {};
+      const SCORE_MAP = {
+        delegation: "workDesign",
+        judgment: "qualityControl",
+        specification: "intent",
+        efficiency: "evaluation",
+        workDesign: "workDesign",
+        qualityControl: "qualityControl",
+        intent: "intent",
+        evaluation: "evaluation",
+      };
+      const normalizedScores = {};
+      for (const [key, value] of Object.entries(currentScores)) {
+        normalizedScores[SCORE_MAP[key] || key] = value;
+      }
+      for (const goal of plan.goals) {
+        if (goal.status === "active" && normalizedScores[goal.pillar] !== null && normalizedScores[goal.pillar] !== undefined) {
+          goal.latestScore = normalizedScores[goal.pillar];
+          goal.lastChecked = new Date().toISOString();
+        }
+      }
+    }
+    res.json(plan);
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/devplan/goals");
+  }
+});
+
+// POST /api/devplan/goals — add a new goal
+app.post("/api/devplan/goals", (req, res) => {
+  try {
+    const { pillar, title, description, source, baselineScore } = req.body;
+    if (!pillar || !title) return res.status(400).json({ error: "pillar and title required" });
+    const plan = readDevPlan();
+    const exists = plan.goals.some((goal) => goal.title === title && goal.pillar === pillar && goal.status === "active");
+    if (exists) return res.status(409).json({ error: "Goal already exists" });
+    const goal = {
+      id: `goal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      pillar,
+      title,
+      description: description || "",
+      source: source || "manual",
+      addedAt: new Date().toISOString(),
+      baselineScore: baselineScore ?? null,
+      latestScore: null,
+      lastChecked: null,
+      status: "active",
+    };
+    plan.goals.push(goal);
+    writeDevPlan(plan);
+    res.status(201).json(goal);
+  } catch (err) {
+    handleRouteError(res, err, "POST /api/devplan/goals");
+  }
+});
+
+// PATCH /api/devplan/goals/:id — update goal status
+app.patch("/api/devplan/goals/:id", (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!["active", "sufficient", "removed"].includes(status)) {
+      return res.status(400).json({ error: "status must be active, sufficient, or removed" });
+    }
+    const plan = readDevPlan();
+    const goal = plan.goals.find((item) => item.id === req.params.id);
+    if (!goal) return res.status(404).json({ error: "Goal not found" });
+    goal.status = status;
+    if (status === "sufficient") {
+      goal.completedAt = new Date().toISOString();
+    } else {
+      delete goal.completedAt;
+    }
+    writeDevPlan(plan);
+    res.json(goal);
+  } catch (err) {
+    handleRouteError(res, err, "PATCH /api/devplan/goals/:id");
+  }
+});
+
+// DELETE /api/devplan/goals/:id — permanently delete a goal
+app.delete("/api/devplan/goals/:id", (req, res) => {
+  try {
+    const plan = readDevPlan();
+    const index = plan.goals.findIndex((goal) => goal.id === req.params.id);
+    if (index === -1) return res.status(404).json({ error: "Goal not found" });
+    plan.goals.splice(index, 1);
+    writeDevPlan(plan);
+    res.json({ ok: true });
+  } catch (err) {
+    handleRouteError(res, err, "DELETE /api/devplan/goals/:id");
   }
 });
 

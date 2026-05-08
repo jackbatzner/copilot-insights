@@ -37,6 +37,12 @@ function formatModelName(model) {
   return model;
 }
 
+const PILLAR_DISPLAY = {
+  delegation: "Work Design",
+  judgment: "Quality Control",
+  feedback: "Intent",
+};
+
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
@@ -121,7 +127,7 @@ export default function Overview() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="overview">
-        Your snapshot — growth across delegation, judgment, and feedback.
+        Your AI leadership snapshot — sessions, skills, and progress at a glance.
       </PageBanner>
 
       {vscodeSummary?.totalSessions > 0 && (
@@ -158,7 +164,7 @@ export default function Overview() {
                 <div style={{ fontSize: 16, fontWeight: 600 }}>
                   <MetricHelp
                     label={tier.name}
-                    definition="Your overall skill tier, derived from your combined Delegation + Judgment + Feedback pillar scores."
+                    definition="Your overall skill tier, derived from your combined Intent, Work Design, Quality Control, and Evaluation pillar scores."
                     target="Progress through tiers by improving your weakest pillar."
                   />
                 </div>
@@ -359,7 +365,7 @@ export default function Overview() {
                     const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
                     return (
                       <span key={pillar} style={{ color, fontWeight: 500 }}>
-                        {pillar.charAt(0).toUpperCase() + pillar.slice(1)}: {badge}
+                        {PILLAR_DISPLAY[pillar] || pillar}: {badge}
                       </span>
                     );
                   })}
@@ -373,7 +379,7 @@ export default function Overview() {
                 <Tooltip
                   contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
                   labelStyle={{ color: "var(--text-muted)" }}
-                  formatter={(value, name) => [`${value}`, name.charAt(0).toUpperCase() + name.slice(1)]}
+                  formatter={(value, name) => [`${value}`, PILLAR_DISPLAY[name] || name]}
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
@@ -381,9 +387,9 @@ export default function Overview() {
               </LineChart>
             </ResponsiveContainer>
             <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)" }}>
-              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
-              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
-              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Feedback" definition="How clearly you communicate requirements and corrections to the agent." target="70+ clarity score is clear communication." /></span>
+              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Work Design" definition="How you divide work between yourself and the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
+              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Quality Control" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
+              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Intent" definition="How clearly you set intent — defining the desired outcome and quality bar upfront." target="70+ clarity score is clear communication." /></span>
             </div>
           </div>
         </CollapsibleSection>
