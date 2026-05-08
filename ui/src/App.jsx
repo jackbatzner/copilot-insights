@@ -12,6 +12,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Instructions from "./pages/Instructions.jsx";
 import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
+import VSCodeSessions from "./pages/VSCodeSessions.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
 import TokenUsage from "./pages/TokenUsage.jsx";
 import { fetchSessions, clearCache } from "./api.js";
@@ -148,6 +149,9 @@ function App() {
               <NavLink to="/instructions">
                 <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
               </NavLink>
+              <NavLink to="/vscode">
+                <span className="nav-icon">💻</span><span className="nav-label">VS Code</span>
+              </NavLink>
             </NavGroup>
             <div className="refresh-section">
               <ThemeToggle />
@@ -176,6 +180,7 @@ function App() {
                 <Route path="/sessions" element={<Sessions />} />
                 <Route path="/sessions/:id" element={<SessionDetail />} />
                 <Route path="/practice" element={<Practice />} />
+                <Route path="/vscode" element={<VSCodeSessions />} />
               </>
             )}
           </Routes>

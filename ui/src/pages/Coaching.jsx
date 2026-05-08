@@ -96,9 +96,9 @@ export default function Coaching() {
             VS Code Copilot chats detected in {vscodeSummary.totalSessions} workspace{vscodeSummary.totalSessions === 1 ? "" : "s"}.
             Coaching and dev-plan scores currently reflect CLI sessions only while VS Code support is still separate.
             {" "}
-            <a href="/api/vscode/sessions" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+            <Link to="/vscode" style={{ color: "var(--accent)" }}>
               View VS Code sessions →
-            </a>
+            </Link>
           </div>
         </div>
       )}

@@ -130,9 +130,9 @@ export default function Overview() {
             VS Code Copilot chat history is available separately for {vscodeSummary.totalSessions} workspace{vscodeSummary.totalSessions === 1 ? "" : "s"}.
             Current scores in Copilot Insights reflect CLI sessions only.
             {" "}
-            <a href="/api/vscode/sessions" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+            <Link to="/vscode" style={{ color: "var(--accent)" }}>
               View VS Code sessions →
-            </a>
+            </Link>
           </div>
         </div>
       )}
