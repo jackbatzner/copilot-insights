@@ -11,6 +11,46 @@ import { analyzeInstructionFailures } from "./instruction-failures.mjs";
 import { listSessions, getSessionTurns, getSessionRefs } from "./db.mjs";
 
 /**
+ * Scoring weight profiles per session intent.
+ * Each profile adjusts how pillar scores are weighted for the overall score.
+ * redirect_penalty_factor: 0 = no penalty, 1 = full penalty for redirections/drip-feeds
+ */
+export const INTENT_WEIGHT_PROFILES = {
+  build: {
+    delegation: 1.0,
+    judgment: 1.0,
+    specification: 1.0,
+    efficiency: 1.0,
+    redirect_penalty_factor: 1.0,
+    description: "Full scoring — clear deliverable expected",
+  },
+  explore: {
+    delegation: 0.5,
+    judgment: 1.0,
+    specification: 0.6,
+    efficiency: 0.4,
+    redirect_penalty_factor: 0.3,
+    description: "De-weighted efficiency — research and learning expected",
+  },
+  iterate: {
+    delegation: 0.6,
+    judgment: 1.0,
+    specification: 0.7,
+    efficiency: 0.3,
+    redirect_penalty_factor: 0.0,
+    description: "No redirect penalty — iterative refinement is the goal",
+  },
+  debug: {
+    delegation: 0.4,
+    judgment: 1.2,
+    specification: 0.5,
+    efficiency: 0.7,
+    redirect_penalty_factor: 0.5,
+    description: "Emphasizes judgment — diagnostic accuracy is key",
+  },
+};
+
+/**
  * Curated learning resources from major AI providers.
  */
 const LEARNING_RESOURCES = {
@@ -197,7 +237,7 @@ function computeEfficiencyMetrics(delegation, efficiency, sessionsData = []) {
 /**
  * Generate a personalized development plan.
  */
-export function generateDevPlan({ repo, since, excludeIds } = {}) {
+export function generateDevPlan({ repo, since, excludeIds, sessionIntents } = {}) {
   const delegation = analyzeDelegation({ repo, since, excludeIds });
   const judgment = analyzeJudgment({ repo, since, excludeIds });
   const sessions = listSessions({ repo, since, excludeIds }).filter((s) => s.turn_count >= 2);
@@ -466,6 +506,60 @@ Example from your session: "${example.substring(0, 120)}..." — this could have
   ].sort((a, b) => a.score - b.score)[0].pillar;
 
   const learningPath = buildLearningPath(weakestPillar, opportunities);
+  const baseOverall = Math.round((delegationScore + judgmentScore + specificationScore + efficiencyScore) / 4);
+
+  let intentAdjustedScores = null;
+  let sessionIntentBreakdown = null;
+  if (sessionIntents && Object.keys(sessionIntents).length > 0) {
+    const intentCounts = { build: 0, explore: 0, iterate: 0, debug: 0 };
+    const sessionsWithIntents = sessions.filter((s) => sessionIntents[s.id]);
+    for (const s of sessionsWithIntents) {
+      const intent = sessionIntents[s.id];
+      if (intentCounts[intent] !== undefined) intentCounts[intent]++;
+    }
+    const totalIntented = sessionsWithIntents.length;
+    sessionIntentBreakdown = {
+      counts: intentCounts,
+      totalTagged: totalIntented,
+      totalSessions: sessions.length,
+      profiles: Object.fromEntries(
+        Object.entries(INTENT_WEIGHT_PROFILES).map(([intent, profile]) => [
+          intent,
+          {
+            description: profile.description,
+            redirect_penalty_factor: profile.redirect_penalty_factor,
+          },
+        ])
+      ),
+    };
+
+    if (totalIntented > 0) {
+      const clampScore = (score) => Math.max(0, Math.min(100, Math.round(score)));
+      const adjustFactor = (pillarKey) => {
+        let weightedSum = 0;
+        let countSum = 0;
+        for (const [intent, count] of Object.entries(intentCounts)) {
+          if (count > 0 && INTENT_WEIGHT_PROFILES[intent]) {
+            weightedSum += INTENT_WEIGHT_PROFILES[intent][pillarKey] * count;
+            countSum += count;
+          }
+        }
+        const nonIntented = sessions.length - totalIntented;
+        return (weightedSum + nonIntented) / (countSum + nonIntented);
+      };
+
+      intentAdjustedScores = {
+        delegation: clampScore(delegationScore * adjustFactor("delegation")),
+        judgment: clampScore(judgmentScore * adjustFactor("judgment")),
+        specification: clampScore(specificationScore * adjustFactor("specification")),
+        efficiency: clampScore(efficiencyScore * adjustFactor("efficiency")),
+      };
+      intentAdjustedScores.overall = Math.round(
+        (intentAdjustedScores.delegation + intentAdjustedScores.judgment +
+         intentAdjustedScores.specification + intentAdjustedScores.efficiency) / 4
+      );
+    }
+  }
 
   return {
     pillarScores: {
@@ -473,8 +567,10 @@ Example from your session: "${example.substring(0, 120)}..." — this could have
       judgment: judgmentScore,
       specification: specificationScore,
       efficiency: efficiencyScore,
-      overall: Math.round((delegationScore + judgmentScore + specificationScore + efficiencyScore) / 4),
+      overall: baseOverall,
     },
+    intentAdjustedScores,
+    sessionIntentBreakdown,
     opportunities: opportunities.slice(0, 10),
     quickWins,
     weeklyGoals,

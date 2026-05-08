@@ -55,6 +55,23 @@ describe("generateDevPlan", () => {
     assert.ok(result !== null, "should not crash on empty data");
     assert.equal(typeof result, "object");
   });
+
+  it("returns intent-adjusted scores when session intents are provided", () => {
+    const result = generateDevPlan({
+      repo: "org/app",
+      sessionIntents: { dp1: "explore", dp2: "build" },
+    });
+
+    assert.ok(result.intentAdjustedScores);
+    assert.equal(typeof result.intentAdjustedScores.overall, "number");
+    assert.ok(result.intentAdjustedScores.overall <= result.pillarScores.overall);
+    assert.deepStrictEqual(result.sessionIntentBreakdown.counts, {
+      build: 1,
+      explore: 1,
+      iterate: 0,
+      debug: 0,
+    });
+  });
 });
 
 describe("generateProgressCheck", () => {

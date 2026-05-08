@@ -267,6 +267,27 @@ export async function fetchChronicleImprove(sessionId) {
   return safeFetch(`${API_BASE}/chronicle/improve/${sessionId}`);
 }
 
+// Session Intent Tags
+export async function fetchSessionIntent(id) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent`);
+}
+
+export async function fetchIntentSuggestion(id) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent-suggestion`);
+}
+
+export async function setSessionIntent(id, intent) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ intent }),
+  });
+}
+
+export async function fetchAllIntents() {
+  return safeFetch(`${API_BASE}/session-intents`);
+}
+
 // VS Code sessions
 export async function fetchVSCodeSessions() {
   return safeFetch(`${API_BASE}/vscode/sessions`);

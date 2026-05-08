@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment, fetchDevPlan } from "../api";
+import { fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment, fetchDevPlan, fetchChronicleTips, fetchVSCodeSummary } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useRefresh } from "../App.jsx";
@@ -10,6 +10,7 @@ import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
+import { PILLARS, PILLAR_ORDER, BACKEND_KEY_MAP, getPillarStatus } from "../pillar-config.js";
 
 export default function Coaching() {
   const { key: refreshKey } = useRefresh();
@@ -19,6 +20,8 @@ export default function Coaching() {
   const [delegation, setDelegation] = useState(null);
   const [judgment, setJudgment] = useState(null);
   const [pillarScores, setPillarScores] = useState(null);
+  const [tips, setTips] = useState(null);
+  const [vscodeSummary, setVSCodeSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
@@ -32,8 +35,18 @@ export default function Coaching() {
       fetchDelegation(timeframe),
       fetchJudgment(timeframe),
       fetchDevPlan(timeframe),
+      fetchChronicleTips(timeframe).catch(() => null),
+      fetchVSCodeSummary().catch(() => null),
     ])
-      .then(([c, e, d, j, plan]) => { setClarity(c); setEfficiency(e); setDelegation(d); setJudgment(j); setPillarScores(plan?.pillarScores || null); })
+      .then(([c, e, d, j, plan, chronicleTips, vscode]) => {
+        setClarity(c);
+        setEfficiency(e);
+        setDelegation(d);
+        setJudgment(j);
+        setPillarScores(plan?.pillarScores || null);
+        setTips(Array.isArray(chronicleTips) ? { tips: chronicleTips } : chronicleTips);
+        setVSCodeSummary(vscode);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [timeframe, refreshKey]);
@@ -51,6 +64,21 @@ export default function Coaching() {
   );
 
   const sessionCount = delegation?.sessionsAnalyzed ?? clarity?.sessions?.length ?? 0;
+  const pillarScoresByKey = Object.fromEntries(
+    Object.entries(pillarScores || {}).map(([backendKey, value]) => [BACKEND_KEY_MAP[backendKey] || backendKey, value])
+  );
+  const pillarFallbacks = {
+    intent: clarity?.avgScore,
+    workDesign: delegation?.overallDelegationRatio,
+    qualityControl: judgment?.avgScore,
+    evaluation: efficiency?.aggregate?.avgEfficiency,
+  };
+  const pillarDetailLines = {
+    intent: `Clarity: ${clarity?.avgScore ?? 0} · Efficiency: ${efficiency?.aggregate?.avgEfficiency ?? 0}%`,
+    workDesign: `Delegation ratio: ${delegation?.overallDelegationRatio ?? 0}% · Leverage: ${delegation?.overallLeverage ?? 0}x`,
+    qualityControl: null,
+    evaluation: `Turn efficiency: ${efficiency?.aggregate?.avgEfficiency ?? 0}%`,
+  };
 
   return (
     <div className="page">
@@ -59,8 +87,21 @@ export default function Coaching() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="coaching">
-        Specification, Delegation, Judgment, Efficiency — your four AI leadership skills.
+        Intent, Work Design, Quality Control, Evaluation — your four AI leadership skills.
       </PageBanner>
+
+      {vscodeSummary?.totalSessions > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            VS Code Copilot chats detected in {vscodeSummary.totalSessions} workspace{vscodeSummary.totalSessions === 1 ? "" : "s"}.
+            Coaching and dev-plan scores currently reflect CLI sessions only while VS Code support is still separate.
+            {" "}
+            <a href="/api/vscode/sessions" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+              View VS Code sessions →
+            </a>
+          </div>
+        </div>
+      )}
 
       {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
         <EmptyState sessionCount={sessionCount} feature="coaching insights" />
@@ -68,54 +109,72 @@ export default function Coaching() {
 
       {/* Four pillars hero */}
       <div className="stats-grid stats-grid-4">
-        <div className={`stat-card pillar-card ${tab === "delegation" ? "pillar-active" : ""}`}onClick={() => setTab("delegation")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: "#58a6ff" }}>{pillarScores?.delegation ?? delegation?.overallDelegationRatio ?? "—"}</div>
-          <div className="stat-label"><MetricHelp label="🤝 Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." action="Describe WHAT you want, not HOW to do it." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>How much autonomy you give</div>
-          <div className="stat-sub">score / 100</div>
-          <div className="stat-sub" style={{ color: (pillarScores?.delegation ?? 0) >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {(pillarScores?.delegation ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.delegation ?? 0) >= 60 ? "✅ Good" : (pillarScores?.delegation ?? 0) >= 40 ? "📐 Room to improve" : "⚠️ Needs work"} · Target: 60+
-          </div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Delegation ratio: {delegation?.overallDelegationRatio ?? 0}% · Leverage: {delegation?.overallLeverage ?? 0}x</div>
-        </div>
-        <div className={`stat-card pillar-card ${tab === "judgment" ? "pillar-active" : ""}`} onClick={() => setTab("judgment")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: (pillarScores?.judgment ?? judgment?.avgScore ?? 0) >= 70 ? "#3fb950" : "#d29922" }}>{pillarScores?.judgment ?? judgment?.avgScore ?? "—"}</div>
-          <div className="stat-label"><MetricHelp label="🧠 Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping, avoiding costly late rollbacks." target="70+ is good, 80+ is excellent." action="Review each agent change carefully before approving." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of review decisions</div>
-          <div className="stat-sub">score / 100</div>
-          <div className="stat-sub" style={{ color: (pillarScores?.judgment ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {(pillarScores?.judgment ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.judgment ?? 0) >= 70 ? "✅ Good" : (pillarScores?.judgment ?? 0) >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
-          </div>
-        </div>
-        <div className={`stat-card pillar-card ${tab === "specification" ? "pillar-active" : ""}`} onClick={() => setTab("specification")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: (pillarScores?.specification ?? clarity?.avgScore ?? 0) >= 60 ? "#3fb950" : "#d29922" }}>{pillarScores?.specification ?? clarity?.avgScore ?? "—"}</div>
-          <div className="stat-label"><MetricHelp label="💬 Specification" definition="How clearly and completely you communicate requirements — the quality of the 'ticket' you write for the agent." target="70+ clarity score is clear specification." action="Include file paths, constraints, acceptance criteria, and what success looks like." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Quality of your prompts</div>
-          <div className="stat-sub">score / 100</div>
-          <div className="stat-sub" style={{ color: (pillarScores?.specification ?? 0) >= 70 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {(pillarScores?.specification ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.specification ?? 0) >= 70 ? "✅ Good" : (pillarScores?.specification ?? 0) >= 50 ? "📐 Fair" : "⚠️ Needs work"} · Target: 70+
-          </div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Clarity: {clarity?.avgScore ?? 0} · Efficiency: {efficiency?.aggregate?.avgEfficiency ?? 0}%</div>
-        </div>
-        <div className={`stat-card pillar-card ${tab === "efficiency" ? "pillar-active" : ""}`} onClick={() => setTab("efficiency")} style={{ cursor: "pointer" }}>
-          <div className="stat-value" style={{ color: (pillarScores?.efficiency ?? 0) >= 60 ? "#3fb950" : "#d29922" }}>{pillarScores?.efficiency ?? efficiency?.aggregate?.avgEfficiency ?? "—"}</div>
-          <div className="stat-label"><MetricHelp label="⚡ Efficiency" definition="How productively you use agent turns — productive turn ratio, session completion, and context hygiene." target="80%+ is excellent, 60%+ is good." action="Front-load context, avoid drip-feeding, keep sessions focused." /></div>
-          <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}>Productive use of turns</div>
-          <div className="stat-sub">score / 100</div>
-          <div className="stat-sub" style={{ color: (pillarScores?.efficiency ?? 0) >= 60 ? "var(--green)" : "var(--yellow)", fontSize: 11 }}>
-            {(pillarScores?.efficiency ?? 0) >= 80 ? "✅ Excellent" : (pillarScores?.efficiency ?? 0) >= 60 ? "✅ Good" : "📐 Needs work"} · Target: 60+
-          </div>
-          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>Turn efficiency: {efficiency?.aggregate?.avgEfficiency ?? 0}%</div>
-        </div>
+        {PILLAR_ORDER.map((pillarKey) => {
+          const config = PILLARS[pillarKey];
+          const score = pillarScoresByKey[pillarKey] ?? pillarFallbacks[pillarKey];
+          const status = getPillarStatus(score, pillarKey);
+
+          return (
+            <div
+              key={pillarKey}
+              className={`stat-card pillar-card ${tab === config.oldKey ? "pillar-active" : ""}`}
+              onClick={() => setTab(config.oldKey)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="stat-value" style={{ color: status.color }}>{score ?? "—"}</div>
+              <div className="stat-label">
+                <MetricHelp
+                  label={`${config.emoji} ${config.label}`}
+                  definition={config.definition}
+                  target={`Target: ${config.target}+`}
+                  action={config.action}
+                />
+              </div>
+              <div
+                style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }}
+                title={config.wtiAnchor}
+              >
+                {config.subtitle}
+              </div>
+              <div className="stat-sub">score / 100</div>
+              <div className="stat-sub" style={{ color: status.color, fontSize: 11 }}>
+                {status.text} · Target: {config.target}+
+              </div>
+              {pillarDetailLines[pillarKey] && (
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                  {pillarDetailLines[pillarKey]}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Tab bar */}
       <div className="tab-bar">
         <button className={`tab-btn ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>📊 Overview</button>
-        <button className={`tab-btn ${tab === "delegation" ? "active" : ""}`} onClick={() => setTab("delegation")}>🤝 Delegation</button>
-        <button className={`tab-btn ${tab === "judgment" ? "active" : ""}`} onClick={() => setTab("judgment")}>🧠 Judgment</button>
-        <button className={`tab-btn ${tab === "specification" ? "active" : ""}`} onClick={() => setTab("specification")}>💬 Specification</button>
+        <button className={`tab-btn ${tab === "delegation" ? "active" : ""}`} onClick={() => setTab("delegation")}>🤝 Work Design</button>
+        <button className={`tab-btn ${tab === "judgment" ? "active" : ""}`} onClick={() => setTab("judgment")}>🧠 Quality Control</button>
+        <button className={`tab-btn ${tab === "specification" ? "active" : ""}`} onClick={() => setTab("specification")}>🎯 Intent</button>
       </div>
+
+      {tab === "overview" && tips && tips.tips && tips.tips.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
+          <div className="card-header">💡 Chronicle Coaching Tips</div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+            Personalized tips based on patterns across your recent sessions.
+          </p>
+          {tips.tips.slice(0, 3).map((tip, i) => (
+            <div key={i} style={{ padding: "6px 0", borderTop: i > 0 ? "1px solid var(--border-color)" : "none" }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{tip.title || tip.category}</div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{tip.suggestion || tip.description}</div>
+            </div>
+          ))}
+          <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+            <Link to="/learn" style={{ color: "var(--accent)" }}>View all tips on Learn tab →</Link>
+          </div>
+        </div>
+      )}
 
       {tab === "overview" && <OverviewTab clarity={clarity} efficiency={efficiency} delegation={delegation} judgment={judgment} />}
       {tab === "delegation" && <DelegationTab data={delegation} />}

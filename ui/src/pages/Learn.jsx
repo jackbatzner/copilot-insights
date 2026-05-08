@@ -6,6 +6,15 @@ import { useTimeframe } from "../TimeframeContext.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
+import {
+  PILLARS,
+  PILLAR_ORDER,
+  BACKEND_KEY_MAP,
+  getPillarStatus,
+  getPillarLabel,
+  getPillarEmoji,
+  getPillarBadgeKey,
+} from "../pillar-config.js";
 
 export default function Learn() {
   const { key: refreshKey } = useRefresh();
@@ -43,6 +52,9 @@ export default function Learn() {
     { id: "retro", label: "🔄 Retro" },
     { id: "learn", label: "📚 Resources" },
   ];
+  const pillarScoresByKey = Object.fromEntries(
+    Object.entries(plan?.pillarScores || {}).map(([backendKey, value]) => [BACKEND_KEY_MAP[backendKey] || backendKey, value])
+  );
 
   return (
     <>
@@ -51,16 +63,24 @@ export default function Learn() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="learn">
-        Your personalized improvement plan — pick a focus and build habits.
+        Build habits across Intent, Work Design, Quality Control, and Evaluation.
       </PageBanner>
 
       {/* Pillar score hero */}
       {plan && (
         <div className="stats-grid stats-grid-5">
-          <ScoreCard emoji="🤝" label="Delegation" score={plan.pillarScores.delegation} />
-          <ScoreCard emoji="🧠" label="Judgment" score={plan.pillarScores.judgment} />
-          <ScoreCard emoji="💬" label="Specification" score={plan.pillarScores.specification} />
-          <ScoreCard emoji="⚡" label="Efficiency" score={plan.pillarScores.efficiency} />
+          {PILLAR_ORDER.map((pillarKey) => {
+            const config = PILLARS[pillarKey];
+            return (
+              <ScoreCard
+                key={pillarKey}
+                pillarKey={pillarKey}
+                emoji={config.emoji}
+                label={config.label}
+                score={pillarScoresByKey[pillarKey]}
+              />
+            );
+          })}
           <ScoreCard emoji="⭐" label="Overall" score={plan.pillarScores.overall} highlight />
         </div>
       )}
@@ -88,17 +108,23 @@ export default function Learn() {
   );
 }
 
-function ScoreCard({ emoji, label, score, highlight }) {
-  const color = score >= 70 ? "var(--green)" : score >= 45 ? "var(--yellow)" : "var(--red)";
+function ScoreCard({ emoji, label, score, highlight, pillarKey }) {
+  const status = pillarKey ? getPillarStatus(score, pillarKey) : null;
+  const color = highlight
+    ? score >= 70 ? "var(--green)" : score >= 45 ? "var(--yellow)" : "var(--red)"
+    : status?.color || "var(--text-muted)";
+  const target = pillarKey ? PILLARS[pillarKey]?.target : null;
   return (
     <div className={`card pillar-score-card${highlight ? " highlight" : ""}`} style={{ textAlign: "center" }}>
       <div style={{ fontSize: 28 }}>{emoji}</div>
       <div className="stat-value" style={{ color, fontSize: 36 }}>{score}</div>
       <div className="stat-label">{label}</div>
       <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-        {label === "Overall" ? "Average of 4 pillars" : "Score out of 100"}
+        {label === "Overall" ? "Average of 4 pillars" : PILLARS[pillarKey]?.subtitle || "Score out of 100"}
       </div>
-      {score < 80 && <div style={{ fontSize: 10, color: "var(--yellow)" }}>→ Target: 80</div>}
+      {!highlight && target != null && score < target && (
+        <div style={{ fontSize: 10, color: "var(--yellow)" }}>→ Target: {target}</div>
+      )}
     </div>
   );
 }
@@ -119,7 +145,7 @@ function QuickWinsCard({ wins }) {
       {shown.map((w, i) => (
         <div key={i} className="opportunity-item quick-win">
           <div className="opp-header">
-            <span className="pillar-pill" data-pillar={w.pillar}>{w.pillar}</span>
+            <span className="pillar-pill" data-pillar={getPillarBadgeKey(w.pillar)}>{getPillarLabel(w.pillar)}</span>
             <strong>{w.title}</strong>
           </div>
           <p className="opp-desc">{w.description}</p>
@@ -149,14 +175,14 @@ function DevPlanTab({ plan, gaps }) {
             return (
               <div key={i} className="opportunity-item">
                 <div className="opp-header">
-                  <span className="pillar-pill" data-pillar={o.pillar}>{o.pillar}</span>
+                  <span className="pillar-pill" data-pillar={getPillarBadgeKey(o.pillar)}>{getPillarLabel(o.pillar)}</span>
                   <strong>{o.title}</strong>
                   <span className="impact-badge">Impact: {o.impact}/10</span>
                 </div>
                 <p className="opp-desc">{o.description}</p>
                 <div className="opp-metric">{o.metric}</div>
                 <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(88, 166, 255, 0.08)", borderRadius: 6, fontSize: 12, color: "var(--accent)" }}>
-                  🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {o.pillar} score improves.
+                  🎯 <strong>This week's mission:</strong> In your next 3 sessions, try {o.title.toLowerCase()} and see if your {getPillarLabel(o.pillar)} score improves.
                 </div>
                 {relatedGoals.length > 0 && (
                   <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "2px solid var(--border)" }}>
@@ -207,18 +233,25 @@ function DevPlanTab({ plan, gaps }) {
 
 /* ── Chronicle Tips Tab ─────────────────────────────────────────── */
 function ChronicleTipsTab({ tips }) {
-  if (!tips || tips.length === 0) {
+  const tipItems = Array.isArray(tips) ? tips : tips?.tips || [];
+
+  if (tipItems.length === 0) {
     return (
       <div className="card">
         <div className="card-header">💡 Chronicle Tips</div>
-        <p style={{ color: "var(--text-muted)", padding: 16 }}>
-          No tips yet — keep using Copilot and check back when you have more sessions.
-        </p>
+        <div className="empty-section" style={{ padding: 16 }}>
+          <div className="empty-icon">🧭</div>
+          <p style={{ color: "var(--text-muted)", marginBottom: 8 }}>
+            No Chronicle coaching tips yet.
+          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, margin: 0 }}>
+            Tips appear once your recent CLI sessions have enough repeat patterns to coach on. Keep using Copilot, then check back here.
+          </p>
+        </div>
       </div>
     );
   }
 
-  const pillarEmoji = { specification: "💬", delegation: "🤝", judgment: "🧠", efficiency: "⚡" };
   const impactColor = { high: "var(--red)", medium: "var(--yellow)", low: "var(--green)" };
 
   return (
@@ -229,11 +262,11 @@ function ChronicleTipsTab({ tips }) {
           Evidence-based suggestions derived from your actual session patterns.
         </p>
       </div>
-      {tips.map((tip) => (
+      {tipItems.map((tip) => (
         <div key={tip.id} className="card" style={{ marginBottom: 12, borderLeft: `3px solid ${impactColor[tip.impact] || "var(--border)"}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span>{pillarEmoji[tip.pillar] || "📌"}</span>
-            <span className="pillar-pill" data-pillar={tip.pillar}>{tip.pillar}</span>
+            <span>{getPillarEmoji(tip.pillar)}</span>
+            <span className="pillar-pill" data-pillar={getPillarBadgeKey(tip.pillar)}>{getPillarLabel(tip.pillar)}</span>
             <strong>{tip.title}</strong>
             <span style={{ marginLeft: "auto", fontSize: 11, color: impactColor[tip.impact], fontWeight: 600 }}>
               {tip.impact} impact
@@ -266,10 +299,10 @@ function DailyCheckTab({ progress }) {
         ) : (
           <>
             <div className="stats-grid stats-grid-4" style={{ gap: 12, marginBottom: 16 }}>
-              <DeltaCard label="Delegation" current={today.delegationScore} delta={deltas.delegation} />
-              <DeltaCard label="Judgment" current={today.judgmentScore} delta={deltas.judgment} />
-              <DeltaCard label="Specification" current={today.specificationScore} delta={deltas.specification} />
-              <DeltaCard label="Efficiency" current={today.efficiencyScore} delta={deltas.efficiency} />
+              <DeltaCard label="Work Design" current={today.delegationScore} delta={deltas.delegation} />
+              <DeltaCard label="Quality Control" current={today.judgmentScore} delta={deltas.judgment} />
+              <DeltaCard label="Intent" current={today.specificationScore} delta={deltas.specification} />
+              <DeltaCard label="Evaluation" current={today.efficiencyScore} delta={deltas.efficiency} />
             </div>
             <div className="check-stats">
               <span>📋 {today.sessionCount} sessions</span>
@@ -377,7 +410,7 @@ function RetroTab({ retro }) {
 
       {/* Next focus */}
       <div className="card" style={{ borderLeft: "3px solid var(--purple)" }}>
-        <div className="card-header">🎯 Next Focus: {retro.nextFocus.pillar}</div>
+        <div className="card-header">🎯 Next Focus: {getPillarLabel(retro.nextFocus.pillar)}</div>
         <p style={{ margin: "8px 0" }}>{retro.nextFocus.recommendation}</p>
         {retro.nextFocus.resources.length > 0 && (
           <div className="retro-resources">
@@ -400,7 +433,7 @@ function ResourcesTab({ plan }) {
   return (
     <>
       <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
-        <div className="card-header">🎯 Focus Area: {learningPath.focus}</div>
+        <div className="card-header">🎯 Focus Area: {getPillarLabel(learningPath.focus)}</div>
         <p style={{ margin: "8px 0", color: "var(--text-muted)" }}>
           Estimated time: ~{learningPath.totalTime} min total
         </p>

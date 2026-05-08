@@ -30,6 +30,7 @@ import { analyzeDelegation } from "../src/delegation.mjs";
 import { analyzeJudgment } from "../src/judgment.mjs";
 import { generateDevPlan, generateProgressCheck, generateRetro } from "../src/dev-plan.mjs";
 import { computePillarTrends } from "../src/trends.mjs";
+import { classifySessionIntent } from "../src/intent-classifier.mjs";
 import { annotateSession } from "../src/replay.mjs";
 import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
@@ -202,6 +203,43 @@ function saveHiddenSessions(set) {
 
 const hiddenSessions = loadHiddenSessions();
 
+// -- Session Intent Tags (persisted to disk) ----------------------
+const TAGS_FILE = join(homedir(), ".copilot", "copilot-insights-tags.json");
+
+// Valid intent tags
+const VALID_INTENTS = new Set(["build", "explore", "iterate", "debug"]);
+
+function loadSessionTags() {
+  try {
+    const raw = readFileSync(TAGS_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && !Array.isArray(parsed)) {
+      // Validate entries
+      const clean = {};
+      for (const [id, tag] of Object.entries(parsed)) {
+        if (UUID_RE.test(id) && VALID_INTENTS.has(tag)) {
+          clean[id] = tag;
+        }
+      }
+      return clean;
+    }
+  } catch {
+    // File missing or corrupted — start fresh
+  }
+  return {};
+}
+
+function saveSessionTags(tags) {
+  try {
+    mkdirSync(join(homedir(), ".copilot"), { recursive: true });
+    writeFileSync(TAGS_FILE, JSON.stringify(tags, null, 2), "utf-8");
+  } catch (err) {
+    log.error("[session-tags] Failed to save:", err.message);
+  }
+}
+
+const sessionTags = loadSessionTags();
+
 /**
  * GET /api/hidden-sessions
  * Return list of session IDs currently hidden from analysis.
@@ -242,6 +280,68 @@ app.delete("/api/sessions/:id/hide", (req, res) => {
   hiddenSessions.delete(id);
   saveHiddenSessions(hiddenSessions);
   res.json({ ok: true });
+});
+
+// -- Session Intent Tags API ----------------------------------------
+
+/**
+ * GET /api/sessions/:id/intent
+ * Get the intent tag for a session.
+ */
+app.get("/api/sessions/:id/intent", (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ error: "Invalid session ID format" });
+  }
+  res.json({ intent: sessionTags[id] || null });
+});
+
+/**
+ * PUT /api/sessions/:id/intent
+ * Set the intent tag for a session.
+ * Body: { "intent": "build" | "explore" | "iterate" | "debug" }
+ */
+app.put("/api/sessions/:id/intent", (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id)) {
+    return res.status(400).json({ error: "Invalid session ID format" });
+  }
+  const { intent } = req.body;
+  if (!intent) {
+    delete sessionTags[id];
+    saveSessionTags(sessionTags);
+    return res.json({ ok: true, intent: null });
+  }
+  if (!VALID_INTENTS.has(intent)) {
+    return res.status(400).json({ error: `Invalid intent. Must be one of: ${[...VALID_INTENTS].join(", ")}` });
+  }
+  sessionTags[id] = intent;
+  saveSessionTags(sessionTags);
+  res.json({ ok: true, intent });
+});
+
+/**
+ * GET /api/session-intents
+ * Get all session intent tags (for bulk operations).
+ */
+app.get("/api/session-intents", (_req, res) => {
+  res.json({ intents: { ...sessionTags } });
+});
+
+/**
+ * GET /api/sessions/:id/intent-suggestion
+ * Auto-detect the intent for a session based on content analysis.
+ */
+app.get("/api/sessions/:id/intent-suggestion", (req, res) => {
+  try {
+    if (!UUID_RE.test(req.params.id)) {
+      return res.status(400).json({ error: "Invalid session ID format" });
+    }
+    const result = classifySessionIntent(req.params.id);
+    res.json(result);
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/sessions/:id/intent-suggestion");
+  }
 });
 
 /**
@@ -694,7 +794,7 @@ app.get("/api/dev-plan", (req, res) => {
     if (repo === null) return;
     const since = validateTimeframe(req, res);
     if (since === null) return;
-    res.json(generateDevPlan({ repo, since, excludeIds: hiddenSessions }));
+    res.json(generateDevPlan({ repo, since, excludeIds: hiddenSessions, sessionIntents: sessionTags }));
   } catch (err) {
     handleRouteError(res, err, "GET /api/dev-plan");
   }
@@ -743,7 +843,7 @@ app.get("/api/pillar-trends", (req, res) => {
     if (repo === null) return;
     const since = validateTimeframe(req, res);
     if (since === null) return;
-    res.json(computePillarTrends({ repo, since, excludeIds: hiddenSessions }));
+    res.json(computePillarTrends({ repo, since, excludeIds: hiddenSessions, sessionIntents: sessionTags }));
   } catch (err) {
     handleRouteError(res, err, "GET /api/pillar-trends");
   }

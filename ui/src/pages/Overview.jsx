@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary } from "../api.js";
+import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary, fetchVSCodeSummary } from "../api.js";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
@@ -46,6 +46,7 @@ export default function Overview() {
   const [pillarTrends, setPillarTrends] = useState(null);
   const [workStyle, setWorkStyle] = useState(null);
   const [tokenData, setTokenData] = useState(null);
+  const [vscodeSummary, setVSCodeSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,8 +62,9 @@ export default function Overview() {
       fetchPillarTrends(timeframe),
       fetchWorkStyle(timeframe),
       fetchTokenSummary(timeframe),
+      fetchVSCodeSummary().catch(() => null),
     ])
-      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary]) => {
+      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary, vscodeData]) => {
         if (cancelled) return;
         setData(sessionsData);
         setTrends(trendsData.trends);
@@ -70,6 +72,7 @@ export default function Overview() {
         setPillarTrends(pillarData);
         setWorkStyle(workStyleData);
         setTokenData(tokenSummary);
+        setVSCodeSummary(vscodeData);
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -120,6 +123,19 @@ export default function Overview() {
       <PageBanner pageId="overview">
         Your snapshot — growth across delegation, judgment, and feedback.
       </PageBanner>
+
+      {vscodeSummary?.totalSessions > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            VS Code Copilot chat history is available separately for {vscodeSummary.totalSessions} workspace{vscodeSummary.totalSessions === 1 ? "" : "s"}.
+            Current scores in Copilot Insights reflect CLI sessions only.
+            {" "}
+            <a href="/api/vscode/sessions" target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+              View VS Code sessions →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Since Last Visit — shown for returning users */}
       <SinceLastVisit refreshKey={refreshKey} />

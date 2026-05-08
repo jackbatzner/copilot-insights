@@ -65,6 +65,17 @@ describe("computePillarTrends", () => {
     assert.equal(totalSessions, 2, "total sessions across weeks should match seed data");
   });
 
+  it("applies intent weights to tagged sessions", () => {
+    const baseline = mod.computePillarTrends({ repo: "org/app" });
+    const weighted = mod.computePillarTrends({
+      repo: "org/app",
+      sessionIntents: { tw1: "explore" },
+    });
+
+    assert.ok(weighted.weeks[0].overall < baseline.weeks[0].overall);
+    assert.ok(weighted.weeks[0].delegation < baseline.weeks[0].delegation);
+  });
+
   it("empty DB returns empty weeks array", () => {
     // Query for a repo that doesn't exist
     const result = mod.computePillarTrends({ repo: "nonexistent/repo" });

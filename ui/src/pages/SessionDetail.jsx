@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens, fetchChronicleImprove } from "../api.js";
+import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens, fetchChronicleImprove, fetchSessionIntent, fetchIntentSuggestion, setSessionIntent } from "../api.js";
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
@@ -21,12 +21,11 @@ export default function SessionDetail() {
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const tagKey = `session-tag-${id}`;
-  const [sessionTag, setSessionTag] = useState(() => {
-    try { return localStorage.getItem(tagKey) || ""; } catch { return ""; }
-  });
+  const [sessionIntent, setSessionIntentState] = useState(null);
+  const [intentSuggestion, setIntentSuggestion] = useState(null);
 
   useEffect(() => {
+    setIntentSuggestion(null);
     Promise.all([
       fetchSessionDetail(id),
       fetchSessionSprawl(id).catch(() => null),
@@ -36,8 +35,21 @@ export default function SessionDetail() {
       fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
       fetchSessionTokens(id).catch(() => null),
       fetchChronicleImprove(id).catch(() => null),
+      fetchSessionIntent(id).catch(() => null),
+      fetchIntentSuggestion(id).catch(() => null),
     ])
-      .then(([d, s, e, r, c, h, t, imp]) => { setData(d); setSprawl(s); setEfficiency(e); setReplay(r); setComplexity(c); setIsHidden(h.sessionIds.includes(id)); setTokenInfo(t); setImprove(imp); })
+      .then(([d, s, e, r, c, h, t, imp, intentData, suggestion]) => {
+        setData(d);
+        setSprawl(s);
+        setEfficiency(e);
+        setReplay(r);
+        setComplexity(c);
+        setIsHidden(h.sessionIds.includes(id));
+        setTokenInfo(t);
+        setImprove(imp);
+        setSessionIntentState(intentData?.intent ?? null);
+        setIntentSuggestion(suggestion);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -103,19 +115,15 @@ export default function SessionDetail() {
     return hasFeedbackLanguage || (planTurns >= 2 && hasStructuralSignals);
   })();
 
-  // Manual session tagging (persisted in localStorage)
-  const setTag = (tag) => {
-    const newTag = sessionTag === tag ? "" : tag;
-    setSessionTag(newTag);
+  const handleIntentChange = async (intent) => {
+    const newIntent = sessionIntent === intent ? null : intent;
+    setSessionIntentState(newIntent);
     try {
-      if (newTag) localStorage.setItem(tagKey, newTag);
-      else localStorage.removeItem(tagKey);
-    } catch { /* storage unavailable */ }
+      await setSessionIntent(id, newIntent);
+    } catch (err) {
+      console.warn("Failed to save intent:", err.message);
+    }
   };
-  const isTaggedTesting = sessionTag === "testing";
-  const isTaggedLearning = sessionTag === "learning";
-  const showTestingBadge = isTaggedTesting || (isTestingSession && !isTaggedLearning);
-  const showLearningBadge = isTaggedLearning || (isLearningSession && !isTaggedTesting);
 
   return (
     <>
@@ -129,6 +137,22 @@ export default function SessionDetail() {
           <p style={{ margin: 0, minWidth: 0 }}>
             <code style={{ wordBreak: "break-all", fontSize: "clamp(10px, 2.5vw, 14px)" }}>{session.id}</code>
           </p>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "3px 8px",
+              borderRadius: 999,
+              border: "1px solid var(--border-color)",
+              background: "rgba(88, 166, 255, 0.08)",
+              color: "var(--accent)",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+            }}
+          >
+            CLI
+          </span>
           <button
             onClick={toggleHide}
             style={{
@@ -201,52 +225,79 @@ export default function SessionDetail() {
             <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
           </div>
         )}
-        {showLearningBadge && (
-          <div className="card" style={{ textAlign: "center", background: "rgba(88, 166, 255, 0.08)", borderColor: "var(--accent)" }}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>📚</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--accent)" }}>Learning Session</div>
-            <div className="stat-sub">Q&A / exploration — no files changed</div>
-          </div>
-        )}
-        {showTestingBadge && (
-          <div className="card" style={{ textAlign: "center", background: "rgba(210, 153, 34, 0.08)", borderColor: "var(--yellow)" }}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>🧪</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--yellow)" }}>Testing & Feedback Session</div>
-            <div className="stat-sub">{isTestingSession && !isTaggedTesting ? "Auto-detected:" : ""} Multiple feedback rounds</div>
-          </div>
-        )}
       </div>
 
-      {/* Manual session type tag */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Tag this session:</span>
-        <button
-          onClick={() => setTag("testing")}
-          style={{
-            background: isTaggedTesting ? "rgba(210, 153, 34, 0.15)" : "var(--bg-card)",
-            border: `1px solid ${isTaggedTesting ? "var(--yellow)" : "var(--border)"}`,
-            color: isTaggedTesting ? "var(--yellow)" : "var(--text-muted)",
-            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
-          }}
-        >
-          🧪 Testing/Feedback
-        </button>
-        <button
-          onClick={() => setTag("learning")}
-          style={{
-            background: isTaggedLearning ? "rgba(88, 166, 255, 0.15)" : "var(--bg-card)",
-            border: `1px solid ${isTaggedLearning ? "var(--accent)" : "var(--border)"}`,
-            color: isTaggedLearning ? "var(--accent)" : "var(--text-muted)",
-            borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 12,
-          }}
-        >
-          📚 Learning/Q&A
-        </button>
-        {sessionTag && (
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            (click again to remove)
-          </span>
+      {/* Session Intent */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">Session Intent</div>
+        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+          What was this session&apos;s purpose? This adjusts how your scores are calculated.
+        </p>
+        {intentSuggestion && !sessionIntent && (
+          <div style={{
+            background: "var(--bg-hover)",
+            border: "1px solid var(--accent)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            marginBottom: 8,
+            fontSize: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}>
+            <span>💡 Suggested: <strong>{intentSuggestion.intent.charAt(0).toUpperCase() + intentSuggestion.intent.slice(1)}</strong></span>
+            <span style={{ color: "var(--text-muted)" }}>
+              ({intentSuggestion.confidence} confidence{intentSuggestion.signals.length > 0 ? ` — ${intentSuggestion.signals[0]}` : ""})
+            </span>
+            <button
+              onClick={() => handleIntentChange(intentSuggestion.intent)}
+              style={{
+                background: "var(--accent)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "4px 12px",
+                cursor: "pointer",
+                fontSize: 11,
+                marginLeft: "auto",
+              }}
+            >
+              Accept
+            </button>
+          </div>
         )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { id: "build", emoji: "🎯", label: "Build", desc: "Clear deliverable" },
+            { id: "explore", emoji: "🧠", label: "Explore", desc: "Research & learn" },
+            { id: "iterate", emoji: "🔄", label: "Iterate", desc: "Refine & improve" },
+            { id: "debug", emoji: "🔧", label: "Debug", desc: "Troubleshoot" },
+          ].map(({ id: intentId, emoji, label, desc }) => (
+            <button
+              key={intentId}
+              onClick={() => handleIntentChange(intentId)}
+              style={{
+                background: sessionIntent === intentId ? "var(--accent)" : "var(--bg-card)",
+                color: sessionIntent === intentId ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${sessionIntent === intentId ? "var(--accent)" : "var(--border-color)"}`,
+                borderRadius: 8,
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: 13,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+                minWidth: 90,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>{emoji}</span>
+              <strong>{label}</strong>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>{desc}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {session.summary && (
@@ -260,7 +311,7 @@ export default function SessionDetail() {
         tabs={[
           { id: "summary", label: "📊 Summary" },
           { id: "deep-dive", label: "🎬 Deep Dive" },
-          { id: "improve", label: "💡 Improve" },
+          { id: "improve", label: "📈 Chronicle Improve" },
           { id: "tokens", label: "💰 Tokens" },
         ]}
         activeTab={tab}
@@ -530,14 +581,15 @@ export default function SessionDetail() {
       </TabPanel>
 
       <TabPanel id="improve" activeTab={tab}>
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
+          <div className="card-header">📈 Chronicle Improve</div>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, padding: "0 16px" }}>
+            {improve?.overallAdvice || "Chronicle coaching is not available for this session yet. When it is, you'll see concrete suggestions for improving your next similar session."}
+          </p>
+        </div>
+
         {improve && improve.suggestions && improve.suggestions.length > 0 ? (
           <div>
-            <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
-              <div className="card-header">💡 What could be better next time</div>
-              <p style={{ color: "var(--text-muted)", fontSize: 12, padding: "0 16px" }}>
-                {improve.overallAdvice}
-              </p>
-            </div>
             {improve.suggestions.map((s, i) => (
               <div key={i} className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--yellow)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -555,11 +607,18 @@ export default function SessionDetail() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : improve ? (
           <div className="card" style={{ padding: 24, textAlign: "center" }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
             <p style={{ color: "var(--text-muted)" }}>
-              {improve?.overallAdvice || "This session was already well-scoped — no specific improvements identified."}
+              This session was already well-scoped — no specific Chronicle improvements were identified.
+            </p>
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 24, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
+            <p style={{ color: "var(--text-muted)" }}>
+              Chronicle Improve data is not available for this session yet. Session detail scoring on this page currently reflects CLI session data.
             </p>
           </div>
         )}

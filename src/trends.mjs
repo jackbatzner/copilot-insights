@@ -6,6 +6,7 @@ import { listSessions, getSessionTurns, getSessionFiles, getSessionRefs } from "
 import { classifyMessage } from "./delegation.mjs";
 import { scoreClarity } from "./clarity.mjs";
 import { analyzeEfficiency } from "./efficiency.mjs";
+import { INTENT_WEIGHT_PROFILES } from "./dev-plan.mjs";
 
 /** Strip XML/HTML system tags from a message before analysis. */
 function stripTags(msg) {
@@ -141,9 +142,9 @@ function scoreSessionEfficiency(session, effResult, refs) {
 
 /**
  * Compute weekly pillar score snapshots using the same formulas as dev-plan.mjs.
- * @param {{ repo?: string, since?: string, excludeIds?: Set<string> }} opts
+ * @param {{ repo?: string, since?: string, excludeIds?: Set<string>, sessionIntents?: Record<string, string> }} opts
  */
-export function computePillarTrends({ repo, since, excludeIds } = {}) {
+export function computePillarTrends({ repo, since, excludeIds, sessionIntents } = {}) {
   const sessions = listSessions({ repo, since, excludeIds, limit: 10000 });
 
   // Group sessions by ISO week
@@ -170,6 +171,7 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
     let specificationSum = 0;
     let efficiencySum = 0;
     let scored = 0;
+    const clampWeightedScore = (score) => Math.max(0, Math.min(100, Math.round(score)));
 
     for (const session of entry.sessions) {
       if (session.turn_count < 2) continue;
@@ -188,18 +190,18 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
         (Math.min(del.agentLeverage, 3) / 3 * 30) +
         (hasFileOps ? 30 : 0)
       ));
-      delegationSum += delScore;
-
-      // Judgment — same scoring logic as judgment.mjs
-      judgmentSum += scoreSessionJudgment(turns);
-
-      // Efficiency — per-session
+      const judgmentScore = scoreSessionJudgment(turns);
       const effResult = analyzeEfficiency(turns, refs) || {};
       effResult._firstMessage = turns[0]?.user_message || "";
-      efficiencySum += scoreSessionEfficiency(session, effResult, refs);
+      const efficiencyScore = scoreSessionEfficiency(session, effResult, refs);
+      const specificationScore = scoreSessionSpecification(turns, effResult);
+      const intent = sessionIntents?.[session.id];
+      const weights = intent ? INTENT_WEIGHT_PROFILES[intent] : null;
 
-      // Specification — clarity + efficiency + drip-feed penalty
-      specificationSum += scoreSessionSpecification(turns, effResult);
+      delegationSum += weights ? clampWeightedScore(delScore * weights.delegation) : delScore;
+      judgmentSum += weights ? clampWeightedScore(judgmentScore * weights.judgment) : judgmentScore;
+      efficiencySum += weights ? clampWeightedScore(efficiencyScore * weights.efficiency) : efficiencyScore;
+      specificationSum += weights ? clampWeightedScore(specificationScore * weights.specification) : specificationScore;
     }
 
     const delegation = scored ? Math.round(delegationSum / scored) : 0;
