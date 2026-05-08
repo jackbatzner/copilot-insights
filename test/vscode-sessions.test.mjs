@@ -189,6 +189,10 @@ describe("readVSCodeSessions", () => {
     });
 
     const summary = summarizeVSCodeSessions();
+    const sessions = readVSCodeSessions();
+    const analyses = sessions.map((session) => analyzeVSCodeSession(session));
+    const avg = (values) => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+
     assert.equal(summary.totalSessions, 2);
     assert.equal(summary.totalTurns, 3);
     assert.equal(summary.avgTurnsPerSession, 1.5);
@@ -196,11 +200,17 @@ describe("readVSCodeSessions", () => {
     assert.deepEqual(summary.editions, { stable: 1, insiders: 1 });
     assert.deepEqual(summary.models[0], { name: "GPT-4.1", count: 2 });
     assert.deepEqual(summary.modes[0], { name: "agent", count: 2 });
+    assert.deepEqual(summary.pillarScores, {
+      intent: avg(analyses.map((analysis) => analysis.specification.score)),
+      workDesign: null,
+      qualityControl: avg(analyses.map((analysis) => analysis.judgment.avgScore)),
+      evaluation: avg(analyses.map((analysis) => analysis.efficiency.aggregate.avgEfficiency)),
+    });
   });
 });
 
 describe("analyzeVSCodeSession", () => {
-  it("scores first-turn clarity and classifies delegation patterns", () => {
+  it("scores clarity, delegation, quality control, and evaluation heuristics", () => {
     seedWorkspace({
       edition: "insiders",
       workspaceId: "analysis-1",
@@ -219,6 +229,18 @@ describe("analyzeVSCodeSession", () => {
               mode: { id: "chat", kind: "chat" },
               selectedModel: { identifier: "copilot/claude-opus-4.6", metadata: { name: "Claude Opus 4.6" } },
             },
+            {
+              inputText: "Actually, fix the validation bug instead.",
+              attachments: [],
+              mode: { id: "agent", kind: "agent" },
+              selectedModel: { identifier: "copilot/claude-opus-4.6", metadata: { name: "Claude Opus 4.6" } },
+            },
+            {
+              inputText: "Also add one more test for empty payloads.",
+              attachments: [],
+              mode: { id: "chat", kind: "chat" },
+              selectedModel: { identifier: "copilot/claude-opus-4.6", metadata: { name: "Claude Opus 4.6" } },
+            },
           ],
         },
       },
@@ -227,13 +249,28 @@ describe("analyzeVSCodeSession", () => {
     const session = readVSCodeSessions()[0];
     const analysis = analyzeVSCodeSession(session);
 
-    assert.equal(analysis.judgment, null);
-    assert.equal(analysis.efficiency, null);
-    assert.equal(analysis.turnCount, 2);
+    assert.equal(analysis.turnCount, 4);
     assert.ok(analysis.specification.score > 40);
     assert.equal(analysis.delegation.turns[0].type, "delegation");
     assert.equal(analysis.delegation.turns[1].type, "question");
-    assert.equal(analysis.delegation.counts.delegation, 1);
+    assert.equal(analysis.delegation.counts.delegation, 2);
     assert.equal(analysis.delegation.counts.question, 1);
+    assert.deepEqual(analysis.judgment, {
+      avgScore: 75,
+      catches: 1,
+      rubberStamps: 0,
+      rubberStampRate: 0,
+      criticalThinking: 0,
+      totalLateCatches: 0,
+      suggestions: [],
+    });
+    assert.deepEqual(analysis.efficiency, {
+      aggregate: {
+        avgEfficiency: 67,
+        totalDripFeeds: 1,
+        totalSkimSignals: 0,
+        totalRedirections: 1,
+      },
+    });
   });
 });

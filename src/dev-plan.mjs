@@ -8,6 +8,7 @@ import { analyzeFirstTurnClarity } from "./clarity.mjs";
 import { analyzeEfficiencyBatch } from "./efficiency.mjs";
 import { analyzeInstructionGaps } from "./instructions.mjs";
 import { analyzeInstructionFailures } from "./instruction-failures.mjs";
+import { computeTokenEfficiencyScore } from "./tokens.mjs";
 import { listSessions, getSessionTurns, getSessionRefs } from "./db.mjs";
 
 /**
@@ -38,7 +39,7 @@ export const INTENT_WEIGHT_PROFILES = {
     specification: 0.7,
     efficiency: 0.3,
     redirect_penalty_factor: 0.0,
-    description: "No redirect penalty — iterative refinement is the goal",
+    description: "Brainstorm & Improve — iterative refinement is the goal",
   },
   debug: {
     delegation: 0.4,
@@ -208,6 +209,12 @@ function computeEfficiencyMetrics(delegation, efficiency, sessionsData = []) {
   const sessionCompletionRate = delegation.sessionsAnalyzed > 0
     ? ((delegation.sessionsWithCommits + delegation.sessionsWithPRs) / delegation.sessionsAnalyzed) * 100
     : 0;
+  const tokenEfficiencyScores = sessionsData
+    .map(({ session }) => computeTokenEfficiencyScore(session.id))
+    .filter((result) => result && typeof result.score === "number");
+  const avgTokenEfficiency = tokenEfficiencyScores.length > 0
+    ? tokenEfficiencyScores.reduce((sum, result) => sum + result.score, 0) / tokenEfficiencyScores.length
+    : 50;
 
   let contextHygiene = 100;
   for (const { session, turns } of sessionsData) {
@@ -221,15 +228,17 @@ function computeEfficiencyMetrics(delegation, efficiency, sessionsData = []) {
 
   contextHygiene = Math.max(0, contextHygiene);
   const efficiencyScore = Math.min(100, Math.max(0, Math.round(
-    (productiveTurnRatio * 0.4) +
-    (sessionCompletionRate * 0.3) +
-    (contextHygiene * 0.3)
+    (productiveTurnRatio * 0.35) +
+    (sessionCompletionRate * 0.25) +
+    (contextHygiene * 0.2) +
+    (avgTokenEfficiency * 0.2)
   )));
 
   return {
     productiveTurnRatio: Math.round(productiveTurnRatio),
     sessionCompletionRate: Math.round(sessionCompletionRate),
     contextHygiene,
+    avgTokenEfficiency: Math.round(avgTokenEfficiency),
     efficiencyScore,
   };
 }
@@ -692,6 +701,7 @@ function computePillarScores(delegation, judgment, clarityResult, efficiency, se
     productiveTurnRatio,
     sessionCompletionRate,
     contextHygiene,
+    avgTokenEfficiency,
     efficiencyScore,
   } = computeEfficiencyMetrics(delegation, efficiency, sessionsData);
   return {
@@ -702,6 +712,7 @@ function computePillarScores(delegation, judgment, clarityResult, efficiency, se
     productiveTurnRatio,
     sessionCompletionRate,
     contextHygiene,
+    avgTokenEfficiency,
   };
 }
 

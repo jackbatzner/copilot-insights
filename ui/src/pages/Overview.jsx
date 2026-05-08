@@ -292,10 +292,10 @@ export default function Overview() {
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>🚀 What to do next</div>
         <div className="next-steps-grid">
           <SuggestedNext
-            to="/coaching"
-            icon="🎓"
-            label="Coaching"
-            description="Delegation, judgment & feedback scores"
+            to="/skills"
+            icon="🎯"
+            label="Skill Building"
+            description="Intent, Work Design, Quality Control & Evaluation scores"
           />
           <SuggestedNext
             to="/sessions"

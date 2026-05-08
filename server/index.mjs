@@ -36,7 +36,7 @@ import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 import { readVSCodeSessions, summarizeVSCodeSessions } from "../src/vscode-sessions.mjs";
 
-import { analyzeSessionTokens, analyzeTokensBatch, fetchLivePricing, getLivePricingOrFallback } from "../src/tokens.mjs";
+import { analyzeSessionTokens, analyzeTokensBatch, computeTokenEfficiencyScore, fetchLivePricing, getLivePricingOrFallback } from "../src/tokens.mjs";
 import {
   tokensByModel,
   tokensPerRedirection,
@@ -1267,6 +1267,80 @@ app.get("/api/tokens/efficiency", (req, res) => {
     res.json(tokenEfficiencyMetrics({ repo, since, excludeIds: hiddenSessions }));
   } catch (err) {
     handleRouteError(res, err, "GET /api/tokens/efficiency");
+  }
+});
+
+/**
+ * GET /api/token-efficiency-score
+ * Aggregate token efficiency scoring for Evaluation drill-down.
+ */
+app.get("/api/token-efficiency-score", (req, res) => {
+  try {
+    const opts = buildFilterOpts(req, res);
+    if (opts === null) return;
+
+    const sessions = listSessions(opts).filter((session) => session.turn_count >= 2);
+    const scoredSessions = sessions
+      .map((session) => ({
+        sessionId: session.id,
+        result: computeTokenEfficiencyScore(session.id),
+      }))
+      .filter(({ result }) => result && typeof result.score === "number");
+
+    if (scoredSessions.length === 0) {
+      return res.json({
+        avgScore: 0,
+        totalSessions: 0,
+        components: { ratioScore: 0, turnScore: 0, cacheScore: 0 },
+        topOptimizations: [],
+      });
+    }
+
+    const componentTotals = scoredSessions.reduce((totals, { result }) => ({
+      ratioScore: totals.ratioScore + (result.components?.ratioScore || 0),
+      turnScore: totals.turnScore + (result.components?.turnScore || 0),
+      cacheScore: totals.cacheScore + (result.components?.cacheScore || 0),
+    }), { ratioScore: 0, turnScore: 0, cacheScore: 0 });
+
+    const components = {
+      ratioScore: Math.round(componentTotals.ratioScore / scoredSessions.length),
+      turnScore: Math.round(componentTotals.turnScore / scoredSessions.length),
+      cacheScore: Math.round(componentTotals.cacheScore / scoredSessions.length),
+    };
+
+    const optimizationPlaybook = [
+      {
+        id: "output-input-ratio",
+        title: "Increase output yield",
+        description: "Batch requirements up front and ask for fuller implementations to get more useful output per input token.",
+        avgScore: components.ratioScore,
+      },
+      {
+        id: "tokens-per-turn",
+        title: "Reduce tokens per turn",
+        description: "Tighten task scope and split exploratory follow-ups into separate sessions to keep productive turns lean.",
+        avgScore: components.turnScore,
+      },
+      {
+        id: "cache-utilization",
+        title: "Improve cache reuse",
+        description: "Reuse stable instructions and shared context so repeated prompts benefit from cached input tokens.",
+        avgScore: components.cacheScore,
+      },
+    ];
+
+    const avgScore = Math.round(
+      scoredSessions.reduce((sum, { result }) => sum + result.score, 0) / scoredSessions.length
+    );
+
+    res.json({
+      avgScore,
+      totalSessions: scoredSessions.length,
+      components,
+      topOptimizations: optimizationPlaybook.sort((a, b) => a.avgScore - b.avgScore).slice(0, 3),
+    });
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/token-efficiency-score");
   }
 });
 

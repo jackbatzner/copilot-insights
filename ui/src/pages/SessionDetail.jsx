@@ -271,7 +271,7 @@ export default function SessionDetail() {
           {[
             { id: "build", emoji: "🎯", label: "Build", desc: "Clear deliverable" },
             { id: "explore", emoji: "🧠", label: "Explore", desc: "Research & learn" },
-            { id: "iterate", emoji: "🔄", label: "Iterate", desc: "Refine & improve" },
+            { id: "iterate", emoji: "🔄", label: "Iterate", desc: "Brainstorm & Improve" },
             { id: "debug", emoji: "🔧", label: "Debug", desc: "Troubleshoot" },
           ].map(({ id: intentId, emoji, label, desc }) => (
             <button

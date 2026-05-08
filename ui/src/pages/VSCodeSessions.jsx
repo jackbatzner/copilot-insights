@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchVSCodeSessions, fetchVSCodeSummary } from "../api.js";
 import { PageBanner } from "../components/PageBanner.jsx";
+import { PILLARS, PILLAR_ORDER, getPillarStatus } from "../pillar-config.js";
 
 export default function VSCodeSessions() {
   const [sessions, setSessions] = useState(null);
@@ -89,10 +90,30 @@ export default function VSCodeSessions() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--yellow)", padding: "12px 16px" }}>
+      {summary?.pillarScores && (
+        <div className="stats-grid stats-grid-4" style={{ marginBottom: 16 }}>
+          {PILLAR_ORDER.map((pillarKey) => {
+            const config = PILLARS[pillarKey];
+            const score = summary.pillarScores[pillarKey];
+            const status = getPillarStatus(score, pillarKey);
+            return (
+              <div key={pillarKey} className="card" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 24 }}>{config.emoji}</div>
+                <div className="stat-value" style={{ color: status.color }}>{score ?? "—"}</div>
+                <div className="stat-label">{config.label}</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {score == null ? "Not yet scored" : `${config.subtitle} · /100`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)", padding: "12px 16px" }}>
         <div style={{ fontSize: 13 }}>
-          <strong>📊 Scoring note:</strong> VS Code sessions are displayed here for visibility but are not yet integrated into the pillar scoring framework.
-          CLI sessions (from Copilot in the terminal) drive your Coaching and Learn scores.
+          <strong>📊 Scoring note:</strong> VS Code pillar scores use session-level heuristics for Intent, Quality Control, and Evaluation.
+          Work Design remains CLI-only for now.
         </div>
       </div>
 

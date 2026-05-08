@@ -503,6 +503,45 @@ export function analyzeSessionTokens(sessionId) {
   };
 }
 
+/**
+ * Compute a token efficiency score (0-100) for a session.
+ * Factors: output-to-input ratio, cache utilization, tokens per productive turn.
+ */
+export function computeTokenEfficiencyScore(sessionId) {
+  const tokenData = analyzeSessionTokens(sessionId);
+  if (!tokenData) return null;
+
+  // 1. Output-to-input ratio (higher = more efficient AI usage) - 40%
+  // Good: output > 2x input. Bad: output < input
+  const ratio = tokenData.tokens.output / Math.max(tokenData.tokens.input, 1);
+  const ratioScore = Math.min(100, Math.round(ratio / 3 * 100)); // 3x = 100
+
+  // 2. Tokens per productive turn (lower = more efficient) - 40%
+  // Good: < 2000 tokens/turn. Bad: > 8000 tokens/turn
+  const tokensPerTurn = tokenData.avgTokensPerTurn || 0;
+  const turnScore = tokensPerTurn > 0
+    ? Math.max(0, Math.min(100, Math.round(100 - (tokensPerTurn - 2000) / 60)))
+    : 50;
+
+  // 3. Cache utilization (if available) - 20%
+  const cacheRatio = tokenData.tokens.cached > 0
+    ? (tokenData.tokens.cached / Math.max(tokenData.tokens.input, 1)) * 100
+    : 0;
+  const cacheScore = Math.min(100, Math.round(cacheRatio * 2)); // 50% cache = 100
+
+  return {
+    score: Math.round(ratioScore * 0.4 + turnScore * 0.4 + cacheScore * 0.2),
+    components: { ratioScore, turnScore, cacheScore },
+    metrics: {
+      outputInputRatio: Math.round(ratio * 100) / 100,
+      tokensPerTurn,
+      cacheRatio: Math.round(cacheRatio),
+      totalCost: tokenData.estimatedCost,
+      model: tokenData.model,
+    },
+  };
+}
+
 // ── Batch Token Analysis ────────────────────────────────────
 
 /**

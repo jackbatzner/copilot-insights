@@ -9,6 +9,10 @@ import { log } from "./log.mjs";
 
 const INTERACTIVE_SESSION_KEY = "memento/interactive-session";
 
+function cleanVSCodeMessage(message) {
+  return typeof message === "string" ? message.trim() : "";
+}
+
 function getAppDataPath() {
   return process.env.APPDATA || join(homedir(), "AppData", "Roaming");
 }
@@ -121,6 +125,73 @@ export function readVSCodeSessions() {
     .filter((session) => session.turnCount > 0);
 }
 
+function analyzeVSCodeJudgment(turns = []) {
+  let catches = 0;
+  let rubberStamps = 0;
+  let criticalThinking = 0;
+
+  for (let i = 1; i < turns.length; i++) {
+    const msg = cleanVSCodeMessage(turns[i]?.userMessage).toLowerCase();
+    if (!msg) continue;
+
+    if (/\b(no|wrong|incorrect|actually|instead|that's not|fix|bug)\b/.test(msg)) {
+      catches++;
+    } else if (/\b(why did you|explain|what about|could you also|is there a better)\b/.test(msg)) {
+      criticalThinking++;
+    } else if (msg.length < 20 && /\b(ok|yes|good|looks good|perfect|thanks|great)\b/.test(msg)) {
+      rubberStamps++;
+    }
+  }
+
+  const totalReviewable = Math.max(1, catches + rubberStamps + criticalThinking);
+  const rubberStampRate = Math.round((rubberStamps / totalReviewable) * 100);
+  const avgScore = Math.max(
+    0,
+    Math.min(100, 70 + (catches * 5) + (criticalThinking * 3) - (rubberStamps * 10))
+  );
+
+  return {
+    avgScore,
+    catches,
+    rubberStamps,
+    rubberStampRate,
+    criticalThinking,
+    totalLateCatches: 0,
+    suggestions: [],
+  };
+}
+
+function analyzeVSCodeEfficiency(turns = []) {
+  let productive = 0;
+  let redirections = 0;
+  let dripFeeds = 0;
+
+  for (const turn of turns) {
+    const msg = cleanVSCodeMessage(turn?.userMessage);
+    if (!msg) continue;
+
+    if (/\b(no|wrong|instead|actually|that's not|try again|redo)\b/i.test(msg)) {
+      redirections++;
+    } else if (/^(also|oh|and\b|by the way|one more thing|forgot to mention)/i.test(msg) && msg.length < 200) {
+      dripFeeds++;
+    } else {
+      productive++;
+    }
+  }
+
+  const total = productive + redirections;
+  const avgEfficiency = total > 0 ? Math.round((productive / total) * 100) : 100;
+
+  return {
+    aggregate: {
+      avgEfficiency,
+      totalDripFeeds: dripFeeds,
+      totalSkimSignals: 0,
+      totalRedirections: redirections,
+    },
+  };
+}
+
 export function analyzeVSCodeSession(session) {
   const specification = scoreClarity(session?.turns?.[0]?.userMessage || "");
   const delegationTurns = (session?.turns || []).map((turn) => ({
@@ -136,12 +207,14 @@ export function analyzeVSCodeSession(session) {
       return acc;
     }, {}),
   };
+  const judgment = analyzeVSCodeJudgment(session?.turns || []);
+  const efficiency = analyzeVSCodeEfficiency(session?.turns || []);
 
   return {
     specification,
     delegation,
-    judgment: null,
-    efficiency: null,
+    judgment,
+    efficiency,
     turnCount: session?.turnCount || 0,
     models: session?.models || [],
     modes: session?.modes || [],
@@ -154,11 +227,21 @@ export function summarizeVSCodeSessions(sessions = readVSCodeSessions()) {
   const editions = { stable: 0, insiders: 0 };
   let totalTurns = 0;
   let sessionsWithAttachments = 0;
+  let totalJudgment = 0;
+  let totalEfficiency = 0;
+  let totalClarity = 0;
+  let scoredSessions = 0;
 
   for (const session of sessions) {
     totalTurns += session.turnCount;
     editions[session.vscodeEdition] = (editions[session.vscodeEdition] || 0) + 1;
     if (session.turns.some((turn) => turn.hasAttachments)) sessionsWithAttachments++;
+
+    const analysis = analyzeVSCodeSession(session);
+    if (analysis.specification?.score != null) totalClarity += analysis.specification.score;
+    if (analysis.judgment?.avgScore != null) totalJudgment += analysis.judgment.avgScore;
+    if (analysis.efficiency?.aggregate?.avgEfficiency != null) totalEfficiency += analysis.efficiency.aggregate.avgEfficiency;
+    scoredSessions++;
 
     for (const turn of session.turns) {
       modelCounts.set(turn.model, (modelCounts.get(turn.model) || 0) + 1);
@@ -178,5 +261,13 @@ export function summarizeVSCodeSessions(sessions = readVSCodeSessions()) {
     modes: [...modeCounts.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    pillarScores: scoredSessions > 0
+      ? {
+        intent: Math.round(totalClarity / scoredSessions),
+        workDesign: null,
+        qualityControl: Math.round(totalJudgment / scoredSessions),
+        evaluation: Math.round(totalEfficiency / scoredSessions),
+      }
+      : null,
   };
 }
