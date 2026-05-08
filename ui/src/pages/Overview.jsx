@@ -40,7 +40,8 @@ function formatModelName(model) {
 const PILLAR_DISPLAY = {
   delegation: "Work Design",
   judgment: "Quality Control",
-  feedback: "Intent",
+  specification: "Intent",
+  efficiency: "Evaluation",
 };
 
 export default function Overview() {
@@ -127,7 +128,7 @@ export default function Overview() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="overview">
-        Your AI leadership snapshot — sessions, skills, and progress at a glance.
+        Snapshot into how you're using Copilot CLI — sessions, trends, work styles, and skill insights.
       </PageBanner>
 
       {vscodeSummary?.totalSessions > 0 && (
@@ -359,7 +360,7 @@ export default function Overview() {
               <span>Pillar Scores by Week</span>
               {pillarTrends.trendDirection && (
                 <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-                  {["delegation", "judgment", "feedback"].map((pillar) => {
+                  {["delegation", "judgment", "specification", "efficiency"].map((pillar) => {
                     const dir = pillarTrends.trendDirection[pillar];
                     const badge = dir === "improving" ? "⬆️ Improving" : dir === "declining" ? "⬇️ Declining" : "➡️ Stable";
                     const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
@@ -383,13 +384,15 @@ export default function Overview() {
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="feedback" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="specification" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="efficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
               <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Work Design" definition="How you divide work between yourself and the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
               <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Quality Control" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
               <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Intent" definition="How clearly you set intent — defining the desired outcome and quality bar upfront." target="70+ clarity score is clear communication." /></span>
+              <span><span style={{ color: "#bc8cff" }}>●</span> <MetricHelp label="Evaluation" definition="Building evaluation discipline — productive turns, session completion, and token efficiency." target="70+ is good." /></span>
             </div>
           </div>
         </CollapsibleSection>

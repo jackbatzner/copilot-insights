@@ -5,6 +5,7 @@ import {
   fetchDevPlan, fetchChronicleTips, fetchVSCodeSummary,
   fetchProgressCheck, fetchRetro, fetchInstructionGaps,
   fetchTokenEfficiency, fetchDevPlanGoals, addDevPlanGoal, updateDevPlanGoalStatus, deleteDevPlanGoal,
+  addGoalNote, fetchJournal,
 } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
@@ -261,8 +262,8 @@ export default function SkillBuilding() {
       {tab === "delegation" && <WorkDesignTab data={delegation} />}
       {tab === "judgment" && <QualityControlTab data={judgment} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
       {tab === "efficiency" && <EvaluationTab efficiency={efficiency} tokenEff={tokenEff} delegation={delegation} />}
-      {tab === "retro" && retro && <RetroTab retro={retro} />}
-      {tab === "plan" && plan && <DevPlanTab plan={plan} gaps={gaps} />}
+      {tab === "retro" && retro && <RetroTab retro={retro} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
+      {tab === "plan" && plan && <DevPlanTab plan={plan} gaps={gaps} addedGoals={addedGoals} setAddedGoals={setAddedGoals} addingGoal={addingGoal} setAddingGoal={setAddingGoal} />}
     </div>
   );
 }
@@ -692,7 +693,7 @@ function EvaluationTab({ efficiency, tokenEff, delegation }) {
 
 /* ── Retro Tab ─────────────────────────────────────────────── */
 
-function RetroTab({ retro }) {
+function RetroTab({ retro, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
   if (retro.empty) return <div className="empty"><div className="empty-icon">📭</div><p>{retro.message}</p></div>;
 
   return (
@@ -742,9 +743,21 @@ function RetroTab({ retro }) {
         {retro.nextFocus.resources.length > 0 && (
           <div className="retro-resources">
             {retro.nextFocus.resources.map((r, i) => (
-              <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="resource-link">
-                📖 {r.title} <span className="resource-provider">{r.provider} · {r.time}</span>
-              </a>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
+                <a href={r.url} target="_blank" rel="noopener noreferrer" className="resource-link" style={{ flex: 1 }}>
+                  📖 {r.title} <span className="resource-provider">{r.provider} · {r.time}</span>
+                </a>
+                <AddToDevPlanButton
+                  pillar={retro.nextFocus.pillar}
+                  title={`Read: ${r.title}`}
+                  description={`${r.description || r.title} (${r.provider}, ${r.time})`}
+                  source="learning-resource"
+                  addedGoals={addedGoals}
+                  setAddedGoals={setAddedGoals}
+                  addingGoal={addingGoal}
+                  setAddingGoal={setAddingGoal}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -755,7 +768,73 @@ function RetroTab({ retro }) {
 
 /* ── Dev Plan Tab ──────────────────────────────────────────── */
 
-function DevPlanTab({ plan, gaps }) {
+function GoalNotes({ goal, onNoteAdded }) {
+  const [expanded, setExpanded] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+    setSaving(true);
+    try {
+      await addGoalNote(goal.id, noteText);
+      setNoteText("");
+      onNoteAdded();
+    } catch (err) {
+      console.error("Failed to add note:", err);
+    }
+    setSaving(false);
+  };
+
+  const notes = goal.notes || [];
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{ background: "none", border: "none", color: "var(--accent)", fontSize: 11, cursor: "pointer", padding: 0 }}
+      >
+        {expanded ? "▼" : "▶"} Notes & Insights ({notes.length})
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 6, paddingLeft: 12, borderLeft: "2px solid var(--border)" }}>
+          {notes.map((n, i) => (
+            <div key={i} style={{ fontSize: 12, color: "var(--text-muted)", padding: "4px 0", borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
+              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{new Date(n.createdAt).toLocaleDateString()}</span>
+              <div style={{ marginTop: 2 }}>{n.text}</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input
+              type="text"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
+              placeholder="Any insights or reminders for yourself?"
+              style={{
+                flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid var(--border)",
+                borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+              }}
+            />
+            <button
+              onClick={handleAddNote}
+              disabled={saving || !noteText.trim()}
+              style={{
+                background: "var(--accent)", color: "white", border: "none", borderRadius: 6,
+                fontSize: 11, padding: "6px 12px", cursor: saving ? "wait" : "pointer",
+                opacity: saving || !noteText.trim() ? 0.5 : 1,
+              }}
+            >
+              {saving ? "Saving…" : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DevPlanTab({ plan, gaps, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
   const [goals, setGoals] = useState(null);
   const [goalsLoading, setGoalsLoading] = useState(true);
 
@@ -826,6 +905,7 @@ function DevPlanTab({ plan, gaps }) {
                           <span>Baseline: {goal.baselineScore}</span>
                         )}
                       </div>
+                      <GoalNotes goal={goal} onNoteAdded={loadGoals} />
                     </div>
                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                       <button
@@ -906,25 +986,68 @@ function DevPlanTab({ plan, gaps }) {
       {plan.learningPath && (
         <>
           <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
-            <div className="card-header">🎯 Focus Area: {getPillarLabel(plan.learningPath.focus)}</div>
-            <p style={{ margin: "8px 0", color: "var(--text-muted)" }}>
-              Estimated time: ~{plan.learningPath.totalTime} min total
+            <div className="card-header">📚 Suggested Resources: {getPillarLabel(plan.learningPath.focus)}</div>
+            <p style={{ margin: "8px 0", color: "var(--text-muted)", fontSize: 12 }}>
+              Explore these resources to strengthen your {getPillarLabel(plan.learningPath.focus)} skills. Add any that interest you to your Dev Plan.
             </p>
           </div>
           {plan.learningPath.primary?.length > 0 && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-header">📖 Priority Reading</div>
-              {plan.learningPath.primary.map((r, i) => <ResourceCard key={i} resource={r} priority />)}
+              {plan.learningPath.primary.map((r, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1 }}><ResourceCard resource={r} priority /></div>
+                  <AddToDevPlanButton
+                    pillar={plan.learningPath.focus}
+                    title={`Read: ${r.title}`}
+                    description={`${r.description} (${r.provider}, ${r.time})`}
+                    source="learning-resource"
+                    addedGoals={addedGoals}
+                    setAddedGoals={setAddedGoals}
+                    addingGoal={addingGoal}
+                    setAddingGoal={setAddingGoal}
+                  />
+                </div>
+              ))}
             </div>
           )}
           {plan.learningPath.secondary?.length > 0 && (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-header">📚 Also Recommended</div>
-              {plan.learningPath.secondary.map((r, i) => <ResourceCard key={i} resource={r} />)}
+              {plan.learningPath.secondary.map((r, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1 }}><ResourceCard resource={r} /></div>
+                  <AddToDevPlanButton
+                    pillar={plan.learningPath.focus}
+                    title={`Read: ${r.title}`}
+                    description={`${r.description} (${r.provider}, ${r.time})`}
+                    source="learning-resource"
+                    addedGoals={addedGoals}
+                    setAddedGoals={setAddedGoals}
+                    addingGoal={addingGoal}
+                    setAddingGoal={setAddingGoal}
+                  />
+                </div>
+              ))}
             </div>
           )}
         </>
       )}
+
+      <div className="card" style={{ marginTop: 16, textAlign: "center", padding: 12 }}>
+        <a
+          href={`${window.location.origin.replace(/:\d+$/, ":3002")}/api/devplan/journal`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => { fetchJournal().catch(() => {}); }}
+          style={{ color: "var(--accent)", fontSize: 13 }}
+        >
+          📄 View Development Journal (Markdown)
+        </a>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+          Your goals, progress, and notes are also saved to <code>~/.copilot/copilot-insights-journal.md</code>
+        </p>
+      </div>
     </>
   );
 }

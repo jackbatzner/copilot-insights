@@ -313,6 +313,22 @@ export async function updateDevPlanGoalStatus(id, status) {
   return res.json();
 }
 
+export async function addGoalNote(id, text) {
+  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ addNote: text }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function fetchJournal() {
+  const res = await fetch(`${API_BASE}/devplan/journal`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
+
 export async function deleteDevPlanGoal(id) {
   const res = await fetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
