@@ -1,4 +1,4 @@
-// Canonical pillar definitions — single source of truth for both Coaching and Learn tabs.
+// Canonical pillar definitions — single source of truth for the Skill Building page.
 // Grounded in the 2026 Microsoft Work Trends Index.
 export const PILLARS = {
   intent: {

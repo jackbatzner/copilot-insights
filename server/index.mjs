@@ -487,6 +487,13 @@ app.get("/api/devplan/goals", (req, res) => {
 app.get("/api/devplan/journal", (req, res) => {
   try {
     if (!existsSync(JOURNAL_FILE)) {
+      // Generate from existing goals (covers goals added before journal feature)
+      const plan = readDevPlan();
+      if (plan.goals.length > 0) {
+        regenerateJournal(plan);
+      }
+    }
+    if (!existsSync(JOURNAL_FILE)) {
       return res.type("text/markdown").send("# Copilot Insights — Development Journal\n\n_No goals yet._\n");
     }
     res.type("text/markdown").send(readFileSync(JOURNAL_FILE, "utf-8"));

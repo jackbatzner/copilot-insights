@@ -1585,56 +1585,6 @@ a:hover {
   flex-shrink: 0;
 }
 
-/*  Learn & Grow page ─ */
-
-.pillar-score-card.highlight {
-  border: 1px solid var(--purple);
-  background: rgba(130, 80, 223, 0.08);
-}
-
-/* Goals */
-.goal-item {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border);
-}
-.goal-item:last-child { border-bottom: none; }
-.goal-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.goal-emoji { font-size: 24px; }
-.goal-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: 4px 0 0;
-}
-.goal-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-}
-.goal-progress-bar {
-  flex: 1;
-  height: 8px;
-  background: var(--bg);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.goal-progress-fill {
-  height: 100%;
-  background: var(--green);
-  border-radius: 4px;
-  transition: width 0.5s ease;
-}
-.goal-target {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
 /* Opportunities */
 .opportunity-item {
   padding: 14px 0;
@@ -1660,8 +1610,8 @@ a:hover {
 }
 .pillar-pill[data-pillar="delegation"] { background: rgba(56, 139, 253, 0.15); color: var(--blue); }
 .pillar-pill[data-pillar="judgment"] { background: rgba(130, 80, 223, 0.15); color: var(--purple); }
-.pillar-pill[data-pillar="feedback"] { background: rgba(63, 185, 80, 0.15); color: var(--green); }
-.pillar-pill[data-pillar="instructions"] { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
+.pillar-pill[data-pillar="specification"] { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+.pillar-pill[data-pillar="efficiency"] { background: rgba(210, 153, 34, 0.15); color: var(--yellow); }
 .impact-badge {
   margin-left: auto;
   font-size: 11px;
@@ -1681,39 +1631,6 @@ a:hover {
   font-family: "SF Mono", monospace;
   color: var(--blue);
 }
-
-/* Daily check */
-.delta-card {
-  background: var(--bg) !important;
-}
-.check-stats {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 8px 0;
-}
-.momentum-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  font-size: 14px;
-}
-.momentum-emoji { font-size: 18px; }
-.tip-item {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-  line-height: 1.5;
-}
-.tip-item:last-child { border-bottom: none; }
-.empty-section {
-  text-align: center;
-  padding: 32px;
-  color: var(--text-muted);
-}
-.empty-section .empty-icon { font-size: 48px; margin-bottom: 8px; }
 
 /* Retro */
 .retro-header {
