@@ -845,7 +845,7 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
   if (data.efficiencyScore >= 70) wins.push({ pillar: "evaluation", emoji: "⚡", text: `Evaluation score: ${data.efficiencyScore}/100 — productive sessions with clean setup.` });
   if (delegation.overallLeverage >= 1.5) wins.push({ pillar: "workDesign", emoji: "📐", text: `${delegation.overallLeverage}x leverage — the agent is doing more than you type.` });
   if (judgment.rubberStampRate < 5) wins.push({ pillar: "qualityControl", emoji: "🔍", text: `Only ${judgment.rubberStampRate}% rubber-stamp rate — careful reviewer.` });
-  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "intent", emoji: "��", text: "Zero drip-feeds — front-loading context well." });
+  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "intent", emoji: "🚫", text: "Zero drip-feeds — front-loading context well." });
 
   const cleanSessions = sessions.filter((s) => {
     const eff = efficiency.sessions?.find((e) => e.sessionId === s.id);
