@@ -220,6 +220,7 @@ export function computePillarTrends({ repo, since, excludeIds, sessionIntents } 
       efficiency,
       overall,
       sessionCount: entry.sessions.length,
+      scoredSessionCount: scored,
     });
   }
 

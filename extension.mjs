@@ -720,7 +720,7 @@ function coachProgress(timeframe) {
   lines.push("");
   lines.push("| Pillar | Score | Trend |");
   lines.push("|--------|------:|:-----:|");
-  for (const p of [pillars[2], pillars[1], pillars[0]]) {
+  for (const p of [...pillars].sort((a, b) => b.score - a.score)) {
     const trend = trends.trend[p.key];
     const trendEmoji = trend === "improving" ? "📈" : trend === "declining" ? "📉" : "➡️";
     lines.push(`| ${p.emoji} ${p.name} | ${p.score}/100 | ${trendEmoji} ${trend} |`);
@@ -739,6 +739,7 @@ function coachProgress(timeframe) {
       delegation: ["course_change", "repetition"],
       judgment: ["explicit_correction", "frustration"],
       specification: ["frustration", "repetition"],
+      efficiency: ["repetition", "course_change"],
     };
     const targetCats = pillarCategoryMap[weakest.key] || [];
 
@@ -770,6 +771,7 @@ function coachProgress(timeframe) {
     delegation: "💡 **Next step:** Try breaking your next complex task into 3 smaller, specific prompts. Tell the agent *what* to build, not *how* to explore.",
     judgment: "💡 **Next step:** In your next session, front-load constraints and acceptance criteria in your first message. The agent makes better decisions with clear boundaries.",
     specification: "💡 **Next step:** Write the full desired outcome in your opening prompt — include files, constraints, and examples.",
+    efficiency: "💡 **Next step:** Launch from the repo directory, keep opening prompts concise, and avoid drip-feeding context across many turns.",
   };
   lines.push(coachingTips[weakest.key] || "💡 Keep prompting — more data means better coaching!");
 

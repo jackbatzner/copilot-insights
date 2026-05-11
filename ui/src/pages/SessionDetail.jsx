@@ -25,6 +25,7 @@ export default function SessionDetail() {
   const [intentSuggestion, setIntentSuggestion] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     setData(null);
@@ -43,6 +44,7 @@ export default function SessionDetail() {
       fetchIntentSuggestion(id).catch(() => null),
     ])
       .then(([d, s, e, r, c, h, t, imp, intentData, suggestion]) => {
+        if (cancelled) return;
         setData(d);
         setSprawl(s);
         setEfficiency(e);
@@ -54,10 +56,10 @@ export default function SessionDetail() {
         setSessionIntentState(intentData?.intent ?? null);
         setIntentSuggestion(suggestion);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => { /* cleanup: stale fetch guard handled by loading state */ };
+    return () => { cancelled = true; };
   }, [id]);
 
   const toggleHide = useCallback(async () => {

@@ -1036,10 +1036,9 @@ function DevPlanTab({ plan, gaps, addedGoals, setAddedGoals, addingGoal, setAddi
 
       <div className="card" style={{ marginTop: 16, textAlign: "center", padding: 12 }}>
         <a
-          href={`${window.location.origin.replace(/:\d+$/, ":3002")}/api/devplan/journal`}
+          href="/api/devplan/journal"
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => { fetchJournal().catch(() => {}); }}
           style={{ color: "var(--accent)", fontSize: 13 }}
         >
           📄 View Development Journal (Markdown)
@@ -1055,17 +1054,18 @@ function DevPlanTab({ plan, gaps, addedGoals, setAddedGoals, addingGoal, setAddi
 /* ── Shared Components ─────────────────────────────────────── */
 
 function AddToDevPlanButton({ pillar, title, description, source, baselineScore, addedGoals, setAddedGoals, addingGoal, setAddingGoal }) {
-  const isAdded = addedGoals.has(title);
-  const isAdding = addingGoal === title;
+  const goalKey = `${pillar}:${title}`;
+  const isAdded = addedGoals.has(goalKey);
+  const isAdding = addingGoal === goalKey;
 
   const handleAdd = async () => {
-    setAddingGoal(title);
+    setAddingGoal(goalKey);
     try {
       await addDevPlanGoal({ pillar, title, description, source, baselineScore });
-      setAddedGoals((prev) => new Set([...prev, title]));
+      setAddedGoals((prev) => new Set([...prev, goalKey]));
     } catch (err) {
       if (String(err?.message || err).includes("409")) {
-        setAddedGoals((prev) => new Set([...prev, title]));
+        setAddedGoals((prev) => new Set([...prev, goalKey]));
       }
     } finally {
       setAddingGoal(null);

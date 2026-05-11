@@ -704,7 +704,7 @@ app.get("/api/vscode/sessions/:workspaceId", (req, res) => {
  */
 app.get("/api/vscode/summary", (_req, res) => {
   try {
-    res.json(summarizeVSCodeSessions());
+    res.json(summarizeVSCodeSessions(getCachedVSCodeSessions()));
   } catch (err) {
     handleRouteError(res, err, "GET /api/vscode/summary");
   }

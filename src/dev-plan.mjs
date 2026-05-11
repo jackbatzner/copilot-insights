@@ -206,8 +206,12 @@ function getDominantStyle(styleCounts = {}) {
 
 function computeEfficiencyMetrics(delegation, efficiency, sessionsData = [], tokenScoreMap = null) {
   const productiveTurnRatio = efficiency.aggregate?.avgEfficiency || 0;
+  const sessionsWithOutput = Math.min(
+    Math.max(delegation.sessionsWithCommits + delegation.sessionsWithPRs, delegation.sessionsWithFiles),
+    delegation.sessionsAnalyzed
+  );
   const sessionCompletionRate = delegation.sessionsAnalyzed > 0
-    ? (Math.max(delegation.sessionsWithCommits + delegation.sessionsWithPRs, delegation.sessionsWithFiles) / delegation.sessionsAnalyzed) * 100
+    ? (sessionsWithOutput / delegation.sessionsAnalyzed) * 100
     : 0;
   const tokenEfficiencyScores = sessionsData
     .map(({ session }) => tokenScoreMap ? tokenScoreMap.get(session.id) : computeTokenEfficiencyScore(session.id))
