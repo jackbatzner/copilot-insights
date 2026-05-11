@@ -62,29 +62,44 @@ export default function Overview() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setWorkStyle(null);
+    setTokenData(null);
+    setVSCodeSummary(null);
     Promise.all([
       fetchSessions(timeframe),
       fetchTrends(timeframe),
       fetchInsights(timeframe),
       fetchPillarTrends(timeframe),
-      fetchWorkStyle(timeframe),
-      fetchTokenSummary(timeframe),
-      fetchVSCodeSummary().catch(() => null),
     ])
-      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary, vscodeData]) => {
+      .then(([sessionsData, trendsData, insightsData, pillarData]) => {
         if (cancelled) return;
         setData(sessionsData);
         setTrends(trendsData.trends);
         setInsights(insightsData.insights);
         setPillarTrends(pillarData);
-        setWorkStyle(workStyleData);
-        setTokenData(tokenSummary);
-        setVSCodeSummary(vscodeData);
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [timeframe, refreshKey]);
+
+  useEffect(() => {
+    if (loading || !data) return undefined;
+
+    let cancelled = false;
+    Promise.allSettled([
+      fetchWorkStyle(timeframe),
+      fetchTokenSummary(timeframe),
+      fetchVSCodeSummary().catch(() => null),
+    ]).then(([workStyleResult, tokenResult, vscodeResult]) => {
+      if (cancelled) return;
+      if (workStyleResult.status === "fulfilled") setWorkStyle(workStyleResult.value);
+      if (tokenResult.status === "fulfilled") setTokenData(tokenResult.value);
+      if (vscodeResult.status === "fulfilled") setVSCodeSummary(vscodeResult.value);
+    });
+
+    return () => { cancelled = true; };
+  }, [loading, data, timeframe]);
 
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 

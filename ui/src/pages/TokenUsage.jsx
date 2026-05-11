@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchTokenPricing,
   fetchTokenSummary,
@@ -21,6 +21,7 @@ import { MetricHelp } from "../components/MetricHelp.jsx";
 import { SkeletonGrid } from "../components/SkeletonCard.jsx";
 import { EmptyState } from "../components/EmptyState.jsx";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
+import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
 
 const TT_STYLE = {
   background: "var(--bg-card)",
@@ -47,15 +48,7 @@ function formatCost(n) {
 export default function TokenUsage() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
-  const [summary, setSummary] = useState(null);
-  const [byModel, setByModel] = useState(null);
-  const [trends, setTrends] = useState(null);
-  const [correlations, setCorrelations] = useState(null);
-  const [budget, setBudget] = useState(null);
-  const [tips, setTips] = useState(null);
   const [livePricing, setLivePricing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
 
   // Fetch live pricing once on mount (not per timeframe change)
@@ -63,31 +56,28 @@ export default function TokenUsage() {
     fetchTokenPricing().then(setLivePricing).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      fetchTokenSummary(timeframe),
-      fetchTokensByModel(timeframe),
-      fetchTokenTrends(timeframe),
-      fetchTokenCorrelations(timeframe),
-      fetchTokenBudget(timeframe),
-      fetchTokenTips(timeframe),
-    ])
-      .then(([s, m, t, c, b, tp]) => {
-        if (cancelled) return;
-        setSummary(s);
-        setByModel(m);
-        setTrends(t);
-        setCorrelations(c);
-        setBudget(b);
-        setTips(tp);
-      })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [timeframe, refreshKey]);
+  const initialEntries = useMemo(() => ({
+    summary: () => fetchTokenSummary(timeframe),
+    trends: () => fetchTokenTrends(timeframe),
+  }), [timeframe]);
+  const deferredByTab = useMemo(() => ({
+    models: { byModel: () => fetchTokensByModel(timeframe) },
+    correlations: { correlations: () => fetchTokenCorrelations(timeframe) },
+    budget: { budget: () => fetchTokenBudget(timeframe) },
+    tips: { tips: () => fetchTokenTips(timeframe) },
+  }), [timeframe]);
+  const { data, loading, error } = useProgressivePageData({
+    deps: [timeframe, refreshKey],
+    initialEntries,
+    deferredByTab,
+    activeTab: tab,
+    validateInitial: (next, results) => {
+      if (next.summary) return null;
+      const firstRejected = results.find((result) => result.status === "rejected");
+      return firstRejected?.reason?.message || "Failed to load token usage.";
+    },
+  });
+  const { summary, trends, byModel, correlations, budget, tips } = data;
 
   if (loading) return (
     <>
@@ -257,7 +247,10 @@ function OverviewTab({ trends, summary }) {
 // ── Models Tab ──────────────────────────────────────────────
 
 function ModelsTab({ data }) {
-  if (!data || !data.models || data.models.length === 0) {
+  if (!data) {
+    return <div className="loading">Loading model breakdown…</div>;
+  }
+  if (!data.models || data.models.length === 0) {
     return <EmptyState message="No model data available." />;
   }
 
@@ -326,7 +319,7 @@ function ModelsTab({ data }) {
 // ── Correlations Tab ────────────────────────────────────────
 
 function CorrelationsTab({ data }) {
-  if (!data) return <EmptyState message="No correlation data available." />;
+  if (!data) return <div className="loading">Loading cost insights…</div>;
 
   const { byWorkStyle } = data;
   const styleChartData = byWorkStyle?.styles?.filter((s) => s.sessions > 0).map((s) => ({
@@ -416,7 +409,8 @@ function CorrelationsTab({ data }) {
 // ── Budget Tab ──────────────────────────────────────────────
 
 function BudgetTab({ data }) {
-  if (!data || !data.hasData) return <EmptyState message="Not enough data for budget projections. Use Copilot for a few more sessions." />;
+  if (!data) return <div className="loading">Loading budget projections…</div>;
+  if (!data.hasData) return <EmptyState message="Not enough data for budget projections. Use Copilot for a few more sessions." />;
 
   const trendIcon = { increasing: "📈", decreasing: "📉", stable: "➡️" }[data.trend] || "➡️";
 
@@ -470,6 +464,8 @@ function BudgetTab({ data }) {
 // ── Tips Tab ────────────────────────────────────────────────
 
 function TipsTab({ data, livePricing }) {
+  if (!data) return <div className="loading">Loading optimization tips…</div>;
+
   const hasTips = data?.tips?.length > 0;
   const hasRecs = data?.modelRecommendations?.length > 0;
   const hasGuide = data?.modelGuide?.length > 0 || (livePricing?.models && Object.keys(livePricing.models).length > 0);

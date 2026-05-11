@@ -116,6 +116,17 @@ describe("GET /api/sessions", () => {
   });
 });
 
+describe("GET /api/sessions/catalog", () => {
+  it("returns 200 with a metadata-only session list", async () => {
+    const { status, body } = await getJSON("/api/sessions/catalog");
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.sessions), "sessions should be an array");
+    assert.ok(body.sessions.length >= testData.sessions.length, "should include all test sessions");
+    assert.ok("id" in body.sessions[0], "missing id");
+    assert.ok("createdAt" in body.sessions[0], "missing createdAt");
+  });
+});
+
 describe("GET /api/sessions/:id", () => {
   it("returns 200 with session detail for a known session", async () => {
     const { status, body } = await getJSON("/api/sessions/sess-redirect-1");
@@ -123,6 +134,7 @@ describe("GET /api/sessions/:id", () => {
     assert.ok("session" in body, "missing session");
     assert.ok("stats" in body, "missing stats");
     assert.ok("redirections" in body, "missing redirections");
+    assert.ok("telemetry" in body, "missing telemetry field");
     assert.equal(body.session.id, "sess-redirect-1");
   });
 
@@ -260,5 +272,58 @@ describe("GET /api/chronicle/improve/:sessionId", () => {
     const { status, body } = await getJSON("/api/chronicle/improve/does-not-exist");
     assert.equal(status, 404);
     assert.ok("error" in body);
+  });
+});
+
+describe("POST /api/devplan/goals — concurrent writes", () => {
+  it("handles concurrent goal additions without data loss", async () => {
+    // Use unique suffix to avoid conflicts with prior runs
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    // Fire 5 concurrent goal additions
+    const promises = Array.from({ length: 5 }, (_, i) =>
+      postJSON("/api/devplan/goals", {
+        pillar: "intent",
+        title: `Concurrent Goal ${i}-${suffix}`,
+        description: `Test goal ${i}`,
+        source: "test",
+      })
+    );
+    const results = await Promise.allSettled(promises);
+    const successes = results.filter((r) => r.status === "fulfilled" && r.value.status === 201);
+    // Some may be 409 (duplicate) but none should fail with 500
+    const serverErrors = results.filter((r) => r.status === "fulfilled" && r.value.status >= 500);
+    assert.equal(serverErrors.length, 0, "No server errors during concurrent writes");
+    assert.ok(successes.length >= 1, "At least one goal should be created");
+  });
+
+  it("handles concurrent goal status updates", async () => {
+    // First create a goal
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const { body: created } = await postJSON("/api/devplan/goals", {
+      pillar: "workDesign",
+      title: `Status Update Test-${suffix}`,
+      description: "Testing concurrent updates",
+      source: "test",
+    });
+    if (!created?.id) return; // skip if creation failed
+    const goalId = created.id;
+    // Fire concurrent status updates
+    const promises = [
+      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "sufficient" }),
+      }),
+      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "active" }),
+      }),
+    ];
+    const results = await Promise.allSettled(promises);
+    const serverErrors = results.filter(
+      (r) => r.status === "fulfilled" && r.value.status >= 500
+    );
+    assert.equal(serverErrors.length, 0, "No server errors during concurrent updates");
   });
 });

@@ -56,11 +56,11 @@ npm run lint    # runs eslint across the project
 
 Before submitting a PR:
 
-1. **Run the tests:** `npm test` (should pass with no failures)
+1. **Run the tests:** `npm test` (should pass with no failures — currently 316 tests across 80 suites)
 2. **Run the linter:** `npm run lint` (should complete with no errors)
 3. **Build the UI:** `cd ui && npm run build` (should complete with no errors)
 4. **Start the server:** `cd server && node index.mjs` → visit http://localhost:3002
-5. **Check all pages:** Navigate through Overview, Coaching, Learn, Analytics, Instructions, Sessions, Practice, and Live Monitor
+5. **Check all pages:** Navigate through Overview, Skill Building, Analytics, Sessions, Practice, VS Code, Live Monitor, Token Usage, and Instructions
 6. **Check the console:** Open browser dev tools (F12) and verify no JavaScript errors
 
 ## Code Style
@@ -71,6 +71,9 @@ Before submitting a PR:
 - Dark theme CSS uses CSS custom properties defined in `ui/src/index.css` — **never use hardcoded colors** (e.g., `#161b22`), always use `var(--bg-card)`, `var(--text)`, etc. so dark mode works
 - New pages should consume the shared `TimeframeContext` via `useTimeframe()` (see `ui/src/TimeframeContext.jsx`) rather than managing timeframe state locally
 - **Hooks ordering** — all `useState`, `useEffect`, `useContext`, and other hooks must be called before any conditional `return` statements. This is a React requirement (Rules of Hooks) and has been a recurring issue
+- **Component decomposition** — Large page components (300+ lines) should be split into a directory with `index.jsx` (orchestrator), individual tab/section components, `shared.jsx` (reusable sub-components), and a context file if prop drilling becomes unwieldy. See `ui/src/pages/SkillBuilding/` for the reference pattern
+- **State context vs props** — Use React Context (e.g., `DevPlanContext`) to share state across deeply nested component trees instead of passing props through multiple layers. Only create a context when 3+ components need the same state
+- **API resilience** — Use `safeFetch()` from `ui/src/api.js` for all API calls; prefer `Promise.allSettled` over `Promise.all` for parallel requests; always include a retry mechanism in error states
 
 ## Accessibility
 

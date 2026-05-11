@@ -1,7 +1,8 @@
 const API_BASE = "/api";
 
-// ── TTL Cache ────────────────────────────────────────────────
+// ── TTL + LRU Cache ─────────────────────────────────────────
 const CACHE_TTL_MS = 60_000; // 60 seconds
+const CACHE_MAX_SIZE = 200;
 const cache = new Map(); // url → { data, ts }
 
 export function clearCache() {
@@ -15,31 +16,54 @@ function getCached(url) {
     cache.delete(url);
     return undefined;
   }
+  // Move to end for LRU ordering
+  cache.delete(url);
+  cache.set(url, entry);
   return entry.data;
 }
 
 function setCache(url, data) {
+  // Evict oldest entries when cache is full
+  if (cache.size >= CACHE_MAX_SIZE) {
+    const oldest = cache.keys().next().value;
+    cache.delete(oldest);
+  }
   cache.set(url, { data, ts: Date.now() });
 }
 
+const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
+
 /**
- * Wrapper around fetch that handles HTTP errors and JSON parse failures.
- * GET requests are cached with a 60-second TTL.
+ * Wrapper around fetch that handles HTTP errors, JSON parse failures, and timeouts.
+ * GET requests are cached with a 60-second TTL and LRU eviction at 200 entries.
+ * Pass { text: true } in options to return raw text instead of JSON.
  */
 async function safeFetch(url, options) {
   const isGet = !options || !options.method || options.method === "GET";
-  if (isGet) {
+  const returnText = options?.text === true;
+  if (isGet && !returnText) {
     const hit = getCached(url);
     if (hit !== undefined) return hit;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  // Strip custom options before passing to fetch
+  const { text: _text, ...fetchOptions } = options || {};
+
   let res;
   try {
-    res = await fetch(url, options);
+    res = await fetch(url, { ...fetchOptions, signal: controller.signal });
   } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Request timed out — the server took too long to respond. Try again or check that the server is running.");
+    }
     throw new Error(
       "Can't reach the Copilot Insights server. Make sure it's running (npm start) and try refreshing."
     );
+  } finally {
+    clearTimeout(timeout);
   }
   if (!res.ok) {
     let errorMessage;
@@ -51,6 +75,11 @@ async function safeFetch(url, options) {
     }
     throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
   }
+
+  if (returnText) {
+    return res.text();
+  }
+
   let data;
   try {
     data = await res.json();
@@ -71,6 +100,10 @@ function tfParams(timeframe, repo) {
 
 export async function fetchSessions(timeframe, repo) {
   return safeFetch(`${API_BASE}/sessions?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchSessionCatalog(timeframe, repo) {
+  return safeFetch(`${API_BASE}/sessions/catalog?${tfParams(timeframe, repo)}`);
 }
 
 export async function fetchSessionDetail(id) {
@@ -318,13 +351,7 @@ export async function addGoalNote(id, text) {
 }
 
 export async function fetchJournal() {
-  const res = await fetch(`${API_BASE}/devplan/journal`);
-  if (!res.ok) {
-    let errorMessage;
-    try { const body = await res.json(); errorMessage = body.error; } catch { /* no JSON */ }
-    throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
-  }
-  return res.text();
+  return safeFetch(`${API_BASE}/devplan/journal`, { text: true });
 }
 
 export async function deleteDevPlanGoal(id) {

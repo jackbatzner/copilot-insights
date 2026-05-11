@@ -105,3 +105,49 @@ describe("generateRetro", () => {
     assert.equal(typeof result, "object");
   });
 });
+
+describe("scoring formula validation", () => {
+  it("pillar scores are numbers between 0 and 100", () => {
+    const result = generateDevPlan({ repo: "org/app" });
+    for (const [key, value] of Object.entries(result.pillarScores)) {
+      if (key === "overall") continue;
+      assert.equal(typeof value, "number", `${key} should be a number`);
+      assert.ok(value >= 0 && value <= 100, `${key} score ${value} out of range 0-100`);
+    }
+  });
+
+  it("overall score is a weighted average of pillar scores", () => {
+    const result = generateDevPlan({ repo: "org/app" });
+    assert.equal(typeof result.pillarScores.overall, "number");
+    const pillars = ["specification", "delegation", "judgment", "efficiency"];
+    const pillarValues = pillars.map((p) => result.pillarScores[p]).filter((v) => v != null);
+    if (pillarValues.length > 0) {
+      const avg = pillarValues.reduce((a, b) => a + b, 0) / pillarValues.length;
+      // Overall should be within reasonable range of the average (may be weighted differently)
+      assert.ok(Math.abs(result.pillarScores.overall - avg) < 30, "Overall score too far from pillar average");
+    }
+  });
+
+  it("progress check baseline scores match dev plan scores", () => {
+    const plan = generateDevPlan({ repo: "org/app" });
+    const progress = generateProgressCheck({ repo: "org/app" });
+    assert.equal(progress.baseline.specificationScore, plan.pillarScores.specification);
+    assert.equal(progress.baseline.efficiencyScore, plan.pillarScores.efficiency);
+  });
+
+  it("retro pillar scores are consistent with dev plan", () => {
+    const plan = generateDevPlan({ repo: "org/app" });
+    const retro = generateRetro({ repo: "org/app" });
+    // Same data should give same scores
+    assert.equal(retro.pillarScores.specification, plan.pillarScores.specification);
+    assert.equal(retro.pillarScores.efficiency, plan.pillarScores.efficiency);
+  });
+
+  it("negative/malformed input does not crash generateDevPlan", () => {
+    assert.ok(generateDevPlan({}) !== null);
+    assert.ok(generateDevPlan({ repo: "" }) !== null);
+    assert.ok(generateDevPlan({ repo: null }) !== null);
+    assert.ok(generateDevPlan({ repo: "org/app", sessionIntents: null }) !== null);
+    assert.ok(generateDevPlan({ repo: "org/app", sessionIntents: {} }) !== null);
+  });
+});

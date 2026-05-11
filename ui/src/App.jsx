@@ -1,21 +1,22 @@
-import { useState, useEffect, createContext, useContext, useCallback } from "react";
+import { lazy, Suspense, useState, useEffect, createContext, useContext, useCallback } from "react";
 import { Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
 import { ThemeToggle } from "./components/ThemeToggle.jsx";
-import Overview from "./pages/Overview.jsx";
-import Welcome from "./pages/Welcome.jsx";
-import Sessions from "./pages/Sessions.jsx";
-import SessionDetail from "./pages/SessionDetail.jsx";
-import SkillBuilding from "./pages/SkillBuilding.jsx";
-import Analytics from "./pages/Analytics.jsx";
-import Instructions from "./pages/Instructions.jsx";
-import Practice from "./pages/Practice.jsx";
-import VSCodeSessions from "./pages/VSCodeSessions.jsx";
-import LiveMonitor from "./pages/LiveMonitor.jsx";
-import TokenUsage from "./pages/TokenUsage.jsx";
-import { fetchSessions, clearCache } from "./api.js";
+import { fetchSessionCatalog, clearCache } from "./api.js";
 import { TimeframeProvider } from "./TimeframeContext.jsx";
+
+const Overview = lazy(() => import("./pages/Overview.jsx"));
+const Welcome = lazy(() => import("./pages/Welcome.jsx"));
+const Sessions = lazy(() => import("./pages/Sessions.jsx"));
+const SessionDetail = lazy(() => import("./pages/SessionDetail.jsx"));
+const SkillBuilding = lazy(() => import("./pages/SkillBuilding/index.jsx"));
+const Analytics = lazy(() => import("./pages/Analytics.jsx"));
+const Instructions = lazy(() => import("./pages/Instructions.jsx"));
+const Practice = lazy(() => import("./pages/Practice.jsx"));
+const VSCodeSessions = lazy(() => import("./pages/VSCodeSessions.jsx"));
+const LiveMonitor = lazy(() => import("./pages/LiveMonitor.jsx"));
+const TokenUsage = lazy(() => import("./pages/TokenUsage.jsx"));
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -46,9 +47,9 @@ function useShowWelcome() {
     }
 
     // Sniff: check if user has existing session data (cache-clear fallback)
-    fetchSessions("all")
+    fetchSessionCatalog("all")
       .then((data) => {
-        const hasSessions = data?.sessions?.length > 0 || data?.aggregate?.sessionsAnalyzed > 0;
+        const hasSessions = data?.sessions?.length > 0;
         if (hasSessions) {
           // User has data — they just cleared cache, skip onboarding
           localStorage.setItem("onboarding-complete", "true");
@@ -65,6 +66,10 @@ function useShowWelcome() {
   }, []);
 
   return showWelcome;
+}
+
+function RouteLoading() {
+  return <div className="loading">Loading page…</div>;
 }
 
 function App() {
@@ -160,27 +165,29 @@ function App() {
         )}
         <main className={`main-content ${isWelcomePage ? "main-content-full" : ""}`}>
           <ErrorBoundary>
-          <Routes>
-            {showWelcome ? (
-              <Route path="*" element={<Welcome />} />
-            ) : (
-              <>
-                <Route path="/" element={<Overview />} />
-                <Route path="/welcome" element={<Welcome />} />
-                <Route path="/skills" element={<SkillBuilding />} />
-                <Route path="/coaching" element={<Navigate to="/skills" replace />} />
-                <Route path="/learn" element={<Navigate to="/skills" replace />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/live" element={<LiveMonitor />} />
-                <Route path="/tokens" element={<TokenUsage />} />
-                <Route path="/instructions" element={<Instructions />} />
-                <Route path="/sessions" element={<Sessions />} />
-                <Route path="/sessions/:id" element={<SessionDetail />} />
-                <Route path="/practice" element={<Practice />} />
-                <Route path="/vscode" element={<VSCodeSessions />} />
-              </>
-            )}
-          </Routes>
+            <Suspense fallback={<RouteLoading />}>
+              <Routes>
+                {showWelcome ? (
+                  <Route path="*" element={<Welcome />} />
+                ) : (
+                  <>
+                    <Route path="/" element={<Overview />} />
+                    <Route path="/welcome" element={<Welcome />} />
+                    <Route path="/skills" element={<SkillBuilding />} />
+                    <Route path="/coaching" element={<Navigate to="/skills" replace />} />
+                    <Route path="/learn" element={<Navigate to="/skills" replace />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/live" element={<LiveMonitor />} />
+                    <Route path="/tokens" element={<TokenUsage />} />
+                    <Route path="/instructions" element={<Instructions />} />
+                    <Route path="/sessions" element={<Sessions />} />
+                    <Route path="/sessions/:id" element={<SessionDetail />} />
+                    <Route path="/practice" element={<Practice />} />
+                    <Route path="/vscode" element={<VSCodeSessions />} />
+                  </>
+                )}
+              </Routes>
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

@@ -274,3 +274,48 @@ describe("analyzeVSCodeSession", () => {
     });
   });
 });
+
+describe("negative/malformed input", () => {
+  it("summarizeVSCodeSessions handles empty session array", () => {
+    const summary = summarizeVSCodeSessions([]);
+    assert.equal(summary.totalSessions, 0);
+    assert.equal(summary.totalTurns, 0);
+  });
+
+  it("analyzeVSCodeSession handles session with empty turns", () => {
+    const analysis = analyzeVSCodeSession({ turns: [], turnCount: 0, models: [], modes: [] });
+    assert.ok(analysis, "should not crash on empty turns");
+  });
+
+  it("analyzeVSCodeSession handles session with null messages", () => {
+    const analysis = analyzeVSCodeSession({
+      turns: [{ turnIndex: 0, userMessage: null, model: "gpt-4", mode: "ask" }],
+      turnCount: 1,
+      models: ["gpt-4"],
+      modes: ["ask"],
+    });
+    assert.ok(analysis, "should not crash on null messages");
+  });
+
+  it("readVSCodeSessions handles corrupted JSON in state DB", () => {
+    seedWorkspace({
+      edition: "stable",
+      workspaceId: "corrupt-json-ws",
+      sessionData: "this is {not valid json",
+    });
+    const sessions = readVSCodeSessions();
+    // Should not throw — corrupted workspaces are skipped
+    assert.ok(Array.isArray(sessions));
+  });
+
+  it("readVSCodeSessions handles missing state table", () => {
+    seedWorkspace({
+      edition: "stable",
+      workspaceId: "missing-table-ws",
+      sessionData: undefined,
+      schema: "other",
+    });
+    const sessions = readVSCodeSessions();
+    assert.ok(Array.isArray(sessions));
+  });
+});
