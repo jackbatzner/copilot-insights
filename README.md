@@ -33,14 +33,16 @@
 Every time you say "no, not that" or "go back to the previous approach," that's signal. It means there's a gap between what you asked for and what the agent did. **Copilot Insights** surfaces those moments so you can learn from them.
 
 - 📊 **See your patterns** — Which corrections do you make most often?
+- 🎯 **Skill Building** — 7-pillar WTI framework with dev plan, retros, and progress tracking
 - 💡 **Get coaching** — Personalized dev plans, daily check-ins, and retros
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
+- 💻 **VS Code Sessions** — Analyze Copilot sessions from VS Code / VS Code Insiders
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
 - 💰 **Token usage & cost** — Track spend by model, get optimization tips, budget projections
 - 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
-- ♿ **Accessible** — Keyboard navigation, ARIA attributes, focus-visible styles
+- ♿ **Accessible** — Full WAI-ARIA keyboard navigation, semantic HTML, focus-visible styles
 
 Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
 
@@ -126,7 +128,7 @@ First-time users are greeted with a **Welcome walkthrough** that explains what t
   <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
 </p>
 
-The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Coaching, Practice Lab, Learn, Sessions) and **Advanced** (Analytics, Live, Instructions, Token Usage) groups:
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Skill Building, Practice Lab, Sessions) and **Advanced** (Token Usage, Analytics, Live, Instructions, VS Code) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
@@ -142,6 +144,10 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 **Sessions list** — sortable, filterable by repo, hide noisy sessions from analysis
 
 <img src="docs/screenshots/sessions.png" alt="Sessions list" width="800" />
+
+**Skill Building** — 7-pillar WTI framework with dev plan, retros, and Chronicle tips
+
+<img src="docs/screenshots/skill-building.png" alt="Skill Building" width="800" />
 
 **Coaching** — delegation, judgment, and feedback analysis with tips
 
@@ -171,6 +177,10 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
 
+**VS Code Sessions** — analyze Copilot sessions from VS Code with turn-by-turn detail
+
+<img src="docs/screenshots/vscode.png" alt="VS Code Sessions" width="800" />
+
 **Token Usage** — track spend by model, estimated costs, and usage trends
 
 <img src="docs/screenshots/token-usage.png" alt="Token Usage overview" width="800" />
@@ -189,19 +199,19 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 - **Welcome** — 3-step onboarding for first-time users; always accessible via `/welcome`
 - **Overview** — Tier hero card, collapsible stats/trends/skill growth/work style sections, prompting insights; "Since last visit" summary for returning users
-- **Learn & Grow** — Personalized dev plan, daily check-in, retros, resources
+- **Skill Building** — 7-pillar WTI framework (Intent, Work Design, Quality Control, Evaluation, plus Retro, Dev Plan, Overview) with pillar cards, tabbed deep-dives, trend detection with sample-size guard, Chronicle tips, and dev plan goal tracking
 - **Sessions** — Sortable table of all sessions with redirections, filterable by repo; hide noisy sessions from analysis
 - **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened; hide/unhide from detail view
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
-- **Coaching** — Delegation, judgment, and instruction gap analysis
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
 - **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
+- **VS Code Sessions** — Analyze Copilot sessions from VS Code and VS Code Insiders with turn-by-turn detail, retry on error, and expandable session cards
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
 - **Token Usage** — 5-tab dashboard (Overview, Models, Cost Insights, Budget, Optimization) tracking token spend by model, personalized cost-saving insights, model recommendations, budget projections, and live pricing from GitHub docs
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
 
-The dashboard is **mobile responsive**: on small screens a hamburger menu replaces the sidebar, tables scroll horizontally, and the layout adapts to narrow viewports. **API caching** (60-second TTL on GET requests) keeps navigation snappy, and the refresh button clears the cache for fresh data. **Hidden sessions** are persisted to disk (`~/.copilot/copilot-insights-hidden.json`) so they survive server restarts.
+The dashboard is **mobile responsive**: on small screens a hamburger menu replaces the sidebar, tables scroll horizontally, and the layout adapts to narrow viewports. **API caching** (60-second TTL on GET requests with LRU eviction at 200 entries) keeps navigation snappy, and the refresh button clears the cache for fresh data. **Hidden sessions** are persisted to disk (`~/.copilot/copilot-insights-hidden.json`) so they survive server restarts. **API resilience** includes `AbortController` with 30s timeout, `Promise.allSettled` for parallel requests, and retry buttons on error states.
 
 ### Practice Lab
 
@@ -235,18 +245,23 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 
 ## How It Works
 
-The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads JSONL event files from `~/.copilot/session-state/` which contain real model and token count data.
+The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads JSONL event files from `~/.copilot/session-state/` which contain real model and token count data. VS Code sessions are read from `state.vscdb` files in VS Code's workspace storage.
 
 ```
 ~/.copilot/session-store.db (read-only)
   → Read user messages from turns table
   → Match against 30+ correction patterns
   → Categorize and aggregate
+  → Chronicle builder: clean messages, classify intent
 
 ~/.copilot/session-state/*/events.jsonl (read-only)
   → Read real token usage & model data
   → Estimate costs using official GitHub Copilot pricing
   → Generate personalized optimization tips
+
+VS Code workspace storage (read-only)
+  → Discover VS Code / VS Code Insiders sessions
+  → Analyze clarity, delegation, judgment, efficiency
 
   → Serve via Express API → React dashboard
 ```
@@ -284,11 +299,13 @@ graph LR
     subgraph "Data Source"
         DB[(~/.copilot/session-store.db)]
         JSONL[(~/.copilot/session-state/*.jsonl)]
+        VSCDB[(VS Code state.vscdb)]
     end
 
     subgraph "Analysis Engine"
         DB -->|read-only| Analyzer[analyzer.mjs]
         JSONL -->|token data| Tokens[tokens.mjs]
+        VSCDB -->|read-only| VSCode[vscode-sessions.mjs]
         Analyzer --> Patterns[30+ regex patterns]
         Analyzer --> Pillars[Clarity · Efficiency · Delegation]
         Analyzer --> Tiers[Tier scoring]
@@ -296,6 +313,9 @@ graph LR
         Patterns --> Practice[practice.mjs]
         DB -->|polling| LiveFeed[/api/live/feed]
         LiveFeed --> Patterns
+        DB --> Chronicle[chronicle.mjs]
+        Chronicle --> IntentClassifier[intent-classifier.mjs]
+        Chronicle --> DevPlan[dev-plan.mjs]
     end
 
     subgraph "Delivery"
@@ -303,6 +323,9 @@ graph LR
         Practice --> API
         LiveFeed --> API
         TokenAnalytics --> API
+        VSCode --> API
+        Chronicle --> API
+        DevPlan --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
         CLI --> Tools[7 insights_* tools]
@@ -313,26 +336,51 @@ graph LR
 copilot-insights/
 ├── extension.mjs          # Copilot CLI extension entry point (7 tools)
 ├── src/
-│   ├── db.mjs             # SQLite read-only access
+│   ├── db.mjs             # SQLite read-only access + batch query support
 │   ├── patterns.mjs       # 30+ regex patterns, 5 categories
 │   ├── analyzer.mjs       # Core analysis engine
+│   ├── chronicle.mjs      # Session chronicle builder with message cleaning
+│   ├── intent-classifier.mjs  # WTI-aligned intent classification
+│   ├── dev-plan.mjs       # Personalized coaching & scoring
+│   ├── vscode-sessions.mjs    # VS Code session discovery & analysis
 │   ├── practice.mjs       # Prompt analysis for Practice Lab (no DB dependency)
 │   ├── challenge-library.mjs  # 83 curated bad prompts with tags and hints
 │   ├── tiers.mjs          # Tier badge system (shared UI + CLI)
 │   ├── suggestions.mjs    # Prompt rewrite engine
 │   ├── delegation.mjs     # Delegation analysis
 │   ├── judgment.mjs       # Judgment analysis
-│   ├── dev-plan.mjs       # Personalized coaching
-│   ├── tokens.mjs         # Token usage estimation, JSONL reader, model pricing, live pricing fetch
-│   ├── token-analytics.mjs # Cost insights, model recommendations, personalized savings plan
+│   ├── efficiency.mjs     # Efficiency scoring
+│   ├── clarity.mjs        # Clarity scoring
+│   ├── sprawl.mjs         # Tool/file sprawl detection
+│   ├── instructions.mjs   # Convention gap analysis
+│   ├── instruction-failures.mjs  # Instruction failure detection
+│   ├── session-insights.mjs  # Per-session improvement suggestions
+│   ├── work-style.mjs     # Work style analysis
+│   ├── trends.mjs         # Time-series trend detection
+│   ├── tokens.mjs         # Token usage estimation, JSONL reader, model pricing
+│   ├── token-analytics.mjs # Cost insights, model recommendations, savings plan
 │   └── formatter.mjs      # Markdown formatting (CLI output)
 ├── server/
-│   └── index.mjs          # Express API + static UI
+│   └── index.mjs          # Express API + static UI + atomic writes + write mutex
 ├── ui/src/
-│   ├── pages/             # Welcome, Overview, Learn, Sessions, SessionDetail, Analytics, Coaching, Practice, Instructions, LiveMonitor, TokenUsage
-│   └── components/        # Charts, badges, timeline, insights, CollapsibleSection, NavGroup, SinceLastVisit
+│   ├── pages/
+│   │   ├── SkillBuilding/     # Decomposed skill building module
+│   │   │   ├── index.jsx      # Orchestrator (data loading, tabs, retry)
+│   │   │   ├── DevPlanContext.jsx  # React context for dev plan state
+│   │   │   ├── shared.jsx     # Shared components (AddToDevPlanButton, MiniStat, etc.)
+│   │   │   ├── OverviewTab.jsx, IntentTab.jsx, WorkDesignTab.jsx
+│   │   │   ├── QualityControlTab.jsx, EvaluationTab.jsx
+│   │   │   ├── RetroTab.jsx, DevPlanTab.jsx
+│   │   │   └── (7 tab components total)
+│   │   ├── Overview.jsx, Welcome.jsx, Sessions.jsx, SessionDetail.jsx
+│   │   ├── Analytics.jsx, Practice.jsx, Instructions.jsx
+│   │   ├── VSCodeSessions.jsx, LiveMonitor.jsx, TokenUsage.jsx
+│   │   └── (12 pages total)
+│   ├── components/        # TabBar, CollapsibleSection, EmptyState, MetricHelp, etc.
+│   └── api.js             # API client with safeFetch, LRU cache, AbortController
 ├── docs/
-│   └── prompting-resources.md  # Official guides, academic papers, scoring reference
+│   ├── prompting-resources.md  # Official guides, academic papers, scoring reference
+│   └── screenshots/       # Auto-captured screenshots and demo GIF
 ├── scripts/               # Mock data seeder + screenshot/GIF capture
 └── .github/workflows/     # CI + Release (GitHub Releases)
 ```

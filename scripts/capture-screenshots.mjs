@@ -88,13 +88,14 @@ try {
   const allPages = [
     { path: "/welcome",   name: "welcome" },
     { path: "/",          name: "overview" },
-    { path: "/learn",     name: "learn" },
+    { path: "/skills",    name: "skill-building" },
     { path: "/sessions",  name: "sessions" },
     { path: "/analytics", name: "analytics" },
     { path: "/coaching",      name: "coaching" },
     { path: "/practice",      name: "practice" },
     { path: "/instructions",  name: "instructions" },
     { path: "/live",          name: "live" },
+    { path: "/vscode",        name: "vscode" },
     { path: "/tokens",        name: "token-usage" },
   ];
 
@@ -103,6 +104,56 @@ try {
     : allPages;
 
   for (const p of filtered) {
+    // Skill Building page: capture overview then click through pillar tabs
+    if (p.name === "skill-building") {
+      console.log("📸 Capturing skill-building (Overview + pillar tabs)…");
+      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(2000);
+      let outPath = resolve(SCREENSHOTS_DIR, "skill-building.png");
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+
+      // Capture Intent tab
+      const intentTab = page.locator("button[role='tab']", { hasText: /intent|specification/i });
+      if (await intentTab.count()) {
+        await intentTab.click();
+        await page.waitForTimeout(1500);
+        outPath = resolve(SCREENSHOTS_DIR, "skill-building-intent.png");
+        await page.screenshot({ path: outPath, fullPage: false });
+        console.log(`   → ${outPath}`);
+      }
+
+      // Capture Dev Plan tab
+      const devPlanTab = page.locator("button[role='tab']", { hasText: /dev plan/i });
+      if (await devPlanTab.count()) {
+        await devPlanTab.click();
+        await page.waitForTimeout(1500);
+        outPath = resolve(SCREENSHOTS_DIR, "skill-building-devplan.png");
+        await page.screenshot({ path: outPath, fullPage: false });
+        console.log(`   → ${outPath}`);
+      }
+      continue;
+    }
+
+    // VS Code Sessions page
+    if (p.name === "vscode") {
+      console.log("📸 Capturing vscode sessions…");
+      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(2000);
+
+      // Try expanding the first session card
+      const expandBtn = page.locator("button[aria-expanded]").first();
+      if (await expandBtn.count()) {
+        await expandBtn.click();
+        await page.waitForTimeout(1000);
+      }
+
+      const outPath = resolve(SCREENSHOTS_DIR, "vscode.png");
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+      continue;
+    }
+
     // Practice page: navigate to Rewrite Challenge with a loaded challenge
     if (p.name === "practice") {
       console.log("📸 Capturing practice (Rewrite Challenge with coaching panel)…");
@@ -214,8 +265,9 @@ try {
 
 /**
  * Record a single full-app demo GIF that walks through the major pages:
- * Overview → Sessions → Session Detail → Coaching → Analytics → Practice
- * (type a prompt) → Live Monitor. Outputs docs/screenshots/demo.gif.
+ * Welcome → Overview → Sessions → Session Detail → Skill Building →
+ * Coaching → Analytics → Practice → Token Usage → VS Code → Live Monitor.
+ * Outputs docs/screenshots/demo.gif.
  */
 async function recordFullDemoGif(browser, baseUrl) {
   console.log("🎬 Recording demo.gif (full-app walkthrough)…");
@@ -260,15 +312,32 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(2500);
   }
 
-  // ── Scene 4: Coaching ─────────────────────────────────────────
+  // ── Scene 4: Skill Building ─────────────────────────────────────
+  await gifPage.goto(`${baseUrl}/skills`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2500);
+
+  // Click through a couple of pillar tabs
+  const intentTab = gifPage.locator("button[role='tab']", { hasText: /intent|specification/i });
+  if (await intentTab.count()) {
+    await intentTab.click();
+    await gifPage.waitForTimeout(1500);
+  }
+
+  const devPlanTab = gifPage.locator("button[role='tab']", { hasText: /dev plan/i });
+  if (await devPlanTab.count()) {
+    await devPlanTab.click();
+    await gifPage.waitForTimeout(1500);
+  }
+
+  // ── Scene 5: Coaching ─────────────────────────────────────────
   await gifPage.goto(`${baseUrl}/coaching`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
 
-  // ── Scene 5: Analytics ────────────────────────────────────────
+  // ── Scene 6: Analytics ────────────────────────────────────────
   await gifPage.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
 
-  // ── Scene 6: Practice Lab — type a prompt ─────────────────────
+  // ── Scene 7: Practice Lab — type a prompt ─────────────────────
   await gifPage.goto(`${baseUrl}/practice`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(1500);
 
@@ -292,7 +361,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     console.warn("⚠️  Practice textarea not found — skipping typing scene");
   }
 
-  // ── Scene 7: Token Usage ───────────────────────────────────────
+  // ── Scene 8: Token Usage ───────────────────────────────────────
   await gifPage.goto(`${baseUrl}/tokens`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2500);
 
@@ -303,7 +372,18 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(2000);
   }
 
-  // ── Scene 8: Live Monitor ─────────────────────────────────────
+  // ── Scene 9: VS Code Sessions ─────────────────────────────────
+  await gifPage.goto(`${baseUrl}/vscode`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(2000);
+
+  // Expand first session if possible
+  const expandBtn = gifPage.locator("button[aria-expanded]").first();
+  if (await expandBtn.count()) {
+    await expandBtn.click();
+    await gifPage.waitForTimeout(1500);
+  }
+
+  // ── Scene 10: Live Monitor ────────────────────────────────────
   await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 

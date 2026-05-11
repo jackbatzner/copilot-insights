@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **WTI Skill Building framework** — 7-pillar tabbed interface (Intent, Work Design, Quality Control, Evaluation, Retro, Dev Plan, Overview) with pillar cards, trend detection, and Chronicle coaching tips
+- **VS Code Sessions page** — Discover and analyze Copilot sessions from VS Code and VS Code Insiders, with turn-by-turn detail, expandable session cards, and retry on error
+- **Chronicle engine** — Session chronicle builder (`chronicle.mjs`) with XML-aware message cleaning and intent classification (`intent-classifier.mjs`)
+- **Dev Plan goals** — Full CRUD for development goals with pillar tracking, notes, and goal-based coaching
 - **Tests in CI** — `npm test` now runs in the CI build matrix (Node 18/20/22); tests are a merge gate for all pull requests
 - **DB schema validation** — On startup, the database layer validates that `~/.copilot/session-store.db` has the expected tables. Missing required tables produce a clear error message; missing optional tables (`session_refs`, `checkpoints`) trigger graceful degradation with a console warning
 - **Practice Lab promoted to core nav** — Moved from the Advanced sidebar group to Core, with a "✨ New" badge and a quick-start option on the Welcome page
@@ -16,14 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Metric tooltips** — Centralized `metricTooltips.js` definitions; inline `MetricHelp` tooltips added to Coaching pillar cards, Overview tier/stats/legend, and SessionDetail complexity/thrashing cards
 - **Dark mode & theme toggle** — System-aware light/dark theme with manual toggle in sidebar; persists to localStorage; flash-free with inline `<script>` in `index.html`
 - **TabBar component** — Reusable accessible tab bar following WAI-ARIA Tabs pattern (`role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, arrow-key navigation with Home/End support)
-- **ARIA improvements** — `aria-expanded` and `aria-controls` on CollapsibleSection; `aria-describedby` on MetricHelp tooltips; `role="status"` on ScoreBadge; `aria-label` on navigation, live feed, and interactive controls; `scope="col"` on table headers
+- **ARIA improvements** — `aria-expanded` and `aria-controls` on CollapsibleSection; `aria-describedby` on MetricHelp tooltips; `role="status"` on ScoreBadge; `aria-label` on navigation, live feed, and interactive controls; `scope="col"` on table headers; semantic `<button>` elements replacing `<div onClick>` throughout
 - **Focus-visible styles** — Global `:focus-visible` outline using `var(--accent)` with refined offsets for tabs, table rows, collapsible headers, and links
 - **CSS custom properties** — ~40 hardcoded color values replaced with CSS variables (`var(--text)`, `var(--bg-card)`, `var(--border)`, etc.) enabling consistent theming
 - **Keyboard navigation** — Arrow key navigation on TimeframeSelector and all TabBar instances; `tabIndex` roving for inactive tabs; Enter/Space activation on session table rows
 - **Timeframe sync** — Timeframe selection (7d / 30d / 90d / All) is now shared across all pages via React Context and persisted to localStorage. Changing the timeframe on one page updates every page instantly.
 - **Skeleton loading** — Overview, Sessions, and Session Detail pages now show animated placeholder cards (shimmer effect) while data loads, replacing the plain "Loading…" text.
 - **Mobile responsive layout** — Hamburger menu toggle at 768px breakpoint, sidebar slides in as an overlay, backdrop dismisses menu, tables scroll horizontally, and the menu auto-closes on navigation.
-- **API caching** — GET requests are cached client-side with a 60-second TTL. POST requests bypass the cache. The refresh button clears the cache to force fresh data.
+- **API caching** — GET requests are cached client-side with a 60-second TTL and LRU eviction at 200 entries. POST requests bypass the cache. The refresh button clears the cache to force fresh data.
 - **Hidden sessions persistence** — Hidden session IDs are now saved to `~/.copilot/copilot-insights-hidden.json` and survive server restarts. Previously they were in-memory only.
 - **Instruction snippets** — Convention gap suggestions now include a ready-to-paste markdown snippet for `.copilot-instructions.md`. Each snippet is grouped by category with imperative-form rules.
 - **Copy button** on instruction suggestions — one click copies the generated markdown snippet to your clipboard
@@ -36,11 +40,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Component decomposition** — Split monolithic `SkillBuilding.jsx` (1,226 lines) into 10 files under `ui/src/pages/SkillBuilding/`: index.jsx (orchestrator), 7 tab components, `shared.jsx` (reusable components), and `DevPlanContext.jsx` (eliminates prop drilling)
+- **API resilience** — `safeFetch()` now includes `AbortController` with 30s timeout; `Promise.all` replaced with `Promise.allSettled` for graceful degradation; unified `fetchJournal()` using `safeFetch()`; retry buttons on error states in Skill Building and VS Code Sessions
+- **Backend performance** — Added `batchGetSessionTurns()` to fix N+1 query pattern; atomic file writes (write-to-tmp then rename) for all JSON persistence; Promise-chain write mutex for serializing concurrent goal operations
 - **Reframed category labels** — Category display names updated to be constructive rather than punitive: Explicit Correction → Iterative Refinement, Frustration Signal → Clarification Needed, Repeated Instruction → Reinforced Instruction, Rollback Request → Direction Change. Internal detection keys (`explicit_correction`, `frustration`, etc.) are unchanged.
 - **Reframed UI language** — "File Thrashing" → "Repeated File Edits", "Anti-Patterns Detected" → "Improvement Opportunities", "Problems" → "Areas to Improve", "Sessions Needing Better Review" → "Sessions to Review", "Weakest Opening Prompts" → "Prompts with Room to Grow"
 - **Improved error messages** — All error states now show actionable guidance instead of raw HTTP codes. Server errors surface specific remediation steps (check server, check database, etc.). Network errors tell users to verify the server is running. `EADDRINUSE` and `EACCES` errors include numbered recovery steps.
 - **Error icons** — Replaced ❌ with ⚠️ across all page error states for a less alarming tone
 - **Category colors** — `explicit_correction` changed from red to amber; `frustration` from amber to purple; `repetition` from purple to gray to reflect reframed severity
+
+### Fixed
+
+- **Sample size guard on trends** — Trend labels ("improving"/"declining") now suppressed when based on fewer than 3 sessions per week
+- **Chronicle fallback** — Skill Building shows a friendly message when Chronicle data is unavailable instead of empty sections
 
 ## [0.2.0] - 2026-04-18
 
@@ -124,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
-- **Test suite** — 270 tests across 34 suites covering all modules (patterns, tiers, clarity, formatter, analyzer, replay, server, analytics, trends, delegation, judgment, work-style, and more)
+- **Test suite** — 316 tests across 80 suites covering all modules including `cleanMessage()` regex, intent classifier edge cases, scoring formula validation, concurrent write safety, and negative/malformed input handling
 - Added `aria-label` to Live Monitor pause/resume button
 - Added `<label>` with `htmlFor` to Sessions page repository filter input
 - Added `.sr-only` CSS utility class for visually hidden, screen-reader accessible elements
