@@ -116,6 +116,17 @@ describe("GET /api/sessions", () => {
   });
 });
 
+describe("GET /api/sessions/catalog", () => {
+  it("returns 200 with a metadata-only session list", async () => {
+    const { status, body } = await getJSON("/api/sessions/catalog");
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.sessions), "sessions should be an array");
+    assert.ok(body.sessions.length >= testData.sessions.length, "should include all test sessions");
+    assert.ok("id" in body.sessions[0], "missing id");
+    assert.ok("createdAt" in body.sessions[0], "missing createdAt");
+  });
+});
+
 describe("GET /api/sessions/:id", () => {
   it("returns 200 with session detail for a known session", async () => {
     const { status, body } = await getJSON("/api/sessions/sess-redirect-1");
@@ -123,6 +134,7 @@ describe("GET /api/sessions/:id", () => {
     assert.ok("session" in body, "missing session");
     assert.ok("stats" in body, "missing stats");
     assert.ok("redirections" in body, "missing redirections");
+    assert.ok("telemetry" in body, "missing telemetry field");
     assert.equal(body.session.id, "sess-redirect-1");
   });
 

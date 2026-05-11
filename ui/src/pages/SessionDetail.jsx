@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens, fetchChronicleImprove, fetchSessionIntent, fetchIntentSuggestion, setSessionIntent } from "../api.js";
 import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
@@ -7,60 +7,64 @@ import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
 import { MetricHelp } from "../components/MetricHelp";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
 import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
+import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
 
 export default function SessionDetail() {
   const { id } = useParams();
-  const [data, setData] = useState(null);
-  const [sprawl, setSprawl] = useState(null);
-  const [efficiency, setEfficiency] = useState(null);
-  const [replay, setReplay] = useState(null);
-  const [complexity, setComplexity] = useState(null);
-  const [tokenInfo, setTokenInfo] = useState(null);
-  const [improve, setImprove] = useState(null);
   const [isHidden, setIsHidden] = useState(false);
   const [tab, setTab] = useState("summary");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [sessionIntent, setSessionIntentState] = useState(null);
   const [intentSuggestion, setIntentSuggestion] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setData(null);
-    setSessionIntentState(null);
-    setIntentSuggestion(null);
-    Promise.all([
-      fetchSessionDetail(id),
-      fetchSessionSprawl(id).catch(() => null),
-      fetchSessionEfficiency(id).catch(() => null),
-      fetchSessionReplay(id).catch(() => null),
-      fetchSessionComplexity(id).catch(() => null),
-      fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
-      fetchSessionTokens(id).catch(() => null),
-      fetchChronicleImprove(id).catch(() => null),
-      fetchSessionIntent(id).catch(() => null),
-      fetchIntentSuggestion(id).catch(() => null),
-    ])
-      .then(([d, s, e, r, c, h, t, imp, intentData, suggestion]) => {
-        if (cancelled) return;
-        setData(d);
-        setSprawl(s);
-        setEfficiency(e);
-        setReplay(r);
-        setComplexity(c);
-        setIsHidden(h.sessionIds.includes(id));
-        setTokenInfo(t);
-        setImprove(imp);
-        setSessionIntentState(intentData?.intent ?? null);
-        setIntentSuggestion(suggestion);
-      })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+  const initialEntries = useMemo(() => ({
+    data: () => fetchSessionDetail(id),
+    sprawl: () => fetchSessionSprawl(id).catch(() => null),
+    efficiency: () => fetchSessionEfficiency(id).catch(() => null),
+    replay: () => fetchSessionReplay(id).catch(() => null),
+    complexity: () => fetchSessionComplexity(id).catch(() => null),
+    hiddenData: () => fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
+    sessionIntentData: () => fetchSessionIntent(id).catch(() => null),
+    intentSuggestionData: () => fetchIntentSuggestion(id).catch(() => null),
+  }), [id]);
+  const deferredByTab = useMemo(() => ({
+    improve: { improve: () => fetchChronicleImprove(id).catch(() => null) },
+    tokens: { tokenInfo: () => fetchSessionTokens(id).catch(() => null) },
+  }), [id]);
+  const { data: pageData, loading, error } = useProgressivePageData({
+    deps: [id],
+    initialEntries,
+    deferredByTab,
+    activeTab: tab,
+    validateInitial: (next, results) => {
+      if (next.data) return null;
+      const firstRejected = results.find((result) => result.status === "rejected");
+      return firstRejected?.reason?.message || "Failed to load session details.";
+    },
+  });
+  const {
+    data,
+    sprawl,
+    efficiency,
+    replay,
+    complexity,
+    hiddenData,
+    tokenInfo,
+    improve,
+    sessionIntentData,
+    intentSuggestionData,
+  } = pageData;
 
-    return () => { cancelled = true; };
-  }, [id]);
+  useEffect(() => {
+    setIsHidden(hiddenData?.sessionIds?.includes(id) ?? false);
+  }, [hiddenData, id]);
+
+  useEffect(() => {
+    setSessionIntentState(sessionIntentData?.intent ?? null);
+  }, [sessionIntentData]);
+
+  useEffect(() => {
+    setIntentSuggestion(intentSuggestionData ?? null);
+  }, [intentSuggestionData]);
 
   const toggleHide = useCallback(async () => {
     try {
@@ -95,6 +99,12 @@ export default function SessionDetail() {
 
   const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
     data;
+  const telemetry = data.telemetry;
+  const toolUsage = telemetry?.toolUsage || [];
+  const skillUsage = telemetry?.skillUsage || [];
+  const subagentUsage = telemetry?.subagentUsage || [];
+  const hookUsage = telemetry?.hookUsage || [];
+  const modelMetrics = telemetry?.shutdown?.modelMetrics || [];
 
   const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
 
@@ -423,6 +433,124 @@ export default function SessionDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {telemetry && (
+        <>
+          <div className="stats-grid" style={{ marginBottom: 24 }}>
+            <div className="stat-card">
+              <div className="stat-value">{telemetry.currentModel || "—"}</div>
+              <div className="stat-label">Current Model</div>
+              <div className="stat-sub">{telemetry.modelChanges.length} model switch{telemetry.modelChanges.length === 1 ? "" : "es"}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{telemetry.modeChanges.length}</div>
+              <div className="stat-label">Mode Changes</div>
+              <div className="stat-sub">plan / interactive / autopilot</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{Math.round((telemetry.shutdown?.totalApiDurationMs || 0) / 1000)}s</div>
+              <div className="stat-label">API Duration</div>
+              <div className="stat-sub">{telemetry.shutdown?.totalPremiumRequests || 0} premium request{(telemetry.shutdown?.totalPremiumRequests || 0) === 1 ? "" : "s"}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{(telemetry.shutdown?.currentTokens || 0).toLocaleString()}</div>
+              <div className="stat-label">Context Tokens</div>
+              <div className="stat-sub">{(telemetry.shutdown?.systemTokens || 0).toLocaleString()} system · {(telemetry.shutdown?.conversationTokens || 0).toLocaleString()} convo</div>
+            </div>
+          </div>
+
+          <div className="charts-grid" style={{ marginBottom: 24 }}>
+            <div className="card">
+              <div className="card-header">Runtime Telemetry</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+                <div><strong>Copilot version:</strong> {telemetry.start?.copilotVersion || "unknown"}</div>
+                <div><strong>Producer:</strong> {telemetry.start?.producer || "unknown"}</div>
+                <div><strong>Started with:</strong> {telemetry.start?.selectedModel || "unknown model"}</div>
+                <div><strong>Shutdown:</strong> {telemetry.shutdown?.shutdownType || "unknown"}</div>
+                <div><strong>Code changes:</strong> +{telemetry.shutdown?.codeChanges?.linesAdded || 0} / -{telemetry.shutdown?.codeChanges?.linesRemoved || 0} across {(telemetry.shutdown?.codeChanges?.filesModified || []).length} file(s)</div>
+              </div>
+              {telemetry.modeChanges.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Mode timeline</div>
+                  {telemetry.modeChanges.map((change, index) => (
+                    <div key={`${change.timestamp || "mode"}-${index}`} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                      {change.previousMode || "unknown"} → <strong style={{ color: "var(--text)" }}>{change.newMode || "unknown"}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {telemetry.modelChanges.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Model switches</div>
+                  {telemetry.modelChanges.map((change, index) => (
+                    <div key={`${change.timestamp || "model"}-${index}`} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                      <strong style={{ color: "var(--text)" }}>{change.newModel}</strong>
+                      {change.reasoningEffort ? ` · ${change.reasoningEffort}` : ""}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="card">
+              <div className="card-header">Tool Activity</div>
+              {toolUsage.length > 0 ? (
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                  <tbody>
+                    {toolUsage.slice(0, 8).map((tool) => (
+                      <tr key={tool.name} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "6px 0" }}>{tool.name}</td>
+                        <td style={{ padding: "6px 0", textAlign: "right" }}>{tool.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="empty" style={{ padding: 24 }}>
+                  <p>No tool execution events captured.</p>
+                </div>
+              )}
+              {(skillUsage.length > 0 || subagentUsage.length > 0 || hookUsage.length > 0) && (
+                <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                  {skillUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Skills:</strong> {skillUsage.map((skill) => `${skill.name} (${skill.count})`).join(", ")}</div>}
+                  {subagentUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Subagents:</strong> {subagentUsage.map((agent) => `${agent.name} (${agent.count})`).join(", ")}</div>}
+                  {hookUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Hooks:</strong> {hookUsage.map((hook) => `${hook.name} (${hook.count})`).join(", ")}</div>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {modelMetrics.length > 0 && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="card-header">Per-Model Usage</div>
+              <div style={{ maxHeight: 320, overflow: "auto" }}>
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                      <th style={{ padding: "6px 8px" }}>Model</th>
+                      <th style={{ padding: "6px 8px" }}>Requests</th>
+                      <th style={{ padding: "6px 8px" }}>Input</th>
+                      <th style={{ padding: "6px 8px" }}>Output</th>
+                      <th style={{ padding: "6px 8px" }}>Cache Read</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modelMetrics.map((metric) => (
+                      <tr key={metric.model} style={{ borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.05))" }}>
+                        <td style={{ padding: "6px 8px" }}>{metric.model}</td>
+                        <td style={{ padding: "6px 8px" }}>{metric.requests}</td>
+                        <td style={{ padding: "6px 8px" }}>{metric.inputTokens.toLocaleString()}</td>
+                        <td style={{ padding: "6px 8px" }}>{metric.outputTokens.toLocaleString()}</td>
+                        <td style={{ padding: "6px 8px" }}>{metric.cacheReadTokens.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Category breakdown + repeated edits side by side */}

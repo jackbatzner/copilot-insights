@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchClarity, fetchEfficiency, fetchDelegation, fetchJudgment,
   fetchDevPlan, fetchChronicleTips, fetchVSCodeSummary,
-  fetchProgressCheck, fetchRetro, fetchInstructionGaps,
-  fetchTokenEfficiency, fetchDevPlanGoals,
+  fetchRetro, fetchInstructionGaps,
 } from "../../api";
 import { TimeframeSelector } from "../../components/TimeframeSelector";
 import { useRefresh } from "../../App.jsx";
@@ -26,6 +25,7 @@ import { QualityControlTab } from "./QualityControlTab.jsx";
 import { EvaluationTab } from "./EvaluationTab.jsx";
 import { RetroTab } from "./RetroTab.jsx";
 import { DevPlanTab } from "./DevPlanTab.jsx";
+import { useProgressivePageData } from "../../hooks/useProgressivePageData.js";
 
 const PILLAR_TABS = [
   { id: "overview", label: "📊 Overview" },
@@ -41,61 +41,46 @@ export default function SkillBuilding() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
 
-  const [clarity, setClarity] = useState(null);
-  const [efficiency, setEfficiency] = useState(null);
-  const [delegation, setDelegation] = useState(null);
-  const [judgment, setJudgment] = useState(null);
-  const [plan, setPlan] = useState(null);
-  const [tips, setTips] = useState(null);
-  const [vscodeSummary, setVSCodeSummary] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [retro, setRetro] = useState(null);
-  const [gaps, setGaps] = useState(null);
-  const [tokenEff, setTokenEff] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
 
   const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      fetchClarity(timeframe),
-      fetchEfficiency(timeframe),
-      fetchDelegation(timeframe),
-      fetchJudgment(timeframe),
-      fetchDevPlan(timeframe),
-      fetchChronicleTips(timeframe),
-      fetchVSCodeSummary(),
-      fetchProgressCheck(timeframe),
-      fetchRetro(timeframe),
-      fetchInstructionGaps(timeframe),
-      fetchTokenEfficiency(timeframe),
-      fetchDevPlanGoals(true),
-    ]).then((results) => {
-      const [c, e, d, j, p, chronicleTips, vscode, prog, ret, g, te, devplanData] = results.map(
-        (r) => (r.status === "fulfilled" ? r.value : null)
-      );
-      // If all critical data failed, show error
-      if (!c && !e && !d && !j && !p) {
-        setError("Failed to load skill data. Check that the server is running.");
-        return;
-      }
-      setClarity(c);
-      setEfficiency(e);
-      setDelegation(d);
-      setJudgment(j);
-      setPlan(p);
-      setTips(Array.isArray(chronicleTips) ? { tips: chronicleTips } : chronicleTips);
-      setVSCodeSummary(vscode);
-      setProgress(prog);
-      setRetro(ret);
-      setGaps(g);
-      setTokenEff(te);
-    }).finally(() => setLoading(false));
-  }, [timeframe, refreshKey, retryCount]);
+  const initialEntries = useMemo(() => ({
+    clarity: () => fetchClarity(timeframe),
+    efficiency: () => fetchEfficiency(timeframe),
+    delegation: () => fetchDelegation(timeframe),
+    judgment: () => fetchJudgment(timeframe),
+    plan: () => fetchDevPlan(timeframe),
+    tips: () => fetchChronicleTips(timeframe).then((value) => Array.isArray(value) ? { tips: value } : value),
+    vscodeSummary: () => fetchVSCodeSummary(),
+  }), [timeframe]);
+  const deferredByTab = useMemo(() => ({
+    efficiency: { retro: () => fetchRetro(timeframe) },
+    retro: { retro: () => fetchRetro(timeframe) },
+    plan: { gaps: () => fetchInstructionGaps(timeframe) },
+  }), [timeframe]);
+  const { data, loading, error } = useProgressivePageData({
+    deps: [timeframe, refreshKey, retryCount],
+    initialEntries,
+    deferredByTab,
+    activeTab: tab,
+    validateInitial: (next, results) => {
+      if (next.clarity || next.efficiency || next.delegation || next.judgment || next.plan) return null;
+      const firstRejected = results.find((result) => result.status === "rejected");
+      return firstRejected?.reason?.message || "Failed to load skill data. Check that the server is running.";
+    },
+  });
+  const {
+    clarity,
+    efficiency,
+    delegation,
+    judgment,
+    plan,
+    tips,
+    vscodeSummary,
+    retro,
+    gaps,
+  } = data;
 
   const handleRetry = () => {
     setRetryCount((c) => c + 1);

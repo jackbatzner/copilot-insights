@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
+import { fetchSessionCatalog, fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
 import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
 import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { SkeletonTable } from "../components/SkeletonCard.jsx";
@@ -14,6 +14,7 @@ export default function Sessions() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
   const [data, setData] = useState(null);
+  const [catalog, setCatalog] = useState(null);
   const [hiddenIds, setHiddenIds] = useState(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -27,10 +28,12 @@ export default function Sessions() {
     setLoading(true);
     Promise.all([
       fetchSessions(timeframe, repoFilter || undefined),
+      fetchSessionCatalog(timeframe, repoFilter || undefined),
       fetchHiddenSessions(),
     ])
-      .then(([sessions, hidden]) => {
+      .then(([sessions, catalogData, hidden]) => {
         setData(sessions);
+        setCatalog(catalogData);
         setHiddenIds(new Set(hidden.sessionIds));
       })
       .catch((err) => setError(err.message))
@@ -79,11 +82,25 @@ export default function Sessions() {
   );
   if (!data) return null;
 
-  const sessionCount = data.sessions?.length || 0;
+  const metricsById = new Map((data.sessions || []).map((session) => [session.id, session]));
+  const allSessions = (catalog?.sessions || []).map((session) => ({
+    ...session,
+    ...(metricsById.get(session.id) || {
+      redirectionCount: 0,
+      redirectionRate: 0,
+      totalWeight: 0,
+      categoryBreakdown: {},
+    }),
+    metricsReady: metricsById.has(session.id),
+  }));
+  const sessionCount = allSessions.length;
 
-  const sorted = [...data.sessions].sort((a, b) => {
+  const sorted = [...allSessions].sort((a, b) => {
     const mul = sortDir === "desc" ? -1 : 1;
-    return (a[sortField] - b[sortField]) * mul;
+    if (sortField === "createdAt") {
+      return String(a.createdAt || "").localeCompare(String(b.createdAt || "")) * mul;
+    }
+    return ((a[sortField] || 0) - (b[sortField] || 0)) * mul;
   });
 
   const arrow = (field) =>
@@ -96,7 +113,7 @@ export default function Sessions() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="sessions">
-        Click any session to see the turn-by-turn replay and analysis.
+        Every session is listed here. Analysis columns fill in when scoring is available.
       </PageBanner>
 
       <div className="filter-bar">
@@ -139,14 +156,16 @@ export default function Sessions() {
         {sorted.length === 0 ? (
           <div className="empty">
             <div className="empty-icon">✅</div>
-            <p>No redirections found. Your prompting is on point!</p>
+            <p>No sessions found for the current filters.</p>
           </div>
         ) : (
           <div className="session-table-wrapper">
           <table className="session-table" style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", minWidth: 140 }} scope="col">Session</th>
+                <th onClick={() => handleSort("createdAt")} style={{ cursor: "pointer", textAlign: "left", minWidth: 140 }} scope="col">
+                  Session{arrow("createdAt")}
+                </th>
                 <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 60 }} scope="col">
                   Turns{arrow("turnCount")}
                 </th>
@@ -161,7 +180,7 @@ export default function Sessions() {
               </tr>
             </thead>
             <tbody>
-              {sorted.filter((s) => showHidden || !hiddenIds.has(s.id)).slice(0, 30).map((s) => {
+              {sorted.filter((s) => showHidden || !hiddenIds.has(s.id)).map((s) => {
                 const isHidden = hiddenIds.has(s.id);
                 const topCat = Object.entries(s.categoryBreakdown || {}).sort(
                   (a, b) => b[1].count - a[1].count
@@ -182,6 +201,9 @@ export default function Sessions() {
                       <div style={{ fontWeight: 500, fontSize: 13 }}>
                         {s.summary?.substring(0, 50) || s.branch?.substring(0, 30) || s.id.substring(0, 8)}
                       </div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                        {s.createdAt ? new Date(s.createdAt).toLocaleString() : "Unknown time"}
+                      </div>
                       {s.repository && (
                         <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                           {s.repository}
@@ -191,13 +213,17 @@ export default function Sessions() {
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.turnCount}</td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.redirectionCount}</td>
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      <ScoreBadge rate={s.redirectionRate} />
+                      {s.metricsReady ? <ScoreBadge rate={s.redirectionRate} /> : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      {topMeta && (
+                      {topMeta && s.metricsReady ? (
                         <span style={{ fontSize: 12 }}>
                           {topMeta.emoji} {topMeta.label}
                         </span>
+                      ) : s.metricsReady ? (
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Clean</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Not scored</span>
                       )}
                     </td>
                     <td>

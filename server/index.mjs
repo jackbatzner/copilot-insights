@@ -55,6 +55,7 @@ import CHALLENGE_LIBRARY from "../src/challenge-library.mjs";
 import { DEFAULT_PORT } from "../src/defaults.mjs";
 import { log } from "../src/log.mjs";
 import { generateTips, generateImprove } from "../src/chronicle.mjs";
+import { analyzeSessionEvents } from "../src/session-events.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -646,6 +647,39 @@ app.get("/api/sessions", (req, res) => {
 });
 
 /**
+ * GET /api/sessions/catalog
+ * Fast metadata-only session list so the UI can show every session without
+ * re-running expensive analysis across the full history.
+ */
+app.get("/api/sessions/catalog", (req, res) => {
+  try {
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+
+    const sessions = listSessions({
+      repo: filter.repo,
+      since: filter.since,
+      excludeIds: filter.excludeIds,
+      limit: 10000,
+    }).map((session) => ({
+      id: session.id,
+      repository: session.repository,
+      branch: session.branch,
+      summary: session.summary,
+      createdAt: session.created_at,
+      updatedAt: session.updated_at,
+      turnCount: session.turn_count,
+      hostType: session.host_type,
+      cwd: session.cwd,
+    }));
+
+    res.json({ sessions });
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/sessions/catalog");
+  }
+});
+
+/**
  * GET /api/sessions/:id
  * Detailed analysis of a single session.
  */
@@ -655,7 +689,10 @@ app.get("/api/sessions/:id", (req, res) => {
     if (!report) {
       return res.status(404).json({ error: "Session not found" });
     }
-    res.json(report);
+    res.json({
+      ...report,
+      telemetry: analyzeSessionEvents(req.params.id),
+    });
   } catch (err) {
     handleRouteError(res, err, "GET /api/sessions/:id");
   }

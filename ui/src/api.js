@@ -102,6 +102,10 @@ export async function fetchSessions(timeframe, repo) {
   return safeFetch(`${API_BASE}/sessions?${tfParams(timeframe, repo)}`);
 }
 
+export async function fetchSessionCatalog(timeframe, repo) {
+  return safeFetch(`${API_BASE}/sessions/catalog?${tfParams(timeframe, repo)}`);
+}
+
 export async function fetchSessionDetail(id) {
   return safeFetch(`${API_BASE}/sessions/${id}`);
 }

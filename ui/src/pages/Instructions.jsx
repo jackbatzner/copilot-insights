@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { fetchInstructionGaps, fetchInstructionFailures } from "../api";
 import { TimeframeSelector } from "../components/TimeframeSelector";
 import { useRefresh } from "../App.jsx";
@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
+import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
 
 const CATEGORY_LABELS = {
   convention: { label: "Style & Conventions", emoji: "🎨", color: "#bc8cff" },
@@ -34,22 +35,26 @@ export default function Instructions() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
   const [tab, setTab] = useState("gaps");
-  const [gaps, setGaps] = useState(null);
-  const [failures, setFailures] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      fetchInstructionGaps(timeframe),
-      fetchInstructionFailures(timeframe),
-    ])
-      .then(([g, f]) => { setGaps(g); setFailures(f); })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [timeframe, refreshKey]);
+  const initialEntries = useMemo(() => ({
+    gaps: () => fetchInstructionGaps(timeframe),
+  }), [timeframe]);
+  const deferredByTab = useMemo(() => ({
+    failures: {
+      failures: () => fetchInstructionFailures(timeframe),
+    },
+  }), [timeframe]);
+  const { data, loading, error } = useProgressivePageData({
+    deps: [timeframe, refreshKey],
+    initialEntries,
+    deferredByTab,
+    activeTab: tab,
+    validateInitial: (next, results) => {
+      if (next.gaps) return null;
+      const firstRejected = results.find((result) => result.status === "rejected");
+      return firstRejected?.reason?.message || "Failed to load instruction effectiveness.";
+    },
+  });
+  const { gaps, failures } = data;
 
   if (loading) return <div className="loading">Analyzing instruction effectiveness…</div>;
   if (error) return <div className="empty"><div className="empty-icon">❌</div><p>{error}</p></div>;

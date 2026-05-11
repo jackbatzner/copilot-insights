@@ -21,37 +21,40 @@ export function SinceLastVisit({ refreshKey }) {
       return;
     }
 
-    // Fetch sessions to compute delta
-    Promise.all([fetchSessions("all"), fetchInsights("7d")])
-      .then(([sessionsData, insightsData]) => {
-        if (cancelled) return;
-        const sessions = sessionsData.sessions || [];
-        const lastVisitDate = new Date(lastVisit);
+    const startFetch = () => {
+      Promise.all([fetchSessions("all"), fetchInsights("7d")])
+        .then(([sessionsData, insightsData]) => {
+          if (cancelled) return;
+          const sessions = sessionsData.sessions || [];
+          const lastVisitDate = new Date(lastVisit);
 
-        // Count sessions created since last visit
-        const newSessions = sessions.filter((s) => {
-          const sessionDate = new Date(s.updatedAt || s.createdAt || 0);
-          return sessionDate > lastVisitDate;
-        });
-
-        const tip = insightsData.insights?.[0]?.message || null;
-
-        if (newSessions.length > 0 || tip) {
-          setData({
-            newCount: newSessions.length,
-            newRedirections: newSessions.reduce((sum, s) => sum + (s.redirectionCount || 0), 0),
-            tip,
+          // Count sessions created since last visit
+          const newSessions = sessions.filter((s) => {
+            const sessionDate = new Date(s.updatedAt || s.createdAt || 0);
+            return sessionDate > lastVisitDate;
           });
-        }
 
-        // Update timestamp for next visit
-        localStorage.setItem("last-visit-timestamp", now);
-      })
-      .catch(() => {
-        // Silently fail — this is non-critical UI
-        if (!cancelled) localStorage.setItem("last-visit-timestamp", now);
-      });
-    return () => { cancelled = true; };
+          const tip = insightsData.insights?.[0]?.message || null;
+
+          if (newSessions.length > 0 || tip) {
+            setData({
+              newCount: newSessions.length,
+              newRedirections: newSessions.reduce((sum, s) => sum + (s.redirectionCount || 0), 0),
+              tip,
+            });
+          }
+
+          // Update timestamp for next visit
+          localStorage.setItem("last-visit-timestamp", now);
+        })
+        .catch(() => {
+          // Silently fail — this is non-critical UI
+          if (!cancelled) localStorage.setItem("last-visit-timestamp", now);
+        });
+    };
+
+    const idleHandle = window.setTimeout(startFetch, 250);
+    return () => { cancelled = true; window.clearTimeout(idleHandle); };
   }, [refreshKey]);
 
   if (!data || dismissed) return null;

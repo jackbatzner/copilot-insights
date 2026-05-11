@@ -94,33 +94,40 @@ export function analyzeSession(sessionId) {
 /**
  * Analyze multiple recent sessions and return a summary.
  */
-export function analyzeRecent({ repo, limit = 500, since, excludeIds } = {}) {
+export function analyzeRecent({ repo, limit = 500, since, excludeIds, includeAll = false } = {}) {
   const sessions = listSessions({ repo, limit, since, excludeIds });
   const results = [];
 
   for (const s of sessions) {
-    if (s.turn_count < 2) continue; // skip trivial sessions
+    if (!includeAll && s.turn_count < 2) continue; // skip trivial sessions for redirection-first analysis
     const report = analyzeSession(s.id);
-    if (report && report.stats.totalRedirections > 0) {
+    if (report && (includeAll || report.stats.totalRedirections > 0)) {
       results.push(report);
     }
   }
 
   // Sort by redirection weight (most problematic first)
-  results.sort((a, b) => b.stats.totalWeight - a.stats.totalWeight);
+  results.sort((a, b) => {
+    if (b.stats.totalWeight !== a.stats.totalWeight) return b.stats.totalWeight - a.stats.totalWeight;
+    return String(b.session.createdAt || "").localeCompare(String(a.session.createdAt || ""));
+  });
+
+  const rateBase = includeAll
+    ? results
+    : results.filter((result) => result.stats.totalRedirections > 0);
 
   // Aggregate stats across all sessions
   const aggregate = {
-    sessionsAnalyzed: sessions.length,
-    sessionsWithRedirections: results.length,
+    sessionsAnalyzed: includeAll ? results.length : sessions.length,
+    sessionsWithRedirections: results.filter((result) => result.stats.totalRedirections > 0).length,
     totalRedirections: results.reduce(
       (s, r) => s + r.stats.totalRedirections,
       0
     ),
     avgRedirectionRate:
-      results.length > 0
-        ? results.reduce((s, r) => s + r.stats.redirectionRate, 0) /
-          results.length
+      rateBase.length > 0
+        ? rateBase.reduce((s, r) => s + r.stats.redirectionRate, 0) /
+          rateBase.length
         : 0,
     categoryTotals: {},
   };

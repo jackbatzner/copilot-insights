@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   fetchPromptLength,
   fetchRepoHealth,
@@ -23,6 +23,7 @@ import { MetricHelp } from "../components/MetricHelp";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
+import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
 
 const TT_STYLE = {
   background: "var(--bg-card)",
@@ -34,47 +35,45 @@ const TT_STYLE = {
 export default function Analytics() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
-  const [promptLen, setPromptLen] = useState(null);
-  const [workStyle, setWorkStyle] = useState(null);
-  const [createEdit, setCreateEdit] = useState(null);
-  const [fileTypes, setFileTypes] = useState(null);
-  const [repos, setRepos] = useState(null);
-  const [files, setFiles] = useState(null);
-  const [depth, setDepth] = useState(null);
-  const [tools, setTools] = useState(null);
-  const [sessions, setSessions] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [tab, setTab] = useState("patterns");
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      fetchPromptLength(timeframe),
-      fetchRepoHealth(timeframe),
-      fetchHotFiles(timeframe),
-      fetchSessionDepth(timeframe),
-      fetchToolUsage(timeframe),
-      fetchWorkStyle(timeframe),
-      fetchCreateEditRatio(timeframe),
-      fetchFileTypes(timeframe),
-      fetchSessions(timeframe).catch(() => null),
-    ])
-      .then(([p, r, f, d, t, ws, ce, ft, sess]) => {
-        setPromptLen(p);
-        setRepos(r);
-        setFiles(f);
-        setDepth(d);
-        setTools(t);
-        setWorkStyle(ws);
-        setCreateEdit(ce);
-        setFileTypes(ft);
-        setSessions(sess);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [timeframe, refreshKey]);
+  const initialEntries = useMemo(() => ({
+    promptLen: () => fetchPromptLength(timeframe),
+    depth: () => fetchSessionDepth(timeframe),
+    workStyle: () => fetchWorkStyle(timeframe),
+    sessions: () => fetchSessions(timeframe).catch(() => null),
+  }), [timeframe]);
+  const deferredByTab = useMemo(() => ({
+    files: {
+      repos: () => fetchRepoHealth(timeframe),
+      files: () => fetchHotFiles(timeframe),
+      tools: () => fetchToolUsage(timeframe),
+      createEdit: () => fetchCreateEditRatio(timeframe),
+      fileTypes: () => fetchFileTypes(timeframe),
+    },
+  }), [timeframe]);
+  const { data, loading, error } = useProgressivePageData({
+    deps: [timeframe, refreshKey],
+    initialEntries,
+    deferredByTab,
+    activeTab: tab,
+    validateInitial: (next, results) => {
+      if (next.promptLen || next.depth || next.workStyle) return null;
+      const firstRejected = results.find((result) => result.status === "rejected");
+      return firstRejected?.reason?.message || "Failed to load analytics data.";
+    },
+  });
+  const {
+    promptLen,
+    repos,
+    files,
+    depth,
+    tools,
+    workStyle,
+    createEdit,
+    fileTypes,
+    sessions,
+  } = data;
 
   const avgRedirectionRate = (() => {
     if (!sessions?.aggregate) return null;
