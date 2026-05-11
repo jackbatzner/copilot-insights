@@ -112,8 +112,8 @@ function scoreSessionJudgment(turns) {
 function scoreSessionSpecification(turns, effResult) {
   const firstMsg = stripTags(turns[0]?.user_message);
   const clarity = scoreClarity(firstMsg);
-  const avgEfficiency = effResult?.efficiency ?? 0;
-  const dripFeeds = effResult?.dripFeedCount ?? 0;
+  const avgEfficiency = (effResult?.efficiencyRatio ?? 0) * 100;
+  const dripFeeds = effResult?.dripFeeding?.count ?? 0;
   return Math.round(
     (clarity.score * 0.5) +
     (avgEfficiency * 0.3) +
@@ -122,7 +122,7 @@ function scoreSessionSpecification(turns, effResult) {
 }
 
 function scoreSessionEfficiency(session, effResult, refs) {
-  const productiveTurnRatio = effResult?.efficiency ?? 0;
+  const productiveTurnRatio = (effResult?.efficiencyRatio ?? 0) * 100;
   const hasCommit = refs.some((r) => r.ref_type === "commit");
   const hasPR = refs.some((r) => r.ref_type === "pr");
   const completionRate = (hasCommit || hasPR) ? 100 : 0;

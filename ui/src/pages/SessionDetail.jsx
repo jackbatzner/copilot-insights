@@ -25,6 +25,10 @@ export default function SessionDetail() {
   const [intentSuggestion, setIntentSuggestion] = useState(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setSessionIntentState(null);
     setIntentSuggestion(null);
     Promise.all([
       fetchSessionDetail(id),
@@ -52,6 +56,8 @@ export default function SessionDetail() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    return () => { /* cleanup: stale fetch guard handled by loading state */ };
   }, [id]);
 
   const toggleHide = useCallback(async () => {
@@ -117,10 +123,12 @@ export default function SessionDetail() {
 
   const handleIntentChange = async (intent) => {
     const newIntent = sessionIntent === intent ? null : intent;
+    const previousIntent = sessionIntent;
     setSessionIntentState(newIntent);
     try {
       await setSessionIntent(id, newIntent);
     } catch (err) {
+      setSessionIntentState(previousIntent);
       console.warn("Failed to save intent:", err.message);
     }
   };

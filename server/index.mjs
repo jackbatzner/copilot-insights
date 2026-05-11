@@ -658,13 +658,25 @@ app.get("/api/patterns", (req, res) => {
   }
 });
 
+// Simple time-based cache for VS Code session reads (avoids re-walking dirs + opening SQLite DBs per request)
+let vscodeCacheData = null;
+let vscodeCacheTime = 0;
+const VSCODE_CACHE_TTL = 30_000; // 30 seconds
+
+function getCachedVSCodeSessions() {
+  if (vscodeCacheData && Date.now() - vscodeCacheTime < VSCODE_CACHE_TTL) return vscodeCacheData;
+  vscodeCacheData = readVSCodeSessions();
+  vscodeCacheTime = Date.now();
+  return vscodeCacheData;
+}
+
 /**
  * GET /api/vscode/sessions
  * List Copilot Chat histories read from VS Code workspace storage.
  */
 app.get("/api/vscode/sessions", (_req, res) => {
   try {
-    res.json(readVSCodeSessions());
+    res.json(getCachedVSCodeSessions());
   } catch (err) {
     handleRouteError(res, err, "GET /api/vscode/sessions");
   }
@@ -676,7 +688,7 @@ app.get("/api/vscode/sessions", (_req, res) => {
  */
 app.get("/api/vscode/sessions/:workspaceId", (req, res) => {
   try {
-    const session = readVSCodeSessions().find((item) => item.workspaceId === req.params.workspaceId);
+    const session = getCachedVSCodeSessions().find((item) => item.workspaceId === req.params.workspaceId);
     if (!session) {
       return res.status(404).json({ error: "VS Code workspace session not found" });
     }

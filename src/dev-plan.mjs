@@ -204,13 +204,13 @@ function getDominantStyle(styleCounts = {}) {
     .sort((a, b) => b[1] - a[1])[0]?.[0] || "collaborative";
 }
 
-function computeEfficiencyMetrics(delegation, efficiency, sessionsData = []) {
+function computeEfficiencyMetrics(delegation, efficiency, sessionsData = [], tokenScoreMap = null) {
   const productiveTurnRatio = efficiency.aggregate?.avgEfficiency || 0;
   const sessionCompletionRate = delegation.sessionsAnalyzed > 0
     ? (Math.max(delegation.sessionsWithCommits + delegation.sessionsWithPRs, delegation.sessionsWithFiles) / delegation.sessionsAnalyzed) * 100
     : 0;
   const tokenEfficiencyScores = sessionsData
-    .map(({ session }) => computeTokenEfficiencyScore(session.id))
+    .map(({ session }) => tokenScoreMap ? tokenScoreMap.get(session.id) : computeTokenEfficiencyScore(session.id))
     .filter((result) => result && typeof result.score === "number");
   const avgTokenEfficiency = tokenEfficiencyScores.length > 0
     ? tokenEfficiencyScores.reduce((sum, result) => sum + result.score, 0) / tokenEfficiencyScores.length
@@ -271,11 +271,17 @@ export function generateDevPlan({ repo, since, excludeIds, sessionIntents } = {}
     ((efficiency.aggregate?.avgEfficiency || 0) * 0.3) +
     (Math.max(0, 100 - (efficiency.aggregate?.totalDripFeeds || 0) * 5) * 0.2)
   );
+  // Pre-compute token efficiency scores in a single batch to avoid N+1
+  const tokenScoreMap = new Map();
+  for (const { session } of effData) {
+    tokenScoreMap.set(session.id, computeTokenEfficiencyScore(session.id));
+  }
+
   const {
     productiveTurnRatio,
     contextHygiene,
     efficiencyScore,
-  } = computeEfficiencyMetrics(delegation, efficiency, effData);
+  } = computeEfficiencyMetrics(delegation, efficiency, effData, tokenScoreMap);
 
   const delegationExamples = flattenExamples(
     delegation.examples?.guided || [],
@@ -697,13 +703,19 @@ function computePillarScores(delegation, judgment, clarityResult, efficiency, se
     ((efficiency.aggregate?.avgEfficiency || 0) * 0.3) +
     (Math.max(0, 100 - (efficiency.aggregate?.totalDripFeeds || 0) * 5) * 0.2)
   );
+  // Pre-compute token efficiency scores in a single batch to avoid N+1
+  const tokenScoreMap = new Map();
+  for (const { session } of sessionsData) {
+    tokenScoreMap.set(session.id, computeTokenEfficiencyScore(session.id));
+  }
+
   const {
     productiveTurnRatio,
     sessionCompletionRate,
     contextHygiene,
     avgTokenEfficiency,
     efficiencyScore,
-  } = computeEfficiencyMetrics(delegation, efficiency, sessionsData);
+  } = computeEfficiencyMetrics(delegation, efficiency, sessionsData, tokenScoreMap);
   return {
     delegationScore,
     judgmentScore,

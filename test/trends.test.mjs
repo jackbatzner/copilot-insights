@@ -41,19 +41,20 @@ describe("computePillarTrends", () => {
     }
   });
 
-  it("returns trend object with delegation/judgment/specification", () => {
+  it("returns trend object with delegation/judgment/specification/efficiency", () => {
     const result = mod.computePillarTrends({ repo: "org/app" });
     assert.ok(result.trend);
     const validTrends = ["stable", "improving", "declining"];
     assert.ok(validTrends.includes(result.trend.delegation), `delegation trend should be one of ${validTrends}`);
     assert.ok(validTrends.includes(result.trend.judgment), `judgment trend should be one of ${validTrends}`);
     assert.ok(validTrends.includes(result.trend.specification), `specification trend should be one of ${validTrends}`);
+    assert.ok(validTrends.includes(result.trend.efficiency), `efficiency trend should be one of ${validTrends}`);
   });
 
   it("each week's scores are 0-100", () => {
     const result = mod.computePillarTrends({ repo: "org/app" });
     for (const w of result.weeks) {
-      for (const field of ["delegation", "judgment", "specification", "overall"]) {
+      for (const field of ["delegation", "judgment", "specification", "efficiency", "overall"]) {
         assert.ok(w[field] >= 0 && w[field] <= 100, `${field} should be 0-100, got ${w[field]}`);
       }
     }

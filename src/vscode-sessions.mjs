@@ -18,6 +18,22 @@ function getAppDataPath() {
 }
 
 function getWorkspaceRoots() {
+  const platform = process.platform;
+  if (platform === "darwin") {
+    const home = homedir();
+    return [
+      { vscodeEdition: "stable", rootPath: join(home, "Library", "Application Support", "Code", "User", "workspaceStorage") },
+      { vscodeEdition: "insiders", rootPath: join(home, "Library", "Application Support", "Code - Insiders", "User", "workspaceStorage") },
+    ];
+  }
+  if (platform === "linux") {
+    const home = homedir();
+    return [
+      { vscodeEdition: "stable", rootPath: join(home, ".config", "Code", "User", "workspaceStorage") },
+      { vscodeEdition: "insiders", rootPath: join(home, ".config", "Code - Insiders", "User", "workspaceStorage") },
+    ];
+  }
+  // Windows (default)
   const appData = getAppDataPath();
   return [
     { vscodeEdition: "stable", rootPath: join(appData, "Code", "User", "workspaceStorage") },

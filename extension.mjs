@@ -306,7 +306,7 @@ api.registerTool({
       const latest = trends.weeks[trends.weeks.length - 1];
       const tier = getTier(latest.overall);
 
-      const weakest = ["delegation", "judgment", "specification"].reduce(
+      const weakest = ["delegation", "judgment", "specification", "efficiency"].reduce(
         (min, p) => (latest[p] < latest[min] ? p : min),
         "delegation"
       );
@@ -315,6 +315,7 @@ api.registerTool({
         delegation: "💡 **Tip:** Break complex tasks into smaller, specific sub-tasks. Tell the agent *what* to build, not *how* to explore.",
         judgment: "💡 **Tip:** Front-load constraints and acceptance criteria in your first message. The agent makes better decisions with clear boundaries.",
         specification: "💡 **Tip:** Write the full desired outcome in your opening prompt — files, constraints, and examples beat drip-fed corrections.",
+        efficiency: "💡 **Tip:** Launch sessions from repo directories with clear context. Fewer redirections and less drip-feeding keep token usage lean.",
       };
 
       const lines = [
@@ -328,6 +329,7 @@ api.registerTool({
         `| 🎯 Delegation | ${latest.delegation}/100 |`,
         `| ⚖️ Judgment | ${latest.judgment}/100 |`,
         `| 💬 Specification | ${latest.specification}/100 |`,
+        `| ⚡ Efficiency | ${latest.efficiency}/100 |`,
         "",
         `### Coaching`,
         tips[weakest],

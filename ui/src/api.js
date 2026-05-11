@@ -294,45 +294,41 @@ export async function fetchDevPlanGoals(withProgress = false) {
 }
 
 export async function addDevPlanGoal({ pillar, title, description, source, baselineScore }) {
-  const res = await fetch(`${API_BASE}/devplan/goals`, {
+  return safeFetch(`${API_BASE}/devplan/goals`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pillar, title, description, source, baselineScore }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
 }
 
 export async function updateDevPlanGoalStatus(id, status) {
-  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, {
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
 }
 
 export async function addGoalNote(id, text) {
-  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, {
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ addNote: text }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
 }
 
 export async function fetchJournal() {
   const res = await fetch(`${API_BASE}/devplan/journal`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let errorMessage;
+    try { const body = await res.json(); errorMessage = body.error; } catch { /* no JSON */ }
+    throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
+  }
   return res.text();
 }
 
 export async function deleteDevPlanGoal(id) {
-  const res = await fetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
 }
 
 // VS Code sessions
