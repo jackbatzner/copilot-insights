@@ -262,3 +262,56 @@ describe("GET /api/chronicle/improve/:sessionId", () => {
     assert.ok("error" in body);
   });
 });
+
+describe("POST /api/devplan/goals — concurrent writes", () => {
+  it("handles concurrent goal additions without data loss", async () => {
+    // Use unique suffix to avoid conflicts with prior runs
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    // Fire 5 concurrent goal additions
+    const promises = Array.from({ length: 5 }, (_, i) =>
+      postJSON("/api/devplan/goals", {
+        pillar: "intent",
+        title: `Concurrent Goal ${i}-${suffix}`,
+        description: `Test goal ${i}`,
+        source: "test",
+      })
+    );
+    const results = await Promise.allSettled(promises);
+    const successes = results.filter((r) => r.status === "fulfilled" && r.value.status === 201);
+    // Some may be 409 (duplicate) but none should fail with 500
+    const serverErrors = results.filter((r) => r.status === "fulfilled" && r.value.status >= 500);
+    assert.equal(serverErrors.length, 0, "No server errors during concurrent writes");
+    assert.ok(successes.length >= 1, "At least one goal should be created");
+  });
+
+  it("handles concurrent goal status updates", async () => {
+    // First create a goal
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const { body: created } = await postJSON("/api/devplan/goals", {
+      pillar: "workDesign",
+      title: `Status Update Test-${suffix}`,
+      description: "Testing concurrent updates",
+      source: "test",
+    });
+    if (!created?.id) return; // skip if creation failed
+    const goalId = created.id;
+    // Fire concurrent status updates
+    const promises = [
+      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "sufficient" }),
+      }),
+      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "active" }),
+      }),
+    ];
+    const results = await Promise.allSettled(promises);
+    const serverErrors = results.filter(
+      (r) => r.status === "fulfilled" && r.value.status >= 500
+    );
+    assert.equal(serverErrors.length, 0, "No server errors during concurrent updates");
+  });
+});

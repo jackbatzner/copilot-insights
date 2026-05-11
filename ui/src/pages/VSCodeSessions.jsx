@@ -10,20 +10,43 @@ export default function VSCodeSessions() {
   const [error, setError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
 
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
-    Promise.all([
+    Promise.allSettled([
       fetchVSCodeSessions(),
       fetchVSCodeSummary(),
     ])
-      .then(([s, sum]) => { setSessions(s); setSummary(sum); })
-      .catch((err) => setError(err.message))
+      .then((results) => {
+        const [s, sum] = results.map((r) => (r.status === "fulfilled" ? r.value : null));
+        if (!s && !sum) {
+          setError("Failed to load VS Code session data.");
+          return;
+        }
+        setSessions(s);
+        setSummary(sum);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [retryCount]);
 
   if (loading) return <div className="loading">Loading VS Code sessions…</div>;
-  if (error) return <div className="empty"><div className="empty-icon">⚠️</div><p>{error}</p></div>;
+  if (error) return (
+    <div className="empty">
+      <div className="empty-icon">⚠️</div>
+      <p>{error}</p>
+      <button
+        onClick={() => setRetryCount((c) => c + 1)}
+        style={{
+          marginTop: 12, background: "var(--accent)", color: "white", border: "none",
+          borderRadius: 6, padding: "8px 16px", cursor: "pointer", fontSize: 13,
+        }}
+      >
+        🔄 Retry
+      </button>
+    </div>
+  );
   if (!sessions || sessions.length === 0) return (
     <div className="empty">
       <div className="empty-icon">💻</div>
@@ -125,14 +148,22 @@ export default function VSCodeSessions() {
             const isExpanded = expandedId === session.id;
             return (
               <div key={session.id} style={{ borderBottom: "1px solid var(--border-color)" }}>
-                <div
+                <button
                   onClick={() => setExpandedId(isExpanded ? null : session.id)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`session-${session.id}`}
                   style={{
                     padding: "12px 0",
                     cursor: "pointer",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    background: "none",
+                    border: "none",
+                    width: "100%",
+                    textAlign: "left",
+                    color: "inherit",
+                    font: "inherit",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -147,13 +178,13 @@ export default function VSCodeSessions() {
                       {session.models.join(", ")}
                     </div>
                   </div>
-                  <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }} aria-hidden="true">
                     {isExpanded ? "▲" : "▼"}
                   </span>
-                </div>
+                </button>
 
                 {isExpanded && (
-                  <div style={{ padding: "0 0 12px 16px" }}>
+                  <div id={`session-${session.id}`} style={{ padding: "0 0 12px 16px" }}>
                     {session.turns.map((turn, i) => (
                       <div key={i} style={{ padding: "6px 0", borderTop: i > 0 ? "1px solid var(--border-color)" : "none" }}>
                         <div style={{ fontSize: 11, color: "var(--accent)", marginBottom: 2 }}>

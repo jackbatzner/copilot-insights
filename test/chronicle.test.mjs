@@ -7,6 +7,7 @@ let analyzeContextHygiene;
 let analyzeToolSelection;
 let generateTips;
 let generateImprove;
+let cleanMessage;
 
 const hugeQuestion = `<context>${"A".repeat(5200)}</context> What should I investigate about this migration?`;
 
@@ -106,6 +107,7 @@ before(async () => {
   analyzeToolSelection = mod.analyzeToolSelection;
   generateTips = mod.generateTips;
   generateImprove = mod.generateImprove;
+  cleanMessage = mod.cleanMessage;
 });
 
 after(() => teardownTestDb());
@@ -160,5 +162,48 @@ describe("generateImprove", () => {
 
   it("returns null for unknown sessions", () => {
     assert.equal(generateImprove("missing-session"), null);
+  });
+});
+
+describe("cleanMessage", () => {
+  it("returns empty string for null/undefined", () => {
+    assert.equal(cleanMessage(null), "");
+    assert.equal(cleanMessage(undefined), "");
+    assert.equal(cleanMessage(""), "");
+  });
+
+  it("strips cross_session_message XML blocks", () => {
+    const msg = "Hello <cross_session_message>secret stuff</cross_session_message> world";
+    assert.equal(cleanMessage(msg), "Hello world");
+  });
+
+  it("strips skill-context XML blocks", () => {
+    const msg = '<skill-context name="test">data</skill-context> Fix the bug';
+    assert.equal(cleanMessage(msg), "Fix the bug");
+  });
+
+  it("strips system_notification XML blocks", () => {
+    const msg = "Before <system_notification>notif</system_notification> after";
+    assert.equal(cleanMessage(msg), "Before after");
+  });
+
+  it("strips nested/generic XML tags", () => {
+    const msg = "Please <b>fix</b> the <code>auth</code> module";
+    assert.equal(cleanMessage(msg), "Please fix the auth module");
+  });
+
+  it("collapses whitespace after stripping", () => {
+    const msg = "  too   much   space  ";
+    assert.equal(cleanMessage(msg), "too much space");
+  });
+
+  it("handles multiline XML blocks", () => {
+    const msg = "Start\n<cross_session_message>\nline1\nline2\n</cross_session_message>\nEnd";
+    assert.equal(cleanMessage(msg), "Start End");
+  });
+
+  it("handles whitespace-only input", () => {
+    assert.equal(cleanMessage("   "), "");
+    assert.equal(cleanMessage("\n\t"), "");
   });
 });

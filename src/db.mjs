@@ -128,6 +128,43 @@ export function getSessionTurns(sessionId) {
 }
 
 /**
+ * Batch-fetch turns for multiple sessions in fewer queries.
+ * Returns a Map of sessionId → turns array.
+ * Chunks IDs to stay within SQLite bind-parameter limits.
+ */
+export function batchGetSessionTurns(sessionIds) {
+  const db = getDb();
+  const result = new Map();
+  if (!sessionIds || sessionIds.length === 0) return result;
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db
+      .prepare(
+        `SELECT session_id, turn_index, user_message, assistant_response, timestamp
+         FROM turns WHERE session_id IN (${placeholders}) ORDER BY session_id, turn_index`
+      )
+      .all(...chunk);
+    for (const row of rows) {
+      if (!result.has(row.session_id)) result.set(row.session_id, []);
+      result.get(row.session_id).push({
+        turn_index: row.turn_index,
+        user_message: row.user_message,
+        assistant_response: row.assistant_response,
+        timestamp: row.timestamp,
+      });
+    }
+  }
+  // Ensure all requested IDs have an entry
+  for (const id of sessionIds) {
+    if (!result.has(id)) result.set(id, []);
+  }
+  return result;
+}
+
+/**
  * Get session metadata by ID.
  */
 export function getSession(sessionId) {

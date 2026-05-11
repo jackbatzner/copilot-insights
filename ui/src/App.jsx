@@ -7,7 +7,7 @@ import Overview from "./pages/Overview.jsx";
 import Welcome from "./pages/Welcome.jsx";
 import Sessions from "./pages/Sessions.jsx";
 import SessionDetail from "./pages/SessionDetail.jsx";
-import SkillBuilding from "./pages/SkillBuilding.jsx";
+import SkillBuilding from "./pages/SkillBuilding/index.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Instructions from "./pages/Instructions.jsx";
 import Practice from "./pages/Practice.jsx";

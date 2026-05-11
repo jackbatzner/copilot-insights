@@ -22,7 +22,8 @@ const STOPWORDS = new Set([
  * Remove system blocks and XML tags from a message.
  * Keeps user text while dropping Copilot-injected wrappers.
  */
-function cleanMessage(msg) {
+// Exported for testability
+export function cleanMessage(msg) {
   if (!msg) return "";
   return msg
     .replace(/<cross_session_message>[\s\S]*?<\/cross_session_message>/gi, " ")
