@@ -675,6 +675,7 @@ function coachProgress(timeframe) {
     { name: "Delegation", key: "delegation", emoji: "🎯", score: latest.delegation },
     { name: "Judgment", key: "judgment", emoji: "⚖️", score: latest.judgment },
     { name: "Specification", key: "specification", emoji: "💬", score: latest.specification },
+    { name: "Efficiency", key: "efficiency", emoji: "⚡", score: latest.efficiency },
   ];
   pillars.sort((a, b) => a.score - b.score);
   const weakest = pillars[0];
