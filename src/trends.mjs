@@ -1,7 +1,12 @@
 // Weekly pillar-score trend computation.
-// All metrics reflect USER behavior only — things the user typed/decided.
+// Uses the SAME analysis primitives as dev-plan.mjs so Coaching and Learn
+// tabs always show consistent scores.
 
-import { listSessions, getSessionTurns } from "./db.mjs";
+import { listSessions, getSessionTurns, getSessionFiles, getSessionRefs } from "./db.mjs";
+import { classifyMessage } from "./delegation.mjs";
+import { scoreClarity } from "./clarity.mjs";
+import { analyzeEfficiency } from "./efficiency.mjs";
+import { INTENT_WEIGHT_PROFILES } from "./dev-plan.mjs";
 
 /** Strip XML/HTML system tags from a message before analysis. */
 function stripTags(msg) {
@@ -15,10 +20,9 @@ function stripTags(msg) {
 /** Return ISO week string "YYYY-Www" and start/end dates for a given date. */
 function isoWeekInfo(dateStr) {
   const d = new Date(dateStr);
-  // ISO week: Monday-based, week 1 contains Jan 4
   const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayOfWeek = tmp.getUTCDay() || 7; // Mon=1 … Sun=7
-  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayOfWeek); // nearest Thursday
+  const dayOfWeek = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayOfWeek);
   const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
   const weekNo = Math.ceil(((tmp - yearStart) / 86400000 + 1) / 7);
 
@@ -35,39 +39,112 @@ function isoWeekInfo(dateStr) {
   };
 }
 
-const HIGH_LEVEL_VERB_RE = /\b(build|create|implement|add|make|write)\b/i;
-const STEP_BY_STEP_RE = /\b(step\s+1|first[,.]|then[,.]|after\s+that)\b/i;
-const CATCH_RE =
-  /\b(wait|hold\s+on|actually|that'?s\s+wrong|not\s+right|broken|fix|bug|issue|error)\b/i;
-const SPECIFIC_RE = /(\b\w+\.\w{1,5}\b|function\s+\w|\/[\w/]+\.\w+|line\s+\d)/i;
+// --- Per-session scoring (mirrors dev-plan.mjs formulas) ---
 
-function scoreDelegation(userMessages) {
-  if (userMessages.length === 0) return 0;
-  const highLevel = userMessages.filter(
-    (m) =>
-      HIGH_LEVEL_VERB_RE.test(m) && m.length < 500 && !STEP_BY_STEP_RE.test(m)
-  ).length;
-  return (highLevel / userMessages.length) * 100;
+const APPROVAL_RE = /^(ok|sure|yes|go\s+ahead|lgtm|looks\s+good|proceed|👍|✅|do\s+it|ship\s+it|sounds\s+good|perfect|great|nice|awesome|exactly)/i;
+const CATCH_RE = /\b(wait|hold\s+on|actually|that'?s\s+wrong|not\s+right|broken|fix|bug|issue|error|revert|undo|no[, ]|wrong|incorrect|stop|don't|shouldn't|remove\s+that)/i;
+
+function scoreSessionDelegation(turns) {
+  const msgTypes = { approval: 0, delegation: 0, guided: 0, correction: 0, question: 0, collaborative: 0, detailed_spec: 0 };
+  let totalUserChars = 0;
+  let totalAgentChars = 0;
+  let userTurns = 0;
+
+  for (const t of turns) {
+    const cleaned = stripTags(t.user_message);
+    if (cleaned.length === 0) continue;
+    userTurns++;
+    const type = classifyMessage(t.user_message);
+    if (type && msgTypes[type] !== undefined) msgTypes[type]++;
+    totalUserChars += cleaned.length;
+    if (t.assistant_response) totalAgentChars += t.assistant_response.length;
+  }
+
+  const autonomyTurns = msgTypes.approval + msgTypes.delegation + msgTypes.detailed_spec;
+  const delegationRatio = userTurns > 0 ? (autonomyTurns / userTurns) * 100 : 0;
+  const agentLeverage = totalUserChars > 0 ? totalAgentChars / totalUserChars : 0;
+  return { delegationRatio, agentLeverage };
 }
 
-function scoreJudgment(userMessages) {
-  if (userMessages.length === 0) return 0;
-  const catches = userMessages.filter((m) => CATCH_RE.test(m)).length;
-  return Math.min((catches / userMessages.length) * 200, 100);
+function scoreSessionJudgment(turns) {
+  let score = 70;
+  let approvals = 0;
+  let catches = 0;
+  let lateCatches = 0;
+  let approvalsBeforeCorrection = 0;
+  let consecutiveApprovals = 0;
+  let maxApprovalStreak = 0;
+  let turnsToFirstCatch = -1;
+  let turnIdx = 0;
+
+  for (const t of turns) {
+    const msg = stripTags(t.user_message);
+    if (msg.length === 0) continue;
+    turnIdx++;
+    const isApproval = APPROVAL_RE.test(msg) && msg.length < 100;
+    const isCatch = CATCH_RE.test(msg);
+
+    if (isApproval) {
+      approvals++;
+      consecutiveApprovals++;
+      maxApprovalStreak = Math.max(maxApprovalStreak, consecutiveApprovals);
+    } else {
+      if (isCatch && consecutiveApprovals > 0) approvalsBeforeCorrection += consecutiveApprovals;
+      consecutiveApprovals = 0;
+    }
+    if (isCatch) {
+      catches++;
+      if (turnsToFirstCatch === -1) turnsToFirstCatch = turnIdx;
+      if (turnIdx > 5) lateCatches++;
+    }
+  }
+
+  if (catches > 0 && turnsToFirstCatch <= 2) score += 10;
+  if (catches > 0 && turnsToFirstCatch > 5) score -= 10;
+  const rubberStampRate = approvals > 0 ? approvalsBeforeCorrection / approvals : 0;
+  if (rubberStampRate > 0.3) score -= 15;
+  if (rubberStampRate === 0 && approvals > 0) score += 10;
+  if (lateCatches > 0) score -= 10 * lateCatches;
+  if (maxApprovalStreak > 5) score -= 5;
+  return Math.max(0, Math.min(100, score));
 }
 
-function scoreFeedback(firstMessage) {
-  if (!firstMessage) return 0;
-  const long = firstMessage.length > 50;
-  const specific = SPECIFIC_RE.test(firstMessage);
-  return long && specific ? 100 : long || specific ? 50 : 0;
+function scoreSessionSpecification(turns, effResult) {
+  const firstMsg = stripTags(turns[0]?.user_message);
+  const clarity = scoreClarity(firstMsg);
+  const avgEfficiency = (effResult?.efficiencyRatio ?? 0) * 100;
+  const dripFeeds = effResult?.dripFeeding?.count ?? 0;
+  return Math.round(
+    (clarity.score * 0.5) +
+    (avgEfficiency * 0.3) +
+    (Math.max(0, 100 - dripFeeds * 5) * 0.2)
+  );
+}
+
+function scoreSessionEfficiency(session, effResult, refs) {
+  const productiveTurnRatio = (effResult?.efficiencyRatio ?? 0) * 100;
+  const hasCommit = refs.some((r) => r.ref_type === "commit");
+  const hasPR = refs.some((r) => r.ref_type === "pr");
+  const completionRate = (hasCommit || hasPR) ? 100 : 0;
+
+  let contextHygiene = 100;
+  const repository = (session.repository || "").trim();
+  if (!repository || repository === "(no repo)") contextHygiene -= 20;
+  const firstMsg = stripTags(effResult?._firstMessage || "");
+  if (firstMsg.length > 5000) contextHygiene -= 15;
+
+  return Math.min(100, Math.max(0, Math.round(
+    (productiveTurnRatio * 0.4) +
+    (completionRate * 0.3) +
+    (contextHygiene * 0.3)
+  )));
 }
 
 /**
- * Compute weekly pillar score snapshots.
- * @param {{ repo?: string, since?: string }} opts
+ * Compute weekly pillar score snapshots using the same formulas as dev-plan.mjs.
+ * @param {{ repo?: string, since?: string, excludeIds?: Set<string>, sessionIntents?: Record<string, string> }} opts
  */
-export function computePillarTrends({ repo, since, excludeIds } = {}) {
+export function computePillarTrends({ repo, since, excludeIds, sessionIntents } = {}) {
   const sessions = listSessions({ repo, since, excludeIds, limit: 10000 });
 
   // Group sessions by ISO week
@@ -91,30 +168,47 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
   )) {
     let delegationSum = 0;
     let judgmentSum = 0;
-    let feedbackSum = 0;
-    const sessionCount = entry.sessions.length;
+    let specificationSum = 0;
+    let efficiencySum = 0;
+    let scored = 0;
+    const clampWeightedScore = (score) => Math.max(0, Math.min(100, Math.round(score)));
 
     for (const session of entry.sessions) {
+      if (session.turn_count < 2) continue;
       const turns = getSessionTurns(session.id);
-      const userMessages = turns
-        .map((t) => stripTags(t.user_message))
-        .filter((m) => m.length > 0);
+      if (turns.length === 0) continue;
+      scored++;
 
-      delegationSum += scoreDelegation(userMessages);
-      judgmentSum += scoreJudgment(userMessages);
-      feedbackSum += scoreFeedback(userMessages[0]);
+      const refs = getSessionRefs(session.id);
+      const files = getSessionFiles(session.id);
+
+      // Delegation — same formula as dev-plan.mjs
+      const del = scoreSessionDelegation(turns);
+      const hasFileOps = files.length > 0;
+      const delScore = Math.min(100, Math.round(
+        (del.delegationRatio * 0.4) +
+        (Math.min(del.agentLeverage, 3) / 3 * 30) +
+        (hasFileOps ? 30 : 0)
+      ));
+      const judgmentScore = scoreSessionJudgment(turns);
+      const effResult = analyzeEfficiency(turns, refs) || {};
+      effResult._firstMessage = turns[0]?.user_message || "";
+      const efficiencyScore = scoreSessionEfficiency(session, effResult, refs);
+      const specificationScore = scoreSessionSpecification(turns, effResult);
+      const intent = sessionIntents?.[session.id];
+      const weights = intent ? INTENT_WEIGHT_PROFILES[intent] : null;
+
+      delegationSum += weights ? clampWeightedScore(delScore * weights.delegation) : delScore;
+      judgmentSum += weights ? clampWeightedScore(judgmentScore * weights.judgment) : judgmentScore;
+      efficiencySum += weights ? clampWeightedScore(efficiencyScore * weights.efficiency) : efficiencyScore;
+      specificationSum += weights ? clampWeightedScore(specificationScore * weights.specification) : specificationScore;
     }
 
-    const delegation = sessionCount
-      ? Math.round(delegationSum / sessionCount)
-      : 0;
-    const judgment = sessionCount
-      ? Math.round(judgmentSum / sessionCount)
-      : 0;
-    const feedback = sessionCount
-      ? Math.round(feedbackSum / sessionCount)
-      : 0;
-    const overall = Math.round((delegation + judgment + feedback) / 3);
+    const delegation = scored ? Math.round(delegationSum / scored) : 0;
+    const judgment = scored ? Math.round(judgmentSum / scored) : 0;
+    const specification = scored ? Math.round(specificationSum / scored) : 0;
+    const efficiency = scored ? Math.round(efficiencySum / scored) : 0;
+    const overall = Math.round((delegation + judgment + specification + efficiency) / 4);
 
     weeks.push({
       week: entry.week,
@@ -122,9 +216,11 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
       endDate: entry.endDate,
       delegation,
       judgment,
-      feedback,
+      specification,
+      efficiency,
       overall,
-      sessionCount,
+      sessionCount: entry.sessions.length,
+      scoredSessionCount: scored,
     });
   }
 
@@ -143,7 +239,8 @@ export function computePillarTrends({ repo, since, excludeIds } = {}) {
     trend: {
       delegation: determineTrend("delegation"),
       judgment: determineTrend("judgment"),
-      feedback: determineTrend("feedback"),
+      specification: determineTrend("specification"),
+      efficiency: determineTrend("efficiency"),
     },
   };
 }

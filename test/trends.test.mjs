@@ -35,25 +35,26 @@ describe("computePillarTrends", () => {
       assert.equal(typeof w.endDate, "string");
       assert.equal(typeof w.delegation, "number");
       assert.equal(typeof w.judgment, "number");
-      assert.equal(typeof w.feedback, "number");
+      assert.equal(typeof w.specification, "number");
       assert.equal(typeof w.overall, "number");
       assert.equal(typeof w.sessionCount, "number");
     }
   });
 
-  it("returns trend object with delegation/judgment/feedback", () => {
+  it("returns trend object with delegation/judgment/specification/efficiency", () => {
     const result = mod.computePillarTrends({ repo: "org/app" });
     assert.ok(result.trend);
     const validTrends = ["stable", "improving", "declining"];
     assert.ok(validTrends.includes(result.trend.delegation), `delegation trend should be one of ${validTrends}`);
     assert.ok(validTrends.includes(result.trend.judgment), `judgment trend should be one of ${validTrends}`);
-    assert.ok(validTrends.includes(result.trend.feedback), `feedback trend should be one of ${validTrends}`);
+    assert.ok(validTrends.includes(result.trend.specification), `specification trend should be one of ${validTrends}`);
+    assert.ok(validTrends.includes(result.trend.efficiency), `efficiency trend should be one of ${validTrends}`);
   });
 
   it("each week's scores are 0-100", () => {
     const result = mod.computePillarTrends({ repo: "org/app" });
     for (const w of result.weeks) {
-      for (const field of ["delegation", "judgment", "feedback", "overall"]) {
+      for (const field of ["delegation", "judgment", "specification", "efficiency", "overall"]) {
         assert.ok(w[field] >= 0 && w[field] <= 100, `${field} should be 0-100, got ${w[field]}`);
       }
     }
@@ -63,6 +64,17 @@ describe("computePillarTrends", () => {
     const result = mod.computePillarTrends({ repo: "org/app" });
     const totalSessions = result.weeks.reduce((sum, w) => sum + w.sessionCount, 0);
     assert.equal(totalSessions, 2, "total sessions across weeks should match seed data");
+  });
+
+  it("applies intent weights to tagged sessions", () => {
+    const baseline = mod.computePillarTrends({ repo: "org/app" });
+    const weighted = mod.computePillarTrends({
+      repo: "org/app",
+      sessionIntents: { tw1: "explore" },
+    });
+
+    assert.ok(weighted.weeks[0].overall < baseline.weeks[0].overall);
+    assert.ok(weighted.weeks[0].delegation < baseline.weeks[0].delegation);
   });
 
   it("empty DB returns empty weeks array", () => {

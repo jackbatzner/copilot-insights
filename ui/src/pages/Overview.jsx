@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary } from "../api.js";
+import { Link } from "react-router-dom";
+import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary, fetchVSCodeSummary } from "../api.js";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
@@ -17,6 +18,32 @@ import { MetricHelp } from "../components/MetricHelp.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
 import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
 
+function formatTokens(n) {
+  if (n == null) return "0";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatCost(n) {
+  if (n == null || n === 0) return "$0.00";
+  if (n < 0.01) return "<$0.01";
+  return `$${n.toFixed(2)}`;
+}
+
+function formatModelName(model) {
+  if (!model || model === "unknown") return "Unknown";
+  if (model === "auto") return "Auto";
+  return model;
+}
+
+const PILLAR_DISPLAY = {
+  delegation: "Work Design",
+  judgment: "Quality Control",
+  specification: "Intent",
+  efficiency: "Evaluation",
+};
+
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
@@ -26,6 +53,7 @@ export default function Overview() {
   const [pillarTrends, setPillarTrends] = useState(null);
   const [workStyle, setWorkStyle] = useState(null);
   const [tokenData, setTokenData] = useState(null);
+  const [vscodeSummary, setVSCodeSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -41,8 +69,9 @@ export default function Overview() {
       fetchPillarTrends(timeframe),
       fetchWorkStyle(timeframe),
       fetchTokenSummary(timeframe),
+      fetchVSCodeSummary().catch(() => null),
     ])
-      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary]) => {
+      .then(([sessionsData, trendsData, insightsData, pillarData, workStyleData, tokenSummary, vscodeData]) => {
         if (cancelled) return;
         setData(sessionsData);
         setTrends(trendsData.trends);
@@ -50,6 +79,7 @@ export default function Overview() {
         setPillarTrends(pillarData);
         setWorkStyle(workStyleData);
         setTokenData(tokenSummary);
+        setVSCodeSummary(vscodeData);
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -83,6 +113,7 @@ export default function Overview() {
   const { aggregate } = data;
   const sessionCount = aggregate.sessionsAnalyzed || 0;
   const avgRate = aggregate.avgRedirectionRate || 0;
+  const topModel = tokenData?.byModel?.find((model) => model.model !== "unknown") || tokenData?.byModel?.[0] || null;
 
   // Derive tier from latest pillar score
   const overallScore = pillarTrends?.weeks?.length
@@ -97,8 +128,21 @@ export default function Overview() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
       <PageBanner pageId="overview">
-        Your snapshot — growth across delegation, judgment, and feedback.
+        Snapshot into how you're using Copilot CLI — sessions, trends, work styles, and skill insights.
       </PageBanner>
+
+      {vscodeSummary?.totalSessions > 0 && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            VS Code Copilot chat history is available separately for {vscodeSummary.totalSessions} workspace{vscodeSummary.totalSessions === 1 ? "" : "s"}.
+            Current scores in Copilot Insights reflect CLI sessions only.
+            {" "}
+            <Link to="/vscode" style={{ color: "var(--accent)" }}>
+              View VS Code sessions →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Since Last Visit — shown for returning users */}
       <SinceLastVisit refreshKey={refreshKey} />
@@ -121,7 +165,7 @@ export default function Overview() {
                 <div style={{ fontSize: 16, fontWeight: 600 }}>
                   <MetricHelp
                     label={tier.name}
-                    definition="Your overall skill tier, derived from your combined Delegation + Judgment + Feedback pillar scores."
+                    definition="Your overall skill tier, derived from your combined Intent, Work Design, Quality Control, and Evaluation pillar scores."
                     target="Progress through tiers by improving your weakest pillar."
                   />
                 </div>
@@ -203,9 +247,7 @@ export default function Overview() {
                 />
               </div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {tokenData.totals.total >= 1_000_000 ? `${(tokenData.totals.total / 1_000_000).toFixed(1)}M`
-                  : tokenData.totals.total >= 1_000 ? `${(tokenData.totals.total / 1_000).toFixed(1)}K`
-                  : tokenData.totals.total}
+                {formatTokens(tokenData.totals.total)}
               </div>
             </div>
             <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
@@ -217,22 +259,50 @@ export default function Overview() {
                 />
               </div>
               <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {tokenData.estimatedCost < 0.01 ? "<$0.01" : `$${tokenData.estimatedCost.toFixed(2)}`}
+                {formatCost(tokenData.estimatedCost)}
               </div>
             </div>
           </>
         )}
       </div>
 
+      {tokenData && tokenData.sessionsAnalyzed > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span>💰 Token Usage</span>
+            <Link to="/tokens" style={{ color: "var(--accent)", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+              View Details →
+            </Link>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Est. Cost</div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>{formatCost(tokenData.estimatedCost)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Total Tokens</div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>{formatTokens(tokenData.totals.total)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Top Model</div>
+              <div style={{ fontSize: 24, fontWeight: 600, overflowWrap: "anywhere" }}>{formatModelName(topModel?.model)}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                {topModel ? `${formatTokens(topModel.total)} tokens` : "No model data"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* What to do next — clear CTAs */}
       <div className="card next-steps-card" style={{ padding: "12px 16px" }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>🚀 What to do next</div>
         <div className="next-steps-grid">
           <SuggestedNext
-            to="/coaching"
-            icon="🎓"
-            label="Coaching"
-            description="Delegation, judgment & feedback scores"
+            to="/skills"
+            icon="🎯"
+            label="Skill Building"
+            description="Intent, Work Design, Quality Control & Evaluation scores"
           />
           <SuggestedNext
             to="/sessions"
@@ -290,13 +360,13 @@ export default function Overview() {
               <span>Pillar Scores by Week</span>
               {pillarTrends.trendDirection && (
                 <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-                  {["delegation", "judgment", "feedback"].map((pillar) => {
+                  {["delegation", "judgment", "specification", "efficiency"].map((pillar) => {
                     const dir = pillarTrends.trendDirection[pillar];
                     const badge = dir === "improving" ? "⬆️ Improving" : dir === "declining" ? "⬇️ Declining" : "➡️ Stable";
                     const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
                     return (
                       <span key={pillar} style={{ color, fontWeight: 500 }}>
-                        {pillar.charAt(0).toUpperCase() + pillar.slice(1)}: {badge}
+                        {PILLAR_DISPLAY[pillar] || pillar}: {badge}
                       </span>
                     );
                   })}
@@ -310,17 +380,19 @@ export default function Overview() {
                 <Tooltip
                   contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
                   labelStyle={{ color: "var(--text-muted)" }}
-                  formatter={(value, name) => [`${value}`, name.charAt(0).toUpperCase() + name.slice(1)]}
+                  formatter={(value, name) => [`${value}`, PILLAR_DISPLAY[name] || name]}
                 />
                 <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="feedback" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="specification" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="efficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)" }}>
-              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Delegation" definition="How effectively you hand off work to the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
-              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Judgment" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
-              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Feedback" definition="How clearly you communicate requirements and corrections to the agent." target="70+ clarity score is clear communication." /></span>
+            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
+              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Work Design" definition="How you divide work between yourself and the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
+              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Quality Control" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
+              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Intent" definition="How clearly you set intent — defining the desired outcome and quality bar upfront." target="70+ clarity score is clear communication." /></span>
+              <span><span style={{ color: "#bc8cff" }}>●</span> <MetricHelp label="Evaluation" definition="Building evaluation discipline — productive turns, session completion, and token efficiency." target="70+ is good." /></span>
             </div>
           </div>
         </CollapsibleSection>

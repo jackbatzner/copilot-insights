@@ -270,7 +270,7 @@ api.registerTool({
 api.registerTool({
   name: "insights_summary",
   description:
-    "Quick snapshot of your current prompting skill level. Shows your tier badge, pillar scores (delegation, judgment, feedback), and a personalized coaching tip.",
+    "Quick snapshot of your current prompting skill level. Shows your tier badge, pillar scores (delegation, judgment, specification), and a personalized coaching tip.",
   permission: "readonly",
   input: {
     type: "object",
@@ -306,7 +306,7 @@ api.registerTool({
       const latest = trends.weeks[trends.weeks.length - 1];
       const tier = getTier(latest.overall);
 
-      const weakest = ["delegation", "judgment", "feedback"].reduce(
+      const weakest = ["delegation", "judgment", "specification", "efficiency"].reduce(
         (min, p) => (latest[p] < latest[min] ? p : min),
         "delegation"
       );
@@ -314,7 +314,8 @@ api.registerTool({
       const tips = {
         delegation: "💡 **Tip:** Break complex tasks into smaller, specific sub-tasks. Tell the agent *what* to build, not *how* to explore.",
         judgment: "💡 **Tip:** Front-load constraints and acceptance criteria in your first message. The agent makes better decisions with clear boundaries.",
-        feedback: "💡 **Tip:** When correcting the agent, explain *why* the output was wrong, not just *what* to change. This reduces repeat corrections.",
+        specification: "💡 **Tip:** Write the full desired outcome in your opening prompt — files, constraints, and examples beat drip-fed corrections.",
+        efficiency: "💡 **Tip:** Launch sessions from repo directories with clear context. Fewer redirections and less drip-feeding keep token usage lean.",
       };
 
       const lines = [
@@ -327,7 +328,8 @@ api.registerTool({
         `|--------|-------|`,
         `| 🎯 Delegation | ${latest.delegation}/100 |`,
         `| ⚖️ Judgment | ${latest.judgment}/100 |`,
-        `| 💬 Feedback | ${latest.feedback}/100 |`,
+        `| 💬 Specification | ${latest.specification}/100 |`,
+        `| ⚡ Efficiency | ${latest.efficiency}/100 |`,
         "",
         `### Coaching`,
         tips[weakest],
@@ -672,7 +674,8 @@ function coachProgress(timeframe) {
   const pillars = [
     { name: "Delegation", key: "delegation", emoji: "🎯", score: latest.delegation },
     { name: "Judgment", key: "judgment", emoji: "⚖️", score: latest.judgment },
-    { name: "Feedback", key: "feedback", emoji: "💬", score: latest.feedback },
+    { name: "Specification", key: "specification", emoji: "💬", score: latest.specification },
+    { name: "Efficiency", key: "efficiency", emoji: "⚡", score: latest.efficiency },
   ];
   pillars.sort((a, b) => a.score - b.score);
   const weakest = pillars[0];
@@ -717,7 +720,7 @@ function coachProgress(timeframe) {
   lines.push("");
   lines.push("| Pillar | Score | Trend |");
   lines.push("|--------|------:|:-----:|");
-  for (const p of [pillars[2], pillars[1], pillars[0]]) {
+  for (const p of [...pillars].sort((a, b) => b.score - a.score)) {
     const trend = trends.trend[p.key];
     const trendEmoji = trend === "improving" ? "📈" : trend === "declining" ? "📉" : "➡️";
     lines.push(`| ${p.emoji} ${p.name} | ${p.score}/100 | ${trendEmoji} ${trend} |`);
@@ -735,7 +738,8 @@ function coachProgress(timeframe) {
     const pillarCategoryMap = {
       delegation: ["course_change", "repetition"],
       judgment: ["explicit_correction", "frustration"],
-      feedback: ["frustration", "repetition"],
+      specification: ["frustration", "repetition"],
+      efficiency: ["repetition", "course_change"],
     };
     const targetCats = pillarCategoryMap[weakest.key] || [];
 
@@ -766,7 +770,8 @@ function coachProgress(timeframe) {
   const coachingTips = {
     delegation: "💡 **Next step:** Try breaking your next complex task into 3 smaller, specific prompts. Tell the agent *what* to build, not *how* to explore.",
     judgment: "💡 **Next step:** In your next session, front-load constraints and acceptance criteria in your first message. The agent makes better decisions with clear boundaries.",
-    feedback: "💡 **Next step:** When you need to correct the agent, explain *why* the output was wrong, not just *what* to change. This reduces repeat corrections.",
+    specification: "💡 **Next step:** Write the full desired outcome in your opening prompt — include files, constraints, and examples.",
+    efficiency: "💡 **Next step:** Launch from the repo directory, keep opening prompts concise, and avoid drip-feeding context across many turns.",
   };
   lines.push(coachingTips[weakest.key] || "💡 Keep prompting — more data means better coaching!");
 

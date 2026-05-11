@@ -8,7 +8,48 @@ import { analyzeFirstTurnClarity } from "./clarity.mjs";
 import { analyzeEfficiencyBatch } from "./efficiency.mjs";
 import { analyzeInstructionGaps } from "./instructions.mjs";
 import { analyzeInstructionFailures } from "./instruction-failures.mjs";
+import { computeTokenEfficiencyScore } from "./tokens.mjs";
 import { listSessions, getSessionTurns, getSessionRefs } from "./db.mjs";
+
+/**
+ * Scoring weight profiles per session intent.
+ * Each profile adjusts how pillar scores are weighted for the overall score.
+ * redirect_penalty_factor: 0 = no penalty, 1 = full penalty for redirections/drip-feeds
+ */
+export const INTENT_WEIGHT_PROFILES = {
+  build: {
+    delegation: 1.0,
+    judgment: 1.0,
+    specification: 1.0,
+    efficiency: 1.0,
+    redirect_penalty_factor: 1.0,
+    description: "Full scoring — clear deliverable expected",
+  },
+  explore: {
+    delegation: 0.5,
+    judgment: 1.0,
+    specification: 0.6,
+    efficiency: 0.4,
+    redirect_penalty_factor: 0.3,
+    description: "De-weighted efficiency — research and learning expected",
+  },
+  iterate: {
+    delegation: 0.6,
+    judgment: 1.0,
+    specification: 0.7,
+    efficiency: 0.3,
+    redirect_penalty_factor: 0.0,
+    description: "Brainstorm & Improve — iterative refinement is the goal",
+  },
+  debug: {
+    delegation: 0.4,
+    judgment: 1.2,
+    specification: 0.5,
+    efficiency: 0.7,
+    redirect_penalty_factor: 0.5,
+    description: "Emphasizes judgment — diagnostic accuracy is key",
+  },
+};
 
 /**
  * Curated learning resources from major AI providers.
@@ -74,7 +115,7 @@ const LEARNING_RESOURCES = {
       description: "Understand how context affects output — helps judge when the agent might lose track.",
     },
   ],
-  feedback: [
+  specification: [
     {
       title: "Give Examples (Multishot)",
       provider: "Anthropic",
@@ -108,6 +149,24 @@ const LEARNING_RESOURCES = {
       description: "Structure your prompts with XML tags for clarity — separates instructions from data.",
     },
   ],
+  efficiency: [
+    {
+      title: "Best Practices for Using Copilot",
+      provider: "GitHub",
+      url: "https://docs.github.com/en/copilot/using-github-copilot/best-practices-for-using-github-copilot",
+      type: "guide",
+      time: "15 min",
+      description: "Optimize your workflow with Copilot — context, tool selection, and efficiency tips.",
+    },
+    {
+      title: "Prompt Caching",
+      provider: "Anthropic",
+      url: "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      type: "guide",
+      time: "15 min",
+      description: "Understand token efficiency and how context affects cost.",
+    },
+  ],
   instructions: [
     {
       title: "Customizing Copilot Instructions",
@@ -128,14 +187,72 @@ const LEARNING_RESOURCES = {
   ],
 };
 
+function stripUserMessage(msg) {
+  if (!msg) return "";
+  return msg
+    .replace(/<[^>]*>[\s\S]*?<\/[^>]*>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .trim();
+}
+
+function flattenExamples(...groups) {
+  return [...new Set(groups.flat().filter(Boolean))].slice(0, 3);
+}
+
+function getDominantStyle(styleCounts = {}) {
+  return Object.entries(styleCounts)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] || "collaborative";
+}
+
+function computeEfficiencyMetrics(delegation, efficiency, sessionsData = [], tokenScoreMap = null) {
+  const productiveTurnRatio = efficiency.aggregate?.avgEfficiency || 0;
+  const sessionsWithOutput = Math.min(
+    Math.max(delegation.sessionsWithCommits + delegation.sessionsWithPRs, delegation.sessionsWithFiles),
+    delegation.sessionsAnalyzed
+  );
+  const sessionCompletionRate = delegation.sessionsAnalyzed > 0
+    ? (sessionsWithOutput / delegation.sessionsAnalyzed) * 100
+    : 0;
+  const tokenEfficiencyScores = sessionsData
+    .map(({ session }) => tokenScoreMap ? tokenScoreMap.get(session.id) : computeTokenEfficiencyScore(session.id))
+    .filter((result) => result && typeof result.score === "number");
+  const avgTokenEfficiency = tokenEfficiencyScores.length > 0
+    ? tokenEfficiencyScores.reduce((sum, result) => sum + result.score, 0) / tokenEfficiencyScores.length
+    : 50;
+
+  let contextHygiene = 100;
+  for (const { session, turns } of sessionsData) {
+    const repository = (session.repository || "").trim();
+    if (!repository || repository === "(no repo)") contextHygiene -= 5;
+
+    const firstUserTurn = turns.find((t) => stripUserMessage(t.user_message).length > 0);
+    const firstMessageLength = stripUserMessage(firstUserTurn?.user_message || "").length;
+    if (firstMessageLength > 5000) contextHygiene -= 3;
+  }
+
+  contextHygiene = Math.max(0, contextHygiene);
+  const efficiencyScore = Math.min(100, Math.max(0, Math.round(
+    (productiveTurnRatio * 0.35) +
+    (sessionCompletionRate * 0.25) +
+    (contextHygiene * 0.2) +
+    (avgTokenEfficiency * 0.2)
+  )));
+
+  return {
+    productiveTurnRatio: Math.round(productiveTurnRatio),
+    sessionCompletionRate: Math.round(sessionCompletionRate),
+    contextHygiene,
+    avgTokenEfficiency: Math.round(avgTokenEfficiency),
+    efficiencyScore,
+  };
+}
+
 /**
  * Generate a personalized development plan.
  */
-export function generateDevPlan({ repo, since, excludeIds } = {}) {
-  // Gather all metrics
+export function generateDevPlan({ repo, since, excludeIds, sessionIntents } = {}) {
   const delegation = analyzeDelegation({ repo, since, excludeIds });
   const judgment = analyzeJudgment({ repo, since, excludeIds });
-
   const sessions = listSessions({ repo, since, excludeIds }).filter((s) => s.turn_count >= 2);
   const clarityResult = analyzeFirstTurnClarity(sessions, getSessionTurns);
   const effData = sessions.map((s) => ({
@@ -147,36 +264,88 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
   const gaps = analyzeInstructionGaps({ repo, since });
   const failures = analyzeInstructionFailures({ repo, since });
 
-  // ── Score each pillar 0-100 ──────────────────────────────────
   const delegationScore = Math.min(100, Math.round(
     (delegation.overallDelegationRatio * 0.4) +
     (Math.min(delegation.overallLeverage, 3) / 3 * 30) +
     (delegation.sessionsWithFiles / Math.max(delegation.sessionsAnalyzed, 1) * 30)
   ));
-
   const judgmentScore = judgment.avgScore;
-
-  const feedbackScore = Math.round(
+  const specificationScore = Math.round(
     (clarityResult.avgScore * 0.5) +
     ((efficiency.aggregate?.avgEfficiency || 0) * 0.3) +
     (Math.max(0, 100 - (efficiency.aggregate?.totalDripFeeds || 0) * 5) * 0.2)
   );
+  // Pre-compute token efficiency scores in a single batch to avoid N+1
+  const tokenScoreMap = new Map();
+  for (const { session } of effData) {
+    tokenScoreMap.set(session.id, computeTokenEfficiencyScore(session.id));
+  }
 
-  // ── Identify opportunities ──────────────────────────────────
+  const {
+    productiveTurnRatio,
+    contextHygiene,
+    efficiencyScore,
+  } = computeEfficiencyMetrics(delegation, efficiency, effData, tokenScoreMap);
+
+  const delegationExamples = flattenExamples(
+    delegation.examples?.guided || [],
+    delegation.examples?.collaborative || [],
+    delegation.examples?.delegation || []
+  );
+  const judgmentExamples = flattenExamples(
+    judgment.examples?.catches || [],
+    judgment.examples?.lateCatches || [],
+    judgment.examples?.approvals || []
+  );
+  const specificationExamples = flattenExamples(
+    ...clarityResult.sessions.slice(0, 3).map((s) => [stripUserMessage(s.firstMessage || "")])
+  );
+  const contextHygieneExamples = effData.flatMap(({ session, turns }) => {
+    const firstUserTurn = turns.find((t) => stripUserMessage(t.user_message).length > 0);
+    const firstMessage = stripUserMessage(firstUserTurn?.user_message || "");
+    const examples = [];
+    const repository = (session.repository || "").trim();
+
+    if (!repository || repository === "(no repo)") {
+      examples.push(`Missing repo context in session "${session.summary || session.id}".`);
+    }
+    if (firstMessage.length > 5000) {
+      examples.push(`Oversized opening prompt (${firstMessage.length} chars): "${firstMessage.substring(0, 120)}..."`);
+    }
+    return examples;
+  }).slice(0, 3);
+
   const opportunities = [];
 
-  // Delegation opportunities
   if (delegation.overallDelegationRatio < 30) {
+    const dominantStyle = getDominantStyle(delegation.styleCounts);
+    let description;
+
+    if ((delegation.styleCounts?.["hands-on"] || 0) > 0) {
+      description = `You're only delegating ${delegation.overallDelegationRatio}% of turns. Try giving full feature specs instead of step-by-step instructions. "Build a login form with email/password validation" beats "create a file, add a form, add inputs..." For example, in one session you gave step-by-step instructions. Try describing the full outcome instead.`;
+    } else {
+      description = `You're only delegating ${delegation.overallDelegationRatio}% of turns. Most of your interactions are ${dominantStyle} — try starting sessions with a complete feature spec that describes the desired outcome. "Build a login form with email/password validation" is more effective than a series of questions and collaborative turns.`;
+    }
+
+    if (delegation.examples?.collaborative?.length > 0) {
+      const example = delegation.examples.collaborative[0];
+      description += `
+
+Example from your session: "${example.substring(0, 120)}..." — this could have been a single spec.`;
+    }
+
     opportunities.push({
       pillar: "delegation",
       type: "high_impact",
       title: "Delegate larger chunks of work",
-      description: `You're only delegating ${delegation.overallDelegationRatio}% of turns. Try giving full feature specs instead of step-by-step instructions. "Build a login form with email/password validation" beats "create a file, add a form, add inputs..."`,
+      description,
       impact: 9,
       effort: "medium",
       metric: `${delegation.overallDelegationRatio}% → target 50%+`,
+      examples: delegationExamples,
     });
   }
+
   if (delegation.overallLeverage < 1) {
     opportunities.push({
       pillar: "delegation",
@@ -186,8 +355,10 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 7,
       effort: "low",
       metric: `${delegation.overallLeverage}x → target 2x+`,
+      examples: delegationExamples,
     });
   }
+
   const guidedPct = delegation.totalUserTurns > 0
     ? Math.round(((delegation.styleCounts?.["hands-on"] || 0) / delegation.sessionsAnalyzed) * 100)
     : 0;
@@ -200,10 +371,10 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 8,
       effort: "medium",
       metric: `${guidedPct}% hands-on → target <15%`,
+      examples: delegation.examples?.guided || delegationExamples,
     });
   }
 
-  // Judgment opportunities
   if (judgment.rubberStampRate > 15) {
     opportunities.push({
       pillar: "judgment",
@@ -213,6 +384,7 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 8,
       effort: "low",
       metric: `${judgment.rubberStampRate}% → target <5%`,
+      examples: judgmentExamples,
     });
   }
   if (judgment.totalLateCatches > 5) {
@@ -224,6 +396,7 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 9,
       effort: "medium",
       metric: `${judgment.totalLateCatches} late catches → target 0`,
+      examples: judgmentExamples,
     });
   }
   if (judgment.avgScore < 60) {
@@ -235,45 +408,72 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 8,
       effort: "medium",
       metric: `${judgment.avgScore}/100 → target 75+`,
+      examples: judgmentExamples,
     });
   }
 
-  // Feedback opportunities
   if (clarityResult.avgScore < 50) {
     opportunities.push({
-      pillar: "feedback",
+      pillar: "specification",
       type: "high_impact",
       title: "Write clearer opening prompts",
       description: `Clarity score is ${clarityResult.avgScore}/100. Include file paths, constraints, expected behavior, and examples in your first message.`,
       impact: 9,
       effort: "low",
       metric: `${clarityResult.avgScore}/100 → target 70+`,
+      examples: specificationExamples,
     });
   }
   if ((efficiency.aggregate?.totalDripFeeds || 0) > 5) {
     opportunities.push({
-      pillar: "feedback",
+      pillar: "specification",
       type: "quick_win",
       title: "Front-load context",
       description: `${efficiency.aggregate.totalDripFeeds} drip-feeds detected. Instead of "oh, and also..." add all requirements to your first message.`,
       impact: 7,
       effort: "low",
       metric: `${efficiency.aggregate.totalDripFeeds} drips → target 0`,
+      examples: specificationExamples,
     });
   }
   if ((efficiency.aggregate?.avgRecoveryTurns || 0) > 2) {
     opportunities.push({
-      pillar: "feedback",
+      pillar: "specification",
       type: "high_impact",
       title: "Give more effective corrections",
       description: `Average ${efficiency.aggregate.avgRecoveryTurns} turns to recover after a redirect. When correcting, be specific: say what's wrong AND what you want instead.`,
       impact: 7,
       effort: "medium",
       metric: `${efficiency.aggregate.avgRecoveryTurns} turns → target <1.5`,
+      examples: specificationExamples,
     });
   }
 
-  // Instruction opportunities
+  if (productiveTurnRatio < 70) {
+    opportunities.push({
+      pillar: "efficiency",
+      type: "high_impact",
+      title: "Reduce wasted turns",
+      description: `Only ${productiveTurnRatio}% of turns are productive. Front-load requirements, keep corrections specific, and split side questions into /ask sessions so the agent stays on track.`,
+      impact: 8,
+      effort: "medium",
+      metric: `${productiveTurnRatio}% productive turns → target 85%+`,
+      examples: [],
+    });
+  }
+  if (contextHygiene < 70) {
+    opportunities.push({
+      pillar: "efficiency",
+      type: "quick_win",
+      title: "Improve session setup",
+      description: `Workspace setup is ${contextHygiene}/100. Launch Copilot from inside repo directories, keep repository context attached, and move recurring conventions into instruction files instead of pasting oversized setup into chat.`,
+      impact: 7,
+      effort: "low",
+      metric: `${contextHygiene}/100 → target 90+`,
+      examples: contextHygieneExamples,
+    });
+  }
+
   if (gaps.totalGaps > 3) {
     opportunities.push({
       pillar: "instructions",
@@ -283,6 +483,7 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 8,
       effort: "low",
       metric: `${gaps.totalGaps} gaps → target 0`,
+      examples: [],
     });
   }
   if (failures.totalIntraRepetitions > 20) {
@@ -294,39 +495,101 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
       impact: 9,
       effort: "medium",
       metric: `${failures.totalIntraRepetitions} repeats → target <5`,
+      examples: [],
     });
   }
 
-  // Sort by impact
   opportunities.sort((a, b) => b.impact - a.impact);
 
-  // ── Weekly goals ────────────────────────────────────────────
   const weeklyGoals = buildWeeklyGoals(opportunities, {
-    delegationScore, judgmentScore, feedbackScore,
-    delegation, judgment, clarityResult, efficiency, gaps,
+    delegationScore,
+    judgmentScore,
+    specificationScore,
+    efficiencyScore,
+    delegation,
+    judgment,
+    clarityResult,
+    efficiency,
+    gaps,
   });
 
-  // ── Quick wins ──────────────────────────────────────────────
   const quickWins = opportunities
     .filter((o) => o.type === "quick_win")
     .slice(0, 5);
 
-  // ── Learning path ───────────────────────────────────────────
   const weakestPillar = [
     { pillar: "delegation", score: delegationScore },
     { pillar: "judgment", score: judgmentScore },
-    { pillar: "feedback", score: feedbackScore },
+    { pillar: "specification", score: specificationScore },
+    { pillar: "efficiency", score: efficiencyScore },
   ].sort((a, b) => a.score - b.score)[0].pillar;
 
   const learningPath = buildLearningPath(weakestPillar, opportunities);
+  const baseOverall = Math.round((delegationScore + judgmentScore + specificationScore + efficiencyScore) / 4);
+
+  let intentAdjustedScores = null;
+  let sessionIntentBreakdown = null;
+  if (sessionIntents && Object.keys(sessionIntents).length > 0) {
+    const intentCounts = { build: 0, explore: 0, iterate: 0, debug: 0 };
+    const sessionsWithIntents = sessions.filter((s) => sessionIntents[s.id]);
+    for (const s of sessionsWithIntents) {
+      const intent = sessionIntents[s.id];
+      if (intentCounts[intent] !== undefined) intentCounts[intent]++;
+    }
+    const totalIntented = sessionsWithIntents.length;
+    sessionIntentBreakdown = {
+      counts: intentCounts,
+      totalTagged: totalIntented,
+      totalSessions: sessions.length,
+      profiles: Object.fromEntries(
+        Object.entries(INTENT_WEIGHT_PROFILES).map(([intent, profile]) => [
+          intent,
+          {
+            description: profile.description,
+            redirect_penalty_factor: profile.redirect_penalty_factor,
+          },
+        ])
+      ),
+    };
+
+    if (totalIntented > 0) {
+      const clampScore = (score) => Math.max(0, Math.min(100, Math.round(score)));
+      const adjustFactor = (pillarKey) => {
+        let weightedSum = 0;
+        let countSum = 0;
+        for (const [intent, count] of Object.entries(intentCounts)) {
+          if (count > 0 && INTENT_WEIGHT_PROFILES[intent]) {
+            weightedSum += INTENT_WEIGHT_PROFILES[intent][pillarKey] * count;
+            countSum += count;
+          }
+        }
+        const nonIntented = sessions.length - totalIntented;
+        return (weightedSum + nonIntented) / (countSum + nonIntented);
+      };
+
+      intentAdjustedScores = {
+        delegation: clampScore(delegationScore * adjustFactor("delegation")),
+        judgment: clampScore(judgmentScore * adjustFactor("judgment")),
+        specification: clampScore(specificationScore * adjustFactor("specification")),
+        efficiency: clampScore(efficiencyScore * adjustFactor("efficiency")),
+      };
+      intentAdjustedScores.overall = Math.round(
+        (intentAdjustedScores.delegation + intentAdjustedScores.judgment +
+         intentAdjustedScores.specification + intentAdjustedScores.efficiency) / 4
+      );
+    }
+  }
 
   return {
     pillarScores: {
       delegation: delegationScore,
       judgment: judgmentScore,
-      feedback: feedbackScore,
-      overall: Math.round((delegationScore + judgmentScore + feedbackScore) / 3),
+      specification: specificationScore,
+      efficiency: efficiencyScore,
+      overall: baseOverall,
     },
+    intentAdjustedScores,
+    sessionIntentBreakdown,
     opportunities: opportunities.slice(0, 10),
     quickWins,
     weeklyGoals,
@@ -342,7 +605,6 @@ export function generateDevPlan({ repo, since, excludeIds } = {}) {
 function buildWeeklyGoals(opportunities, data) {
   const goals = [];
 
-  // Always include one goal per pillar if there's room to improve
   if (data.delegationScore < 80) {
     goals.push({
       pillar: "delegation",
@@ -365,18 +627,28 @@ function buildWeeklyGoals(opportunities, data) {
     });
   }
 
-  if (data.feedbackScore < 80) {
+  if (data.specificationScore < 80) {
     goals.push({
-      pillar: "feedback",
+      pillar: "specification",
       emoji: "💬",
-      goal: "Include context in every opening prompt",
-      description: "Every new session should start with: what you want, where the files are, constraints, and an example of success.",
+      goal: "Write clear specifications for every opening prompt",
+      description: "Every new session should start with a clear specification: desired outcome, file paths, constraints, and an example of success.",
       target: "70+ clarity score on all new sessions",
       progress: Math.min(100, Math.round(data.clarityResult.avgScore * 1.3)),
     });
   }
 
-  // Add instruction file goal if gaps exist
+  if (data.efficiencyScore < 80) {
+    goals.push({
+      pillar: "efficiency",
+      emoji: "⚡",
+      goal: "Complete 3 sessions from project directories",
+      description: "Launch Copilot from inside your repo directory so it has full context. Use /ask for side questions.",
+      target: "3 sessions with repo context and <10 turns each",
+      progress: Math.min(100, Math.round(data.efficiencyScore * 1.2)),
+    });
+  }
+
   if (data.gaps.totalGaps > 0) {
     goals.push({
       pillar: "instructions",
@@ -388,7 +660,6 @@ function buildWeeklyGoals(opportunities, data) {
     });
   }
 
-  // Stretch goal
   goals.push({
     pillar: "all",
     emoji: "🏆",
@@ -408,7 +679,7 @@ function buildLearningPath(weakestPillar, opportunities) {
   const primary = LEARNING_RESOURCES[weakestPillar] || [];
   const hasInstructionIssues = opportunities.some((o) => o.pillar === "instructions");
   const instructionResources = hasInstructionIssues ? LEARNING_RESOURCES.instructions : [];
-  const allPillars = ["delegation", "judgment", "feedback"];
+  const allPillars = ["delegation", "judgment", "specification", "efficiency"];
   const secondary = allPillars
     .filter((p) => p !== weakestPillar)
     .flatMap((p) => (LEARNING_RESOURCES[p] || []).slice(0, 1));
@@ -424,19 +695,41 @@ function buildLearningPath(weakestPillar, opportunities) {
 }
 
 // ── Helper: compute pillar scores from raw data ─────────────────
-function computePillarScores(delegation, judgment, clarityResult, efficiency) {
+function computePillarScores(delegation, judgment, clarityResult, efficiency, sessionsData = []) {
   const delegationScore = Math.min(100, Math.round(
     (delegation.overallDelegationRatio * 0.4) +
     (Math.min(delegation.overallLeverage, 3) / 3 * 30) +
     (delegation.sessionsWithFiles / Math.max(delegation.sessionsAnalyzed, 1) * 30)
   ));
   const judgmentScore = judgment.avgScore;
-  const feedbackScore = Math.round(
+  const specificationScore = Math.round(
     (clarityResult.avgScore * 0.5) +
     ((efficiency.aggregate?.avgEfficiency || 0) * 0.3) +
     (Math.max(0, 100 - (efficiency.aggregate?.totalDripFeeds || 0) * 5) * 0.2)
   );
-  return { delegationScore, judgmentScore, feedbackScore };
+  // Pre-compute token efficiency scores in a single batch to avoid N+1
+  const tokenScoreMap = new Map();
+  for (const { session } of sessionsData) {
+    tokenScoreMap.set(session.id, computeTokenEfficiencyScore(session.id));
+  }
+
+  const {
+    productiveTurnRatio,
+    sessionCompletionRate,
+    contextHygiene,
+    avgTokenEfficiency,
+    efficiencyScore,
+  } = computeEfficiencyMetrics(delegation, efficiency, sessionsData, tokenScoreMap);
+  return {
+    delegationScore,
+    judgmentScore,
+    specificationScore,
+    efficiencyScore,
+    productiveTurnRatio,
+    sessionCompletionRate,
+    contextHygiene,
+    avgTokenEfficiency,
+  };
 }
 
 // ── Helper: gather all metrics for a time range ─────────────────
@@ -451,7 +744,7 @@ function gatherMetrics({ repo, since, excludeIds } = {}) {
     refs: getSessionRefs(s.id),
   }));
   const efficiency = analyzeEfficiencyBatch(effData);
-  const scores = computePillarScores(delegation, judgment, clarityResult, efficiency);
+  const scores = computePillarScores(delegation, judgment, clarityResult, efficiency, effData);
   return { delegation, judgment, clarityResult, efficiency, sessions, ...scores };
 }
 
@@ -459,10 +752,7 @@ function gatherMetrics({ repo, since, excludeIds } = {}) {
  * Daily progress check — compares today's sessions against overall baseline.
  */
 export function generateProgressCheck({ repo, since, excludeIds } = {}) {
-  // Overall baseline (all-time or from `since`)
   const baseline = gatherMetrics({ repo, since, excludeIds });
-
-  // Today's sessions only
   const todayStr = new Date().toISOString().split("T")[0];
   const todaySessions = baseline.sessions.filter(
     (s) => s.created_at && s.created_at.startsWith(todayStr)
@@ -479,7 +769,7 @@ export function generateProgressCheck({ repo, since, excludeIds } = {}) {
       refs: getSessionRefs(s.id),
     }));
     const todayEff = analyzeEfficiencyBatch(todayEffData);
-    const todayScores = computePillarScores(todayDelegation, todayJudgment, todayClarity, todayEff);
+    const todayScores = computePillarScores(todayDelegation, todayJudgment, todayClarity, todayEff, todayEffData);
     today = {
       sessionCount: todaySessions.length,
       totalTurns: todaySessions.reduce((s, x) => s + (x.turn_count || 0), 0),
@@ -493,33 +783,36 @@ export function generateProgressCheck({ repo, since, excludeIds } = {}) {
     };
   }
 
-  // Compute deltas
   const deltas = today ? {
     delegation: today.delegationScore - baseline.delegationScore,
     judgment: today.judgmentScore - baseline.judgmentScore,
-    feedback: today.feedbackScore - baseline.feedbackScore,
+    specification: today.specificationScore - baseline.specificationScore,
+    efficiency: today.efficiencyScore - baseline.efficiencyScore,
   } : null;
 
-  // Build momentum signals
   const momentum = [];
   if (deltas) {
     if (deltas.delegation > 5) momentum.push({ emoji: "📈", text: `Delegation up ${deltas.delegation}pts today` });
     if (deltas.delegation < -5) momentum.push({ emoji: "📉", text: `Delegation down ${Math.abs(deltas.delegation)}pts today` });
     if (deltas.judgment > 5) momentum.push({ emoji: "📈", text: `Judgment up ${deltas.judgment}pts today` });
     if (deltas.judgment < -5) momentum.push({ emoji: "📉", text: `Judgment down ${Math.abs(deltas.judgment)}pts today` });
-    if (deltas.feedback > 5) momentum.push({ emoji: "📈", text: `Feedback up ${deltas.feedback}pts today` });
-    if (deltas.feedback < -5) momentum.push({ emoji: "📉", text: `Feedback down ${Math.abs(deltas.feedback)}pts today` });
+    if (deltas.specification > 5) momentum.push({ emoji: "📈", text: `Specification up ${deltas.specification}pts today` });
+    if (deltas.specification < -5) momentum.push({ emoji: "📉", text: `Specification down ${Math.abs(deltas.specification)}pts today` });
+    if (deltas.efficiency > 5) momentum.push({ emoji: "📈", text: `Efficiency up ${deltas.efficiency}pts today` });
+    if (deltas.efficiency < -5) momentum.push({ emoji: "📉", text: `Efficiency down ${Math.abs(deltas.efficiency)}pts today` });
     if (today.sessionCount >= 5) momentum.push({ emoji: "🔥", text: `${today.sessionCount} sessions today — productive day!` });
     if (today.rubberStampRate === 0 && today.sessionCount >= 2) momentum.push({ emoji: "✅", text: "Zero rubber-stamps today!" });
   }
 
-  // Today's tips (1-2 quick actionable tips)
   const tips = [];
   if (today && today.delegationScore < baseline.delegationScore) {
     tips.push("Try delegating your next task fully — describe the outcome, not the steps.");
   }
   if (today && today.rubberStampRate > 10) {
     tips.push("Pause before approving — read through the agent's changes before saying yes.");
+  }
+  if (today && today.efficiencyScore < baseline.efficiencyScore) {
+    tips.push("Tighten session setup — launch from the repo directory and front-load the full spec.");
   }
   if (!today || today.sessionCount === 0) {
     tips.push("No sessions yet today. Start one and practice your weakest pillar!");
@@ -534,7 +827,8 @@ export function generateProgressCheck({ repo, since, excludeIds } = {}) {
     baseline: {
       delegationScore: baseline.delegationScore,
       judgmentScore: baseline.judgmentScore,
-      feedbackScore: baseline.feedbackScore,
+      specificationScore: baseline.specificationScore,
+      efficiencyScore: baseline.efficiencyScore,
       sessionCount: baseline.sessions.length,
     },
     deltas,
@@ -549,36 +843,42 @@ export function generateProgressCheck({ repo, since, excludeIds } = {}) {
 export function generateRetro({ repo, since, excludeIds } = {}) {
   const data = gatherMetrics({ repo, since, excludeIds });
   const { sessions, delegation, judgment, efficiency } = data;
+  const resourcePillarMap = {
+    workDesign: "delegation",
+    qualityControl: "judgment",
+    intent: "specification",
+    evaluation: "efficiency",
+  };
 
   if (sessions.length === 0) {
     return { empty: true, message: "No sessions in this timeframe to review." };
   }
 
-  // ── Wins ──────────────────────────────────────────────────────
   const wins = [];
-  if (data.delegationScore >= 60) wins.push({ pillar: "delegation", emoji: "🤝", text: `Delegation score: ${data.delegationScore}/100 — solid trust in the agent.` });
-  if (data.judgmentScore >= 70) wins.push({ pillar: "judgment", emoji: "🧠", text: `Judgment score: ${data.judgmentScore}/100 — good quality review.` });
-  if (data.feedbackScore >= 70) wins.push({ pillar: "feedback", emoji: "💬", text: `Feedback score: ${data.feedbackScore}/100 — clear communication.` });
-  if (delegation.overallLeverage >= 1.5) wins.push({ pillar: "delegation", emoji: "📐", text: `${delegation.overallLeverage}x leverage — the agent is doing more than you type.` });
-  if (judgment.rubberStampRate < 5) wins.push({ pillar: "judgment", emoji: "🔍", text: `Only ${judgment.rubberStampRate}% rubber-stamp rate — careful reviewer.` });
-  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "feedback", emoji: "📋", text: "Zero drip-feeds — front-loading context well." });
+  if (data.delegationScore >= 60) wins.push({ pillar: "workDesign", emoji: "🤝", text: `Work Design score: ${data.delegationScore}/100 — solid trust in the agent.` });
+  if (data.judgmentScore >= 70) wins.push({ pillar: "qualityControl", emoji: "🧠", text: `Quality Control score: ${data.judgmentScore}/100 — good quality review.` });
+  if (data.specificationScore >= 70) wins.push({ pillar: "intent", emoji: "💬", text: `Intent score: ${data.specificationScore}/100 — clear communication.` });
+  if (data.efficiencyScore >= 70) wins.push({ pillar: "evaluation", emoji: "⚡", text: `Evaluation score: ${data.efficiencyScore}/100 — productive sessions with clean setup.` });
+  if (delegation.overallLeverage >= 1.5) wins.push({ pillar: "workDesign", emoji: "📐", text: `${delegation.overallLeverage}x leverage — the agent is doing more than you type.` });
+  if (judgment.rubberStampRate < 5) wins.push({ pillar: "qualityControl", emoji: "🔍", text: `Only ${judgment.rubberStampRate}% rubber-stamp rate — careful reviewer.` });
+  if ((efficiency.aggregate?.totalDripFeeds || 0) === 0) wins.push({ pillar: "intent", emoji: "🚫", text: "Zero drip-feeds — front-loading context well." });
 
   const cleanSessions = sessions.filter((s) => {
     const eff = efficiency.sessions?.find((e) => e.sessionId === s.id);
-    return eff && eff.efficiency >= 95;
+    return eff && eff.efficiency.efficiencyRatio >= 0.95;
   }).length;
   if (cleanSessions > 0) wins.push({ pillar: "all", emoji: "✨", text: `${cleanSessions} clean sessions with minimal redirections.` });
 
-  // ── Misses / areas that need work ─────────────────────────────
   const misses = [];
-  if (data.delegationScore < 40) misses.push({ pillar: "delegation", emoji: "⚠️", text: `Delegation score ${data.delegationScore}/100 — too much hand-holding.` });
-  if (data.judgmentScore < 50) misses.push({ pillar: "judgment", emoji: "⚠️", text: `Judgment score ${data.judgmentScore}/100 — review quality needs work.` });
-  if (data.feedbackScore < 40) misses.push({ pillar: "feedback", emoji: "⚠️", text: `Feedback score ${data.feedbackScore}/100 — prompts could be clearer.` });
-  if (judgment.rubberStampRate > 20) misses.push({ pillar: "judgment", emoji: "🔴", text: `${judgment.rubberStampRate}% rubber-stamp rate — approving without reviewing.` });
-  if ((efficiency.aggregate?.totalDripFeeds || 0) > 10) misses.push({ pillar: "feedback", emoji: "🔴", text: `${efficiency.aggregate.totalDripFeeds} drip-feeds — context dribbled out over many turns.` });
-  if (judgment.totalLateCatches > 10) misses.push({ pillar: "judgment", emoji: "⚠️", text: `${judgment.totalLateCatches} late catches — issues found too late in sessions.` });
+  if (data.delegationScore < 40) misses.push({ pillar: "workDesign", emoji: "⚠️", text: `Work Design score ${data.delegationScore}/100 — too much hand-holding.` });
+  if (data.judgmentScore < 50) misses.push({ pillar: "qualityControl", emoji: "⚠️", text: `Quality Control score ${data.judgmentScore}/100 — review quality needs work.` });
+  if (data.specificationScore < 40) misses.push({ pillar: "intent", emoji: "⚠️", text: `Intent score ${data.specificationScore}/100 — prompts could be clearer.` });
+  if (data.efficiencyScore < 50) misses.push({ pillar: "evaluation", emoji: "⚠️", text: `Evaluation score ${data.efficiencyScore}/100 — too much setup friction or wasted motion.` });
+  if (judgment.rubberStampRate > 20) misses.push({ pillar: "qualityControl", emoji: "🔴", text: `${judgment.rubberStampRate}% rubber-stamp rate — approving without reviewing.` });
+  if ((efficiency.aggregate?.totalDripFeeds || 0) > 10) misses.push({ pillar: "intent", emoji: "🔴", text: `${efficiency.aggregate.totalDripFeeds} drip-feeds — context dribbled out over many turns.` });
+  if (data.contextHygiene < 70) misses.push({ pillar: "evaluation", emoji: "🔴", text: `Workspace setup ${data.contextHygiene}/100 — launch from repo dirs and avoid oversized opening prompts.` });
+  if (judgment.totalLateCatches > 10) misses.push({ pillar: "qualityControl", emoji: "⚠️", text: `${judgment.totalLateCatches} late catches — issues found too late in sessions.` });
 
-  // ── Trends (compare first half vs second half of timeframe) ───
   const trends = [];
   if (sessions.length >= 6) {
     const mid = Math.floor(sessions.length / 2);
@@ -603,26 +903,27 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
     }
   }
 
-  // ── Next focus recommendation ─────────────────────────────────
   const weakest = [
-    { pillar: "delegation", score: data.delegationScore },
-    { pillar: "judgment", score: data.judgmentScore },
-    { pillar: "feedback", score: data.feedbackScore },
+    { pillar: "workDesign", score: data.delegationScore },
+    { pillar: "qualityControl", score: data.judgmentScore },
+    { pillar: "intent", score: data.specificationScore },
+    { pillar: "evaluation", score: data.efficiencyScore },
   ].sort((a, b) => a.score - b.score)[0];
 
   const nextFocus = {
     pillar: weakest.pillar,
     score: weakest.score,
-    recommendation: weakest.pillar === "delegation"
+    recommendation: weakest.pillar === "workDesign"
       ? "Next period: practice giving full feature specs in a single prompt. Trust the agent."
-      : weakest.pillar === "judgment"
+      : weakest.pillar === "qualityControl"
         ? "Next period: read every agent change before approving. Check edge cases."
-        : "Next period: include file paths, constraints, and examples in every opening prompt.",
-    resources: (LEARNING_RESOURCES[weakest.pillar] || []).slice(0, 2),
+        : weakest.pillar === "intent"
+          ? "Next period: include file paths, constraints, and examples in every opening prompt."
+          : "Next period: launch from repo directories, keep sessions focused, and front-load the full task context.",
+    resources: (LEARNING_RESOURCES[resourcePillarMap[weakest.pillar]] || []).slice(0, 2),
   };
 
-  // ── Summary stats ─────────────────────────────────────────────
-  const overallScore = Math.round((data.delegationScore + data.judgmentScore + data.feedbackScore) / 3);
+  const overallScore = Math.round((data.delegationScore + data.judgmentScore + data.specificationScore + data.efficiencyScore) / 4);
 
   return {
     empty: false,
@@ -632,9 +933,14 @@ export function generateRetro({ repo, since, excludeIds } = {}) {
       since: since || sessions[sessions.length - 1]?.created_at || "all time",
     },
     pillarScores: {
+      workDesign: data.delegationScore,
+      qualityControl: data.judgmentScore,
+      intent: data.specificationScore,
+      evaluation: data.efficiencyScore,
       delegation: data.delegationScore,
       judgment: data.judgmentScore,
-      feedback: data.feedbackScore,
+      specification: data.specificationScore,
+      efficiency: data.efficiencyScore,
       overall: overallScore,
     },
     grade: overallScore >= 80 ? "A" : overallScore >= 65 ? "B" : overallScore >= 50 ? "C" : "D",

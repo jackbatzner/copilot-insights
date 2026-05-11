@@ -258,3 +258,83 @@ export async function hideSession(id) {
 export async function unhideSession(id) {
   return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
 }
+
+// Chronicle
+export async function fetchChronicleTips(timeframe, repo) {
+  return safeFetch(`${API_BASE}/chronicle/tips?${tfParams(timeframe, repo)}`);
+}
+export async function fetchChronicleImprove(sessionId) {
+  return safeFetch(`${API_BASE}/chronicle/improve/${sessionId}`);
+}
+
+// Session Intent Tags
+export async function fetchSessionIntent(id) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent`);
+}
+
+export async function fetchIntentSuggestion(id) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent-suggestion`);
+}
+
+export async function setSessionIntent(id, intent) {
+  return safeFetch(`${API_BASE}/sessions/${id}/intent`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ intent }),
+  });
+}
+
+export async function fetchAllIntents() {
+  return safeFetch(`${API_BASE}/session-intents`);
+}
+
+// Dev Plan Goals
+export async function fetchDevPlanGoals(withProgress = false) {
+  return safeFetch(`${API_BASE}/devplan/goals${withProgress ? "?progress=true" : ""}`);
+}
+
+export async function addDevPlanGoal({ pillar, title, description, source, baselineScore }) {
+  return safeFetch(`${API_BASE}/devplan/goals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pillar, title, description, source, baselineScore }),
+  });
+}
+
+export async function updateDevPlanGoalStatus(id, status) {
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function addGoalNote(id, text) {
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ addNote: text }),
+  });
+}
+
+export async function fetchJournal() {
+  const res = await fetch(`${API_BASE}/devplan/journal`);
+  if (!res.ok) {
+    let errorMessage;
+    try { const body = await res.json(); errorMessage = body.error; } catch { /* no JSON */ }
+    throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
+  }
+  return res.text();
+}
+
+export async function deleteDevPlanGoal(id) {
+  return safeFetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
+}
+
+// VS Code sessions
+export async function fetchVSCodeSessions() {
+  return safeFetch(`${API_BASE}/vscode/sessions`);
+}
+export async function fetchVSCodeSummary() {
+  return safeFetch(`${API_BASE}/vscode/summary`);
+}

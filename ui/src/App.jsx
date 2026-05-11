@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
-import { Routes, Route, NavLink, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
 import { ThemeToggle } from "./components/ThemeToggle.jsx";
@@ -7,11 +7,11 @@ import Overview from "./pages/Overview.jsx";
 import Welcome from "./pages/Welcome.jsx";
 import Sessions from "./pages/Sessions.jsx";
 import SessionDetail from "./pages/SessionDetail.jsx";
-import Coaching from "./pages/Coaching.jsx";
+import SkillBuilding from "./pages/SkillBuilding.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Instructions from "./pages/Instructions.jsx";
-import Learn from "./pages/Learn.jsx";
 import Practice from "./pages/Practice.jsx";
+import VSCodeSessions from "./pages/VSCodeSessions.jsx";
 import LiveMonitor from "./pages/LiveMonitor.jsx";
 import TokenUsage from "./pages/TokenUsage.jsx";
 import { fetchSessions, clearCache } from "./api.js";
@@ -121,33 +121,32 @@ function App() {
               <NavLink to="/" end>
                 <span className="nav-icon">📊</span><span className="nav-label">Overview</span>
               </NavLink>
-              <NavLink to="/coaching">
-                <span className="nav-icon">🎓</span><span className="nav-label">Coaching</span>
+              <NavLink to="/skills">
+                <span className="nav-icon">🎯</span><span className="nav-label">Skill Building</span>
               </NavLink>
               <NavLink to="/practice">
                 <span className="nav-icon">🧪</span><span className="nav-label">Practice Lab</span>
                 <span className="nav-badge">✨ New</span>
-              </NavLink>
-              <NavLink to="/learn">
-                <span className="nav-icon">📚</span><span className="nav-label">Learn</span>
               </NavLink>
               <NavLink to="/sessions">
                 <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
               </NavLink>
             </NavGroup>
             <NavGroup label="ADVANCED">
-              <NavLink to="/analytics">
-                <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
-              </NavLink>
               <NavLink to="/tokens">
                 <span className="nav-icon">💰</span><span className="nav-label">Token Usage</span>
-                <span className="nav-badge">✨ New</span>
+              </NavLink>
+              <NavLink to="/analytics">
+                <span className="nav-icon">📈</span><span className="nav-label">Analytics</span>
               </NavLink>
               <NavLink to="/live">
                 <span className="nav-icon">📡</span><span className="nav-label">Live</span>
               </NavLink>
               <NavLink to="/instructions">
                 <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
+              </NavLink>
+              <NavLink to="/vscode">
+                <span className="nav-icon">💻</span><span className="nav-label">VS Code</span>
               </NavLink>
             </NavGroup>
             <div className="refresh-section">
@@ -168,8 +167,9 @@ function App() {
               <>
                 <Route path="/" element={<Overview />} />
                 <Route path="/welcome" element={<Welcome />} />
-                <Route path="/coaching" element={<Coaching />} />
-                <Route path="/learn" element={<Learn />} />
+                <Route path="/skills" element={<SkillBuilding />} />
+                <Route path="/coaching" element={<Navigate to="/skills" replace />} />
+                <Route path="/learn" element={<Navigate to="/skills" replace />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/live" element={<LiveMonitor />} />
                 <Route path="/tokens" element={<TokenUsage />} />
@@ -177,6 +177,7 @@ function App() {
                 <Route path="/sessions" element={<Sessions />} />
                 <Route path="/sessions/:id" element={<SessionDetail />} />
                 <Route path="/practice" element={<Practice />} />
+                <Route path="/vscode" element={<VSCodeSessions />} />
               </>
             )}
           </Routes>

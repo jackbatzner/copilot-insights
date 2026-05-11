@@ -43,17 +43,34 @@ describe("generateDevPlan", () => {
     assert.equal(typeof result, "object");
   });
 
-  it("result has pillar data or plan structure", () => {
+  it("result exposes renamed and new pillar scores", () => {
     const result = generateDevPlan({ repo: "org/app" });
-    // Should have score fields or opportunities
-    const keys = Object.keys(result);
-    assert.ok(keys.length > 0, "result should have keys");
+    assert.equal(typeof result.pillarScores.specification, "number");
+    assert.equal(typeof result.pillarScores.efficiency, "number");
+    assert.ok(!("feedback" in result.pillarScores));
   });
 
   it("handles empty DB gracefully", () => {
     const result = generateDevPlan({ repo: "nonexistent-repo-xyz" });
     assert.ok(result !== null, "should not crash on empty data");
     assert.equal(typeof result, "object");
+  });
+
+  it("returns intent-adjusted scores when session intents are provided", () => {
+    const result = generateDevPlan({
+      repo: "org/app",
+      sessionIntents: { dp1: "explore", dp2: "build" },
+    });
+
+    assert.ok(result.intentAdjustedScores);
+    assert.equal(typeof result.intentAdjustedScores.overall, "number");
+    assert.ok(result.intentAdjustedScores.overall <= result.pillarScores.overall);
+    assert.deepStrictEqual(result.sessionIntentBreakdown.counts, {
+      build: 1,
+      explore: 1,
+      iterate: 0,
+      debug: 0,
+    });
   });
 });
 
@@ -62,6 +79,8 @@ describe("generateProgressCheck", () => {
     const result = generateProgressCheck({ repo: "org/app" });
     assert.ok(result !== null, "result should not be null/undefined");
     assert.equal(typeof result, "object");
+    assert.equal(typeof result.baseline.specificationScore, "number");
+    assert.equal(typeof result.baseline.efficiencyScore, "number");
   });
 
   it("handles empty DB gracefully", () => {
@@ -76,6 +95,8 @@ describe("generateRetro", () => {
     const result = generateRetro({ repo: "org/app" });
     assert.ok(result !== null, "result should not be null/undefined");
     assert.equal(typeof result, "object");
+    assert.equal(typeof result.pillarScores.specification, "number");
+    assert.equal(typeof result.pillarScores.efficiency, "number");
   });
 
   it("handles empty DB gracefully", () => {

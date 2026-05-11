@@ -53,7 +53,7 @@ describe("analyzeDelegation", () => {
       "totalFileOps", "sessionsAnalyzed", "sessionsWithFiles",
       "sessionsWithCommits", "sessionsWithPRs", "agentOutputKB",
       "userInputKB", "turnTypeBreakdown", "styleDistribution",
-      "topDelegated", "styleCounts",
+      "topDelegated", "styleCounts", "examples",
     ]) {
       assert.ok(key in result, `missing key: ${key}`);
     }

@@ -75,6 +75,7 @@ function analyzeSessionJudgment(session, turns, files) {
   let lateCatches = 0;
   let approvalsBeforeCorrection = 0;
   const catchTurns = [];
+  const examples = { approvals: [], catches: [], lateCatches: [] };
   let approvalStreak = 0;
   let maxApprovalStreak = 0;
   let turnsToFirstCatch = null;
@@ -108,6 +109,7 @@ function analyzeSessionJudgment(session, turns, files) {
 
     if (isAppr) {
       approvals++;
+      if (examples.approvals.length < 2) examples.approvals.push(cleaned);
       approvalStreak++;
       maxApprovalStreak = Math.max(maxApprovalStreak, approvalStreak);
       lastWasApproval = true;
@@ -117,6 +119,7 @@ function analyzeSessionJudgment(session, turns, files) {
 
     if (isCat || isRedirect) {
       catches++;
+      if (examples.catches.length < 2) examples.catches.push(cleaned);
       catchTurns.push(i);
       if (turnsToFirstCatch === null) turnsToFirstCatch = i;
 
@@ -128,6 +131,7 @@ function analyzeSessionJudgment(session, turns, files) {
 
     if (isLate) {
       lateCatches++;
+      if (examples.lateCatches.length < 2) examples.lateCatches.push(cleaned);
     }
 
     if (!isAppr) lastWasApproval = false;
@@ -171,6 +175,7 @@ function analyzeSessionJudgment(session, turns, files) {
     thrashCount: thrashedFiles.length,
     rubberStampRate: Math.round(rubberStampRate * 100),
     score,
+    examples,
   };
 }
 
@@ -181,6 +186,7 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
   const sessions = listSessions({ repo, since, excludeIds });
 
   const sessionResults = [];
+  const examples = { approvals: [], catches: [], lateCatches: [] };
   let totalApprovals = 0;
   let totalCatches = 0;
   let totalLateCatches = 0;
@@ -196,6 +202,13 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
     const result = analyzeSessionJudgment(s, turns, files);
     sessionResults.push(result);
 
+    for (const type of Object.keys(examples)) {
+      for (const example of result.examples[type] || []) {
+        if (examples[type].length < 4 && !examples[type].includes(example)) {
+          examples[type].push(example);
+        }
+      }
+    }
     totalApprovals += result.approvals;
     totalCatches += result.catches;
     totalLateCatches += result.lateCatches;
@@ -297,5 +310,6 @@ export function analyzeJudgment({ repo, since, excludeIds } = {}) {
     worstJudgment,
     allThrashed,
     suggestions,
+    examples,
   };
 }
