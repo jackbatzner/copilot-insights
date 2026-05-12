@@ -1483,13 +1483,58 @@ a:hover {
 /* ── Coaching pillars ──────────────────────────────────────── */
 
 .pillar-card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 160px;
+  padding: 16px 18px;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   transition: all 0.2s;
-  border: 1px solid transparent;
 }
 
 .pillar-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
+}
+
+.pillar-card .stat-value {
+  margin-bottom: 2px;
+  line-height: 1;
+}
+
+.pillar-card .stat-label {
+  margin-top: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.pillar-card .stat-sub {
+  margin-top: 0;
+  line-height: 1.4;
+}
+
+.pillar-card-subtitle {
+  font-size: 11px;
+  color: var(--accent);
+  font-style: italic;
+  line-height: 1.35;
+}
+
+.pillar-card-status {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pillar-card-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 
 .pillar-active {
