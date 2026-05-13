@@ -18,6 +18,7 @@ Thumbs.db
 # Coverage / test output
 coverage/
 .nyc_output/
+test-artifacts/
 
 # Lint cache
 .eslintcache

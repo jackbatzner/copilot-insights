@@ -1,7 +1,8 @@
 import { before, after, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import Database from "better-sqlite3";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -43,7 +44,7 @@ function seedWorkspace({ edition, workspaceId, sessionData, schema = "normal" })
 
 before(() => {
   originalAppData = process.env.APPDATA;
-  appDataRoot = join(process.cwd(), "test-artifacts", `vscode-sessions-${process.pid}`);
+  appDataRoot = mkdtempSync(join(tmpdir(), "copilot-insights-vscode-sessions-"));
   process.env.APPDATA = appDataRoot;
 });
 
