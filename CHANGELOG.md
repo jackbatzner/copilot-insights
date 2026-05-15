@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Official Copilot CLI extension layout** — The package now ships a discovered extension entrypoint at `.github/extensions/copilot-insights/extension.mjs`, aligned with the current `joinSession()`-based SDK model
 - **WTI Skill Building framework** — 7-pillar tabbed interface (Intent, Work Design, Quality Control, Evaluation, Retro, Dev Plan, Overview) with pillar cards, trend detection, and Chronicle coaching tips
 - **VS Code Sessions page** — Discover and analyze Copilot sessions from VS Code and VS Code Insiders, with turn-by-turn detail, expandable session cards, and retry on error
 - **Chronicle engine** — Session chronicle builder (`chronicle.mjs`) with XML-aware message cleaning and intent classification (`intent-classifier.mjs`)
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Extension runtime migration** — Moved Copilot CLI tool registration to `src/extension-runtime.mjs`, updated linking to target the packaged discovered extension directory, and simplified the package to assume a clean fresh install
 - **Component decomposition** — Split monolithic `SkillBuilding.jsx` (1,226 lines) into 10 files under `ui/src/pages/SkillBuilding/`: index.jsx (orchestrator), 7 tab components, `shared.jsx` (reusable components), and `DevPlanContext.jsx` (eliminates prop drilling)
 - **API resilience** — `safeFetch()` now includes `AbortController` with 30s timeout; `Promise.all` replaced with `Promise.allSettled` for graceful degradation; unified `fetchJournal()` using `safeFetch()`; retry buttons on error states in Skill Building and VS Code Sessions
 - **Backend performance** — Added `batchGetSessionTurns()` to fix N+1 query pattern; atomic file writes (write-to-tmp then rename) for all JSON persistence; Promise-chain write mutex for serializing concurrent goal operations

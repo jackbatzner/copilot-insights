@@ -29,10 +29,10 @@ cd server && npm run dev   # → http://localhost:3002 (API only)
 ## Project Structure
 
 ```
-src/           → Core analysis modules (patterns, scoring, DB access)
-server/        → Express API server
-ui/            → React + Vite dashboard frontend
-extension.mjs  → Copilot CLI extension entry point
+src/                               → Core analysis modules (patterns, scoring, DB access)
+server/                            → Express API server
+ui/                                → React + Vite dashboard frontend
+.github/extensions/copilot-insights/extension.mjs → Official Copilot CLI entry point
 ```
 
 ## Making Changes

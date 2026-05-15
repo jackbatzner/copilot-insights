@@ -96,7 +96,9 @@ Open [http://localhost:3002](http://localhost:3002) to see your dashboard.
 
 ### 3. Use as a Copilot CLI Extension (optional)
 
-To get insights directly inside Copilot CLI chat, link it as an extension:
+This repo follows the official Copilot CLI extension layout: `.github/extensions/copilot-insights/extension.mjs`.
+
+To get insights directly inside Copilot CLI chat from a global or source install, link the packaged extension directory into your Copilot user extensions folder:
 
 ```bash
 copilot-insights link    # if installed globally
@@ -110,14 +112,16 @@ copilot-insights unlink    # if installed globally
 node bin/cli.mjs unlink    # if running from source
 ```
 
-Then restart Copilot CLI. The extension registers 7 tools that the agent can invoke:
+Then reload extensions (`/extensions reload`) or restart Copilot CLI. The extension registers 8 tools that the agent can invoke:
 
 ```
 > How am I doing with my prompting?          → insights_summary
 > Scan my recent sessions                    → insights_analyze
 > What are my most common correction patterns? → insights_patterns
 > Compare sessions abc123 and def456         → insights_compare
+> Coach this prompt before I send it         → insights_coach
 > Launch the insights dashboard              → insights_dashboard
+> Stop the dashboard                         → insights_stop
 ```
 
 ## Dashboard
@@ -240,6 +244,7 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 | `insights_patterns` | Most common correction patterns with real examples |
 | `insights_summary` | Quick snapshot: tier badge, pillar scores, coaching tip |
 | `insights_compare` | Compare two sessions side-by-side |
+| `insights_coach` | Prompt coaching: immediate feedback, periodic review, and progress tracking |
 | `insights_dashboard` | Launch the web dashboard from the CLI |
 | `insights_stop` | Stop the dashboard server |
 
@@ -328,13 +333,16 @@ graph LR
         DevPlan --> API
         API --> UI[React Dashboard]
         Analyzer --> CLI[Copilot CLI Extension]
-        CLI --> Tools[7 insights_* tools]
+        CLI --> Tools[8 insights_* tools]
     end
 ```
 
 ```
 copilot-insights/
-├── extension.mjs          # Copilot CLI extension entry point (7 tools)
+├── .github/
+│   └── extensions/
+│       └── copilot-insights/
+│           └── extension.mjs  # Official discovered Copilot CLI entry point
 ├── src/
 │   ├── db.mjs             # SQLite read-only access + batch query support
 │   ├── patterns.mjs       # 30+ regex patterns, 5 categories

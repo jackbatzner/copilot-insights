@@ -1,5 +1,5 @@
 // Tier system — maps overall pillar score to a user skill tier.
-// Shared between the UI (Overview.jsx) and CLI tools (extension.mjs).
+// Shared between the UI (Overview.jsx) and Copilot CLI tools.
 
 export const TIERS = [
   { min: 0,  emoji: "🌱", name: "Prompt Padawan" },
