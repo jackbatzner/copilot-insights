@@ -5,6 +5,7 @@
 - **Bug reports** — [Open an issue](https://github.com/jackbatzner/copilot-insights/issues/new?template=bug_report.md) using the bug report template.
 - **Feature requests** — [Open an issue](https://github.com/jackbatzner/copilot-insights/issues/new?template=feature_request.md) using the feature request template.
 - **Questions** — [Start a discussion](https://github.com/jackbatzner/copilot-insights/discussions) in the Discussions tab.
+- **Security issues** — Follow the private disclosure guidance in [SECURITY.md](SECURITY.md). Do **not** post vulnerabilities in public issues or discussions.
 
 ## Troubleshooting
 

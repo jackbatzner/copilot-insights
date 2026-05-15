@@ -12,8 +12,9 @@
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT open a public GitHub issue.**
-2. Email the maintainer or use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories) to report privately.
-3. Include a description of the vulnerability, steps to reproduce, and potential impact.
+2. Prefer GitHub's private reporting flow from the **Security** tab or the repository's advisory form: <https://github.com/jackbatzner/copilot-insights/security/advisories/new>.
+3. If the advisory form is unavailable, contact the maintainer privately before sharing any details.
+4. Include a description of the vulnerability, steps to reproduce, and potential impact.
 
 We will acknowledge receipt within 48 hours and aim to release a patch within 7 days for critical issues.
 

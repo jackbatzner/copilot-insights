@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and support
+    url: https://github.com/jackbatzner/copilot-insights/discussions
+    about: Ask usage questions or get help in GitHub Discussions.
+  - name: Security policy
+    url: https://github.com/jackbatzner/copilot-insights/security/policy
+    about: Review the private vulnerability reporting guidance before disclosing a security issue.
