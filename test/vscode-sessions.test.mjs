@@ -15,10 +15,23 @@ import {
 const INTERACTIVE_SESSION_KEY = "memento/interactive-session";
 let appDataRoot;
 let originalAppData;
+let originalXdgConfigHome;
+
+function getWorkspaceBase() {
+  if (process.platform === "linux") {
+    return process.env.XDG_CONFIG_HOME || join(appDataRoot, ".config");
+  }
+
+  if (process.platform === "darwin") {
+    return join(appDataRoot, "Library", "Application Support");
+  }
+
+  return appDataRoot;
+}
 
 function workspaceRoot(edition, workspaceId) {
   const productDir = edition === "stable" ? "Code" : "Code - Insiders";
-  return join(appDataRoot, productDir, "User", "workspaceStorage", workspaceId);
+  return join(getWorkspaceBase(), productDir, "User", "workspaceStorage", workspaceId);
 }
 
 function seedWorkspace({ edition, workspaceId, sessionData, schema = "normal" }) {
@@ -44,13 +57,18 @@ function seedWorkspace({ edition, workspaceId, sessionData, schema = "normal" })
 
 before(() => {
   originalAppData = process.env.APPDATA;
+  originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
   appDataRoot = mkdtempSync(join(tmpdir(), "copilot-insights-vscode-sessions-"));
   process.env.APPDATA = appDataRoot;
+  process.env.XDG_CONFIG_HOME = appDataRoot;
 });
 
 after(() => {
   if (originalAppData === undefined) delete process.env.APPDATA;
   else process.env.APPDATA = originalAppData;
+
+  if (originalXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+  else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
 
   if (existsSync(appDataRoot)) {
     rmSync(appDataRoot, { recursive: true, force: true });

@@ -5,8 +5,8 @@
 <h1 align="center">Copilot Insights</h1>
 
 <p align="center">
-  <strong>Understand how you prompt. Get better at it.</strong><br/>
-  A community-built dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you communicate more effectively with AI agents.
+  <strong>Understand how you work with AI. Build the skills to do it better.</strong><br/>
+  A community-built dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you build stronger AI collaboration skills over time.
 </p>
 
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.

@@ -1,6 +1,6 @@
 # Contributing to Copilot Insights
 
-Thanks for your interest in contributing! This project helps developers improve their AI prompting by analyzing Copilot CLI session logs.
+Thanks for your interest in contributing! This project helps developers build stronger AI working skills by analyzing Copilot CLI session logs.
 
 ## Prerequisites
 
