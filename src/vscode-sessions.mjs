@@ -254,9 +254,9 @@ export function summarizeVSCodeSessions(sessions = readVSCodeSessions()) {
     if (session.turns.some((turn) => turn.hasAttachments)) sessionsWithAttachments++;
 
     const analysis = analyzeVSCodeSession(session);
-    if (analysis.specification?.score != null) totalClarity += analysis.specification.score;
-    if (analysis.judgment?.avgScore != null) totalJudgment += analysis.judgment.avgScore;
-    if (analysis.efficiency?.aggregate?.avgEfficiency != null) totalEfficiency += analysis.efficiency.aggregate.avgEfficiency;
+    if (analysis.specification?.score !== null && analysis.specification?.score !== undefined) totalClarity += analysis.specification.score;
+    if (analysis.judgment?.avgScore !== null && analysis.judgment?.avgScore !== undefined) totalJudgment += analysis.judgment.avgScore;
+    if (analysis.efficiency?.aggregate?.avgEfficiency !== null && analysis.efficiency?.aggregate?.avgEfficiency !== undefined) totalEfficiency += analysis.efficiency.aggregate.avgEfficiency;
     scoredSessions++;
 
     for (const turn of session.turns) {
