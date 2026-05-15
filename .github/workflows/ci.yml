@@ -75,15 +75,15 @@ jobs:
           curl -sf http://localhost:3002/api/summary || echo "No session DB (expected in CI)"
           kill $SERVER_PID 2>/dev/null || true
 
-      - name: Verify CLI entry point
-        run: node -e "import('./bin/cli.mjs')" || true
-
-      - name: Verify extension entry point
-        run: node -e "import('./extension.mjs')" || true
+      - name: Syntax check CLI and extension entry points
+        run: |
+          node --check ./bin/cli.mjs
+          node --check ./.github/extensions/copilot-insights/extension.mjs
 
       - name: Check package files
         run: |
           npm pack --dry-run 2>&1 | head -50
+          npm pack --dry-run 2>&1 | grep -F ".github/extensions/copilot-insights/extension.mjs"
 
   audit:
     name: Security audit

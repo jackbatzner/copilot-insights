@@ -12,13 +12,17 @@ export const EXTENSIONS_DIR = path.join(
   "copilot-insights",
 );
 
+export function getExtensionSourcePath(packageRoot) {
+  return path.join(path.resolve(packageRoot), ".github", "extensions", "copilot-insights");
+}
+
 /**
- * Create a symlink from the extensions directory to the package root.
+ * Create a symlink from the user extensions directory to the packaged extension folder.
  * On Windows uses a junction; on Unix uses a directory symlink.
  * Returns { linked: boolean, message: string }.
  */
 export function linkExtension(packageRoot) {
-  const target = path.resolve(packageRoot);
+  const target = getExtensionSourcePath(packageRoot);
   const link = EXTENSIONS_DIR;
 
   if (fs.existsSync(link)) {
