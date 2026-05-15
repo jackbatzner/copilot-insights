@@ -6,7 +6,7 @@ import cors from "cors";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import {
   analyzeSession,
   analyzeRecent,
