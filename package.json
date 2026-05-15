@@ -1,7 +1,7 @@
 {
   "name": "copilot-insights",
   "version": "0.2.0",
-  "description": "Copilot CLI extension that analyzes session logs for prompting patterns — clarity, efficiency, redirections, and actionable coaching.",
+  "description": "Copilot CLI extension that analyzes AI coding sessions for collaboration patterns, skill development, and actionable coaching.",
   "type": "module",
   "main": ".github/extensions/copilot-insights/extension.mjs",
   "bin": {
@@ -45,7 +45,7 @@
     "@github/copilot-sdk": ">=1.0.43"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "keywords": [
     "copilot",

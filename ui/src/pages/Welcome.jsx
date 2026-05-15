@@ -9,7 +9,7 @@ const STEPS = [
         <div className="welcome-hero-icon">💡</div>
         <h2>Welcome to Copilot Insights</h2>
         <p className="welcome-subtitle">
-          Understand how you prompt. Get better at it.
+          Understand how you work with AI. Build the skills to do it better.
         </p>
         <div className="welcome-explanation">
           <p>

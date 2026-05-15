@@ -17,6 +17,10 @@ function getAppDataPath() {
   return process.env.APPDATA || join(homedir(), "AppData", "Roaming");
 }
 
+function getLinuxConfigPath() {
+  return process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+}
+
 function getWorkspaceRoots() {
   const platform = process.platform;
   if (platform === "darwin") {
@@ -27,10 +31,10 @@ function getWorkspaceRoots() {
     ];
   }
   if (platform === "linux") {
-    const home = homedir();
+    const configHome = getLinuxConfigPath();
     return [
-      { vscodeEdition: "stable", rootPath: join(home, ".config", "Code", "User", "workspaceStorage") },
-      { vscodeEdition: "insiders", rootPath: join(home, ".config", "Code - Insiders", "User", "workspaceStorage") },
+      { vscodeEdition: "stable", rootPath: join(configHome, "Code", "User", "workspaceStorage") },
+      { vscodeEdition: "insiders", rootPath: join(configHome, "Code - Insiders", "User", "workspaceStorage") },
     ];
   }
   // Windows (default)
