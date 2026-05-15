@@ -62,7 +62,7 @@ It also detects **repeated file edits** — when the same file is edited 3+ time
 
 ### Prerequisites
 
-- **Node.js 18+**
+- **Node.js 20+**
 - **[Copilot CLI](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line)** installed and used at least once (creates `~/.copilot/session-store.db`)
 - **OS:** macOS, Linux, or Windows
 

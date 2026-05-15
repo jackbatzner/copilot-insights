@@ -4,7 +4,7 @@ Thanks for your interest in contributing! This project helps developers build st
 
 ## Prerequisites
 
-- **Node.js 18+** (check with `node --version`)
+- **Node.js 20+** (check with `node --version`)
 - **Copilot CLI** installed and used at least once (creates `~/.copilot/session-store.db`)
 
 ## Setup
