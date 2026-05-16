@@ -10,7 +10,7 @@
     "dev": "node --watch index.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^12.9.0",
+    "better-sqlite3": "^12.10.0",
     "cors": "^2.8.5",
     "express": "^5.2.1"
   },
