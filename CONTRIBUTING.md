@@ -12,8 +12,10 @@ Thanks for your interest in contributing! This project helps developers build st
 ```bash
 git clone https://github.com/jackbatzner/copilot-insights.git
 cd copilot-insights
-npm run setup
+npm install
 ```
+
+`npm install` is the standard setup path. It installs the nested `server/` and `ui/` dependencies and builds the UI through the root `postinstall` script. Use `npm run setup` if you need the same bootstrap flow without running root install scripts.
 
 ## Development
 

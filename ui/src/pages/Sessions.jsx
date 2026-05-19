@@ -247,7 +247,7 @@ export default function Sessions() {
           </div>
         )}
       </div>
-      <SuggestedNext to="/coaching" icon="🎓" label="Coaching" description="See tips based on your session patterns" />
+      <SuggestedNext to="/skills" icon="🎓" label="Skill Building" description="See coaching, retro prompts, and your current WTI focus areas" />
     </>
   );
 }

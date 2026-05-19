@@ -18,6 +18,11 @@ const STEPS = [
             you communicate with Copilot.
           </p>
           <p>
+            Copilot Insights reads your local Copilot CLI history. Before the
+            dashboard can show anything, install Copilot CLI and complete at
+            least one session so <code>~/.copilot/session-store.db</code> exists.
+          </p>
+          <p>
             Every time you correct, rephrase, or undo something the AI did —
             that's a <strong>"redirection."</strong> We track those moments to
             help you learn from them.
@@ -42,20 +47,20 @@ const STEPS = [
           </div>
           <div className="welcome-concept-card">
             <div className="welcome-concept-icon">📊</div>
-            <h3>Pillars</h3>
+            <h3>Skill Building</h3>
             <p>
-              Three skills we measure: <strong>Delegation</strong> (giving clear
-              tasks), <strong>Judgment</strong> (knowing when to intervene), and{" "}
-              <strong>Feedback</strong> (how you course-correct). Each scored
-              0–100.
+              Your 7-part WTI workspace combines four scored pillars —{" "}
+              <strong>Intent</strong>, <strong>Work Design</strong>,{" "}
+              <strong>Quality Control</strong>, and <strong>Evaluation</strong>
+              — plus Overview, Retro, and Dev Plan.
             </p>
           </div>
           <div className="welcome-concept-card">
             <div className="welcome-concept-icon">🏅</div>
             <h3>Tiers</h3>
             <p>
-              Your overall level based on pillar scores. Progress from Novice →
-              Explorer → Mentor → Expert → Master as you improve.
+              Your overall level is based on the four scored pillars. Progress
+              from Novice → Explorer → Mentor → Expert → Master as you improve.
             </p>
           </div>
         </div>
@@ -82,9 +87,9 @@ const STEPS = [
           />
           <StartOption
             icon="🎓"
-            title="Get Coaching tips"
-            description="Personalized scores for delegation, judgment, and feedback"
-            path="/coaching"
+            title="Open Skill Building"
+            description="Review the 7-part WTI workspace, pillar scores, retro, and dev plan"
+            path="/skills"
           />
           <StartOption
             icon="📋"
@@ -94,7 +99,7 @@ const STEPS = [
           />
         </div>
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12, textAlign: "center" }}>
-          More pages in the sidebar: Learn, Analytics, and more.
+          More pages in the sidebar: Token Usage, Analytics, Live, Instructions, and VS Code.
         </div>
       </>
     ),

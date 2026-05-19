@@ -91,7 +91,6 @@ try {
     { path: "/skills",    name: "skill-building" },
     { path: "/sessions",  name: "sessions" },
     { path: "/analytics", name: "analytics" },
-    { path: "/coaching",      name: "coaching" },
     { path: "/practice",      name: "practice" },
     { path: "/instructions",  name: "instructions" },
     { path: "/live",          name: "live" },
@@ -266,7 +265,7 @@ try {
 /**
  * Record a single full-app demo GIF that walks through the major pages:
  * Welcome → Overview → Sessions → Session Detail → Skill Building →
- * Coaching → Analytics → Practice → Token Usage → VS Code → Live Monitor.
+ * Analytics → Practice → Token Usage → VS Code → Live Monitor.
  * Outputs docs/screenshots/demo.gif.
  */
 async function recordFullDemoGif(browser, baseUrl) {
@@ -329,15 +328,11 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(1500);
   }
 
-  // ── Scene 5: Coaching ─────────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/coaching`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2000);
-
-  // ── Scene 6: Analytics ────────────────────────────────────────
+  // ── Scene 5: Analytics ────────────────────────────────────────
   await gifPage.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
 
-  // ── Scene 7: Practice Lab — type a prompt ─────────────────────
+  // ── Scene 6: Practice Lab — type a prompt ─────────────────────
   await gifPage.goto(`${baseUrl}/practice`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(1500);
 
@@ -361,7 +356,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     console.warn("⚠️  Practice textarea not found — skipping typing scene");
   }
 
-  // ── Scene 8: Token Usage ───────────────────────────────────────
+  // ── Scene 7: Token Usage ───────────────────────────────────────
   await gifPage.goto(`${baseUrl}/tokens`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2500);
 
@@ -372,7 +367,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(2000);
   }
 
-  // ── Scene 9: VS Code Sessions ─────────────────────────────────
+  // ── Scene 8: VS Code Sessions ─────────────────────────────────
   await gifPage.goto(`${baseUrl}/vscode`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
 
@@ -383,7 +378,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(1500);
   }
 
-  // ── Scene 10: Live Monitor ────────────────────────────────────
+  // ── Scene 9: Live Monitor ─────────────────────────────────────
   await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 
