@@ -222,8 +222,16 @@ a:hover {
 .stats-grid-overview { grid-template-columns: auto 1fr 1fr 1fr 1fr; }
 
 .stat-card {
-  composes: card;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
   text-align: center;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
 .stat-value {
@@ -1483,8 +1491,49 @@ a:hover {
 /* ── Coaching pillars ──────────────────────────────────────── */
 
 .pillar-card {
+  appearance: none;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  align-items: flex-start;
   transition: all 0.2s;
-  border: 1px solid transparent;
+  border-color: var(--border);
+}
+
+.pillar-card .stat-value {
+  margin-bottom: 2px;
+}
+
+.pillar-card .stat-label {
+  margin-top: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pillar-subtitle {
+  font-size: 11px;
+  color: var(--accent);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.pillar-status {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pillar-detail {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.pillar-card .metric-help {
+  color: inherit;
 }
 
 .pillar-card:hover {

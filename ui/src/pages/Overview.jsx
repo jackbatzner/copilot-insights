@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary, fetchVSCodeSummary } from "../api.js";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
 import { InsightCard } from "../components/InsightCard.jsx";
@@ -9,10 +9,10 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { SinceLastVisit } from "../components/SinceLastVisit.jsx";
 import { rateColor } from "../components/ScoreBadge.jsx";
-import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
+import { SkeletonCard } from "../components/SkeletonCard.jsx";
 import { useRefresh } from "../App.jsx";
 import { useTimeframe } from "../TimeframeContext.jsx";
-import { TIERS, getTier } from "@shared/tiers.mjs";
+import { getTier } from "@shared/tiers.mjs";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
 import { SuggestedNext } from "../components/SuggestedNext.jsx";
@@ -44,90 +44,131 @@ const PILLAR_DISPLAY = {
   efficiency: "Evaluation",
 };
 
+function useOverviewResource(loader, deps) {
+  const [state, setState] = useState({
+    data: null,
+    error: null,
+    loading: true,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    setState({ data: null, error: null, loading: true });
+
+    Promise.resolve()
+      .then(() => loader(controller.signal))
+      .then((data) => {
+        if (!cancelled) {
+          setState({ data, error: null, loading: false });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled && err.name !== "AbortError") {
+          setState({ data: null, error: err.message || "Failed to load section.", loading: false });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, deps);
+
+  return state;
+}
+
+function OverviewSkeletonCard({ lines = 3 }) {
+  return (
+    <div className="card">
+      <SkeletonCard lines={lines} />
+    </div>
+  );
+}
+
+function OverviewStatSkeletons({ count }) {
+  return Array.from({ length: count }, (_, index) => (
+    <div key={`overview-stat-skeleton-${index}`} className="card" style={{ padding: "12px 8px" }}>
+      <SkeletonCard variant="stat" />
+    </div>
+  ));
+}
+
+function OverviewInlineNotice({ children, tone = "neutral" }) {
+  const borderColor = tone === "error" ? "var(--red, #f85149)" : "var(--border)";
+  return (
+    <div
+      className="card"
+      style={{
+        marginBottom: 16,
+        borderLeft: `3px solid ${borderColor}`,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>{children}</div>
+    </div>
+  );
+}
+
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
-  const [data, setData] = useState(null);
-  const [trends, setTrends] = useState(null);
-  const [insights, setInsights] = useState(null);
-  const [pillarTrends, setPillarTrends] = useState(null);
-  const [workStyle, setWorkStyle] = useState(null);
-  const [tokenData, setTokenData] = useState(null);
-  const [vscodeSummary, setVSCodeSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const sessionsState = useOverviewResource(
+    (signal) => fetchSessions(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const trendsState = useOverviewResource(
+    (signal) => fetchTrends(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const insightsState = useOverviewResource(
+    (signal) => fetchInsights(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const pillarTrendsState = useOverviewResource(
+    (signal) => fetchPillarTrends(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const workStyleState = useOverviewResource(
+    (signal) => fetchWorkStyle(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const tokenState = useOverviewResource(
+    (signal) => fetchTokenSummary(timeframe, undefined, { signal }),
+    [timeframe, refreshKey]
+  );
+  const vscodeState = useOverviewResource(
+    (signal) => fetchVSCodeSummary({ signal }),
+    [timeframe, refreshKey]
+  );
 
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setWorkStyle(null);
-    setTokenData(null);
-    setVSCodeSummary(null);
-    Promise.all([
-      fetchSessions(timeframe),
-      fetchTrends(timeframe),
-      fetchInsights(timeframe),
-      fetchPillarTrends(timeframe),
-    ])
-      .then(([sessionsData, trendsData, insightsData, pillarData]) => {
-        if (cancelled) return;
-        setData(sessionsData);
-        setTrends(trendsData.trends);
-        setInsights(insightsData.insights);
-        setPillarTrends(pillarData);
-      })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [timeframe, refreshKey]);
-
-  useEffect(() => {
-    if (loading || !data) return undefined;
-
-    let cancelled = false;
-    Promise.allSettled([
-      fetchWorkStyle(timeframe),
-      fetchTokenSummary(timeframe),
-      fetchVSCodeSummary().catch(() => null),
-    ]).then(([workStyleResult, tokenResult, vscodeResult]) => {
-      if (cancelled) return;
-      if (workStyleResult.status === "fulfilled") setWorkStyle(workStyleResult.value);
-      if (tokenResult.status === "fulfilled") setTokenData(tokenResult.value);
-      if (vscodeResult.status === "fulfilled") setVSCodeSummary(vscodeResult.value);
-    });
-
-    return () => { cancelled = true; };
-  }, [loading, data, timeframe]);
-
-  useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
-
-  if (loading) return (
-    <>
-      <div className="page-header"><h1>📊 Overview</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
-      <SkeletonGrid count={5} />
-      <SkeletonCard lines={4} />
-    </>
-  );
-  if (error) return (
-    <div className="empty">
-      <div className="empty-icon">⚠️</div>
-      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-        {error.includes("session database") || error.includes("HTTP 500")
-          ? "Couldn't connect to your session data. Make sure the Copilot Insights server is running and you've completed at least one Copilot CLI session."
-          : error}
-      </p>
-      <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-        Need help? Run <code>copilot-insights --help</code> to get started.
-      </p>
-    </div>
-  );
-  if (!data) return null;
-
-  const { aggregate } = data;
-  const sessionCount = aggregate.sessionsAnalyzed || 0;
-  const avgRate = aggregate.avgRedirectionRate || 0;
+  const data = sessionsState.data;
+  const trends = trendsState.data?.trends || null;
+  const insights = insightsState.data?.insights || null;
+  const pillarTrends = pillarTrendsState.data;
+  const workStyle = workStyleState.data;
+  const tokenData = tokenState.data;
+  const vscodeSummary = vscodeState.data;
+  const sectionErrors = [
+    sessionsState.error && "session summary",
+    trendsState.error && "trend charts",
+    insightsState.error && "insights",
+    pillarTrendsState.error && "skill growth",
+    workStyleState.error && "work style",
+    tokenState.error && "token usage",
+    vscodeState.error && "VS Code summary",
+  ].filter(Boolean);
+  const primaryErrors = [
+    sessionsState.error,
+    trendsState.error,
+    insightsState.error,
+    pillarTrendsState.error,
+  ].filter(Boolean);
+  const aggregate = data?.aggregate || null;
+  const sessionCount = aggregate?.sessionsAnalyzed || 0;
+  const avgRate = aggregate?.avgRedirectionRate || 0;
   const topModel = tokenData?.byModel?.find((model) => model.model !== "unknown") || tokenData?.byModel?.[0] || null;
 
   // Derive tier from latest pillar score
@@ -146,6 +187,15 @@ export default function Overview() {
         Snapshot into how you're using Copilot CLI — sessions, trends, work styles, and skill insights.
       </PageBanner>
 
+      {primaryErrors.length > 0 && (
+        <OverviewInlineNotice tone="error">
+          Some sections are still unavailable right now: {sectionErrors.join(", ")}.
+          {sessionsState.error?.includes("session database") || sessionsState.error?.includes("HTTP 500")
+            ? " Make sure the Copilot Insights server is running and your session database is available."
+            : ""}
+        </OverviewInlineNotice>
+      )}
+
       {vscodeSummary?.totalSessions > 0 && (
         <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--purple)" }}>
           <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
@@ -158,12 +208,17 @@ export default function Overview() {
           </div>
         </div>
       )}
+      {vscodeState.error && (
+        <OverviewInlineNotice tone="error">
+          VS Code session summary couldn&apos;t load right now.
+        </OverviewInlineNotice>
+      )}
 
       {/* Since Last Visit — shown for returning users */}
       <SinceLastVisit refreshKey={refreshKey} />
 
       {/* Empty / low-session state */}
-      {sessionCount < MIN_SESSIONS_FOR_TRENDS && (
+      {aggregate && sessionCount < MIN_SESSIONS_FOR_TRENDS && (
         <EmptyState sessionCount={sessionCount} feature="trend analysis and coaching" />
       )}
 
@@ -172,7 +227,9 @@ export default function Overview() {
       {/* Tier + Top Insight — side by side */}
       <div className="hero-row">
         {/* Tier Hero — your level at a glance */}
-        {pillarTrends && (
+        {pillarTrendsState.loading ? (
+          <OverviewSkeletonCard lines={4} />
+        ) : pillarTrends ? (
           <div className="tier-hero-card card">
             <div className="tier-hero-content">
               <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
@@ -203,10 +260,14 @@ export default function Overview() {
               </div>
             </div>
           </div>
-        )}
+        ) : pillarTrendsState.error ? (
+          <OverviewInlineNotice tone="error">Skill growth is unavailable right now.</OverviewInlineNotice>
+        ) : null}
 
         {/* Top Insight — the ONE thing that makes you go "oh, I do that" */}
-        {insights && insights.length > 0 && (
+        {insightsState.loading ? (
+          <OverviewSkeletonCard lines={4} />
+        ) : insights && insights.length > 0 ? (
           <div className="top-insight-card">
             <div className="top-insight-header">
               💡 <strong>{insights[0].title}</strong>
@@ -220,37 +281,50 @@ export default function Overview() {
               </div>
             )}
           </div>
-        )}
+        ) : insightsState.error ? (
+          <OverviewInlineNotice tone="error">Insights are unavailable right now.</OverviewInlineNotice>
+        ) : null}
       </div>
 
       {/* Quick Stats — just the headline numbers */}
       <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Sessions</div>
-          <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.sessionsAnalyzed}</div>
-        </div>
-        <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
-            <MetricHelp
-              label="Redirections"
-              definition="Total turns where you corrected, redirected, or re-explained something to the agent. Each one means the agent didn't do what you wanted on the first try."
-              target="Fewer is better — each redirection is a chance to improve your opening prompt."
-            />
-          </div>
-          <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.totalRedirections}</div>
-        </div>
-        <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
-            <MetricHelp
-              label="Avg Rate"
-              definition="Percentage of your turns that correct or redirect the agent."
-              target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
-            />
-          </div>
-          <div className={`${rateColor(avgRate)}`} style={{ fontSize: 24, fontWeight: 600 }}>
-            {(avgRate * 100).toFixed(1)}%
-          </div>
-        </div>
+        {sessionsState.loading ? (
+          <OverviewStatSkeletons count={3} />
+        ) : aggregate ? (
+          <>
+            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Sessions</div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.sessionsAnalyzed}</div>
+            </div>
+            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                <MetricHelp
+                  label="Redirections"
+                  definition="Total turns where you corrected, redirected, or re-explained something to the agent. Each one means the agent didn't do what you wanted on the first try."
+                  target="Fewer is better — each redirection is a chance to improve your opening prompt."
+                />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 600 }}>
+                {aggregate.totalRedirections}
+              </div>
+            </div>
+            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+                <MetricHelp
+                  label="Avg Rate"
+                  definition="Percentage of your turns that correct or redirect the agent."
+                  target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
+                />
+              </div>
+              <div className={`${rateColor(avgRate)}`} style={{ fontSize: 24, fontWeight: 600 }}>
+                {(avgRate * 100).toFixed(1)}%
+              </div>
+            </div>
+          </>
+        ) : (
+          <OverviewInlineNotice tone="error">Session summary is unavailable right now.</OverviewInlineNotice>
+        )}
+        {tokenState.loading && <OverviewStatSkeletons count={2} />}
         {tokenData && tokenData.sessionsAnalyzed > 0 && (
           <>
             <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
@@ -281,6 +355,10 @@ export default function Overview() {
         )}
       </div>
 
+      {tokenState.loading && <OverviewSkeletonCard lines={3} />}
+      {tokenState.error && (
+        <OverviewInlineNotice tone="error">Token usage is unavailable right now.</OverviewInlineNotice>
+      )}
       {tokenData && tokenData.sessionsAnalyzed > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -358,25 +436,25 @@ export default function Overview() {
         <div className="charts-grid">
           <div className="card">
             <div className="card-header">Redirection Rate Over Time</div>
-            <TrendChart trends={trends} />
+            {trendsState.loading ? <SkeletonCard lines={4} /> : trends ? <TrendChart trends={trends} /> : <p style={{ color: "var(--text-muted)" }}>Trend data is unavailable right now.</p>}
           </div>
           <div className="card">
             <div className="card-header">By Category</div>
-            <CategoryBreakdown categoryTotals={aggregate.categoryTotals} />
+            {sessionsState.loading ? <SkeletonCard lines={4} /> : aggregate ? <CategoryBreakdown categoryTotals={aggregate.categoryTotals} /> : <p style={{ color: "var(--text-muted)" }}>Category breakdown is unavailable right now.</p>}
           </div>
         </div>
       </CollapsibleSection>
 
       {/* Pillar Trends */}
-      {pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0 && (
+      {(pillarTrendsState.loading || (pillarTrends && pillarTrends.weeks && pillarTrends.weeks.length > 0) || pillarTrendsState.error) && (
         <CollapsibleSection title="📈 Skill Growth Over Time" id="overview-pillars" defaultOpen={false}>
           <div className="card">
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <span>Pillar Scores by Week</span>
-              {pillarTrends.trendDirection && (
+              {pillarTrends?.trend && (
                 <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
                   {["delegation", "judgment", "specification", "efficiency"].map((pillar) => {
-                    const dir = pillarTrends.trendDirection[pillar];
+                    const dir = pillarTrends.trend[pillar];
                     const badge = dir === "improving" ? "⬆️ Improving" : dir === "declining" ? "⬇️ Declining" : "➡️ Stable";
                     const color = dir === "improving" ? "#3fb950" : dir === "declining" ? "#f85149" : "#8b949e";
                     return (
@@ -388,122 +466,144 @@ export default function Overview() {
                 </div>
               )}
             </div>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={pillarTrends.weeks} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
-                <XAxis dataKey="week" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
-                  labelStyle={{ color: "var(--text-muted)" }}
-                  formatter={(value, name) => [`${value}`, PILLAR_DISPLAY[name] || name]}
-                />
-                <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="specification" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="efficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-            <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
-              <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Work Design" definition="How you divide work between yourself and the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
-              <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Quality Control" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
-              <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Intent" definition="How clearly you set intent — defining the desired outcome and quality bar upfront." target="70+ clarity score is clear communication." /></span>
-              <span><span style={{ color: "#bc8cff" }}>●</span> <MetricHelp label="Evaluation" definition="Building evaluation discipline — productive turns, session completion, and token efficiency." target="70+ is good." /></span>
-            </div>
+            {pillarTrendsState.loading ? (
+              <SkeletonCard lines={4} />
+            ) : pillarTrends ? (
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={pillarTrends.weeks} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
+                    <XAxis dataKey="week" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }}
+                      labelStyle={{ color: "var(--text-muted)" }}
+                      formatter={(value, name) => [`${value}`, PILLAR_DISPLAY[name] || name]}
+                    />
+                    <Line type="monotone" dataKey="delegation" stroke="#58a6ff" strokeWidth={2} dot={{ fill: "#58a6ff", r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="judgment" stroke="#3fb950" strokeWidth={2} dot={{ fill: "#3fb950", r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="specification" stroke="#d29922" strokeWidth={2} dot={{ fill: "#d29922", r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="efficiency" stroke="#bc8cff" strokeWidth={2} dot={{ fill: "#bc8cff", r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", justifyContent: "center", gap: 24, padding: "8px 0 4px", fontSize: 12, color: "var(--text-muted)", flexWrap: "wrap" }}>
+                  <span><span style={{ color: "#58a6ff" }}>●</span> <MetricHelp label="Work Design" definition="How you divide work between yourself and the agent — giving goals vs. step-by-step instructions." target="Over 60% delegation ratio is good." /></span>
+                  <span><span style={{ color: "#3fb950" }}>●</span> <MetricHelp label="Quality Control" definition="How well you evaluate agent output — catching issues early, not rubber-stamping." target="70+ is good, 80+ is excellent." /></span>
+                  <span><span style={{ color: "#d29922" }}>●</span> <MetricHelp label="Intent" definition="How clearly you set intent — defining the desired outcome and quality bar upfront." target="70+ clarity score is clear communication." /></span>
+                  <span><span style={{ color: "#bc8cff" }}>●</span> <MetricHelp label="Evaluation" definition="Building evaluation discipline — productive turns, session completion, and token efficiency." target="70+ is good." /></span>
+                </div>
+              </>
+            ) : (
+              <p style={{ color: "var(--text-muted)" }}>Skill growth is unavailable right now.</p>
+            )}
           </div>
         </CollapsibleSection>
       )}
 
       {/* Work Style */}
-      {workStyle && workStyle.summary && (
+      {(workStyleState.loading || workStyle?.summary || workStyleState.error) && (
         <CollapsibleSection title="🌊 Work Style" id="overview-workstyle" defaultOpen={false}>
-          <div className="charts-grid">
-            <div className="card">
-              <div className="card-header">Style Distribution</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 0" }}>
-                {(() => {
-                  const { styleCounts, total } = workStyle.summary;
-                  const styles = [
-                    { key: "vibe", label: "🌊 Vibe", color: "#58a6ff" },
-                    { key: "structured", label: "📋 Structured", color: "#3fb950" },
-                    { key: "iterative", label: "🔄 Iterative", color: "#d29922" },
-                    { key: "mixed", label: "🔀 Mixed", color: "#8b949e" },
-                  ];
-                  return styles.map(({ key, label, color }) => {
-                    const count = styleCounts[key] || 0;
-                    const pct = total > 0 ? (count / total) * 100 : 0;
-                    return (
-                      <div key={key}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ color: "var(--text)" }}>{label}</span>
-                          <span style={{ color: "var(--text-muted)" }}>{count} session{count !== 1 ? "s" : ""} ({pct.toFixed(0)}%)</span>
-                        </div>
-                        <div style={{ height: 8, borderRadius: 4, background: "var(--bg-hover)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 4, transition: "width 0.3s" }} />
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-              <div style={{ textAlign: "center", padding: "8px 0", fontSize: 14 }}>
-                <span style={{ color: "var(--text)" }}>
-                  Dominant style: {workStyle.summary.dominantEmoji} {workStyle.summary.dominantStyle}
-                </span>
-              </div>
+          {workStyleState.loading ? (
+            <div className="charts-grid">
+              <OverviewSkeletonCard lines={4} />
+              <OverviewSkeletonCard lines={4} />
             </div>
-            <div className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div className="card-header">Session Stats</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "8px 0" }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{workStyle.summary.total}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Total Sessions</div>
+          ) : workStyle?.summary ? (
+            <>
+              <div className="charts-grid">
+                <div className="card">
+                  <div className="card-header">Style Distribution</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "12px 0" }}>
+                    {(() => {
+                      const { styleCounts, total } = workStyle.summary;
+                      const styles = [
+                        { key: "vibe", label: "🌊 Vibe", color: "#58a6ff" },
+                        { key: "structured", label: "📋 Structured", color: "#3fb950" },
+                        { key: "iterative", label: "🔄 Iterative", color: "#d29922" },
+                        { key: "mixed", label: "🔀 Mixed", color: "#8b949e" },
+                      ];
+                      return styles.map(({ key, label, color }) => {
+                        const count = styleCounts[key] || 0;
+                        const pct = total > 0 ? (count / total) * 100 : 0;
+                        return (
+                          <div key={key}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                              <span style={{ color: "var(--text)" }}>{label}</span>
+                              <span style={{ color: "var(--text-muted)" }}>{count} session{count !== 1 ? "s" : ""} ({pct.toFixed(0)}%)</span>
+                            </div>
+                            <div style={{ height: 8, borderRadius: 4, background: "var(--bg-hover)", overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 4, transition: "width 0.3s" }} />
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  <div style={{ textAlign: "center", padding: "8px 0", fontSize: 14 }}>
+                    <span style={{ color: "var(--text)" }}>
+                      Dominant style: {workStyle.summary.dominantEmoji} {workStyle.summary.dominantStyle}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{workStyle.summary.vibeRate}%</div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{workStyle.summary.structuredRate}%</div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: "#d29922" }}>{workStyle.summary.avgFirstFileTurn.toFixed(1)}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Avg First File Turn" definition="Average turn number when the first file is created or edited in your sessions. Lower means you start coding sooner." target="Not a target per se — turn 0-1 is vibe coding, turn 3+ means you planned first. Match to your task complexity." /></div>
+                <div className="card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="card-header">Session Stats</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: "8px 0" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: "var(--text)" }}>{workStyle.summary.total}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Total Sessions</div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: "#58a6ff" }}>{workStyle.summary.vibeRate}%</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Vibe Rate" definition="Percentage of sessions where you jumped straight to code (first file edit on turn 0-1) without planning." target="Not inherently good or bad — depends on task complexity. Quick fixes suit vibe coding; complex tasks benefit from planning first." /></div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: "#3fb950" }}>{workStyle.summary.structuredRate}%</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Structured Rate" definition="Percentage of sessions where you planned first (2+ planning turns before first file edit after turn 3+)." target="Higher is better for complex tasks. Structured sessions tend to have fewer redirections." /></div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: "#d29922" }}>{workStyle.summary.avgFirstFileTurn.toFixed(1)}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}><MetricHelp label="Avg First File Turn" definition="Average turn number when the first file is created or edited in your sessions. Lower means you start coding sooner." target="Not a target per se — turn 0-1 is vibe coding, turn 3+ means you planned first. Match to your task complexity." /></div>
+                    </div>
+                  </div>
+                  {workStyle.coachingTip && (
+                    <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "var(--text)" }}>
+                      💡 <strong>Coaching Tip:</strong> {workStyle.coachingTip}
+                    </div>
+                  )}
                 </div>
               </div>
-              {workStyle.coachingTip && (
-                <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "var(--text)" }}>
-                  💡 <strong>Coaching Tip:</strong> {workStyle.coachingTip}
+
+              {/* Plan vs Execution */}
+              {workStyle.planExecution?.sessions?.length > 0 && (
+                <div className="card" style={{ marginTop: 16 }}>
+                  <div className="card-header">Plan Completion Rates</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+                    {workStyle.planExecution.insight}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, padding: "12px 0" }}>
+                    {workStyle.planExecution.sessions.map((item, index) => {
+                      const pct = item.completionRate ?? 0;
+                      const color = pct >= 80 ? "#3fb950" : pct >= 50 ? "#d29922" : "#f85149";
+                      const itemKey = item.sessionId || item.intentPreview || `rate-${index}`;
+                      return (
+                        <div key={itemKey} style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 14px", border: "1px solid var(--border)" }}>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.intentPreview || `Session ${index + 1}`}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ height: 6, flex: 1, borderRadius: 3, background: "var(--bg-hover)", overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color }}>{pct.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Plan vs Execution */}
-          {workStyle.planVsExecution && workStyle.planVsExecution.length > 0 && (
-            <div className="card" style={{ marginTop: 16 }}>
-              <div className="card-header">Plan Completion Rates</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, padding: "12px 0" }}>
-                {workStyle.planVsExecution.map((item) => {
-                  const pct = item.completionRate != null ? item.completionRate * 100 : 0;
-                  const color = pct >= 80 ? "#3fb950" : pct >= 50 ? "#d29922" : "#f85149";
-                  const itemKey = item.session || item.name || `rate-${pct}`;
-                  return (
-                    <div key={itemKey} style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 14px", border: "1px solid var(--border)" }}>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.session || item.name || `Session ${i + 1}`}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ height: 6, flex: 1, borderRadius: 3, background: "var(--bg-hover)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color }}>{pct.toFixed(0)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            </>
+          ) : (
+            <p style={{ color: "var(--text-muted)" }}>Work style is unavailable right now.</p>
           )}
 
         </CollapsibleSection>

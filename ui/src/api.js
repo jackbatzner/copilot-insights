@@ -47,23 +47,37 @@ async function safeFetch(url, options) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, FETCH_TIMEOUT_MS);
 
   // Strip custom options before passing to fetch
-  const { text: _text, ...fetchOptions } = options || {};
+  const { text: _text, signal, ...fetchOptions } = options || {};
+  const abortForwarder = () => controller.abort();
+
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", abortForwarder, { once: true });
+  }
 
   let res;
   try {
     res = await fetch(url, { ...fetchOptions, signal: controller.signal });
   } catch (err) {
     if (err.name === "AbortError") {
-      throw new Error("Request timed out — the server took too long to respond. Try again or check that the server is running.");
+      if (timedOut) {
+        throw new Error("Request timed out — the server took too long to respond. Try again or check that the server is running.");
+      }
+      throw err;
     }
     throw new Error(
       "Can't reach the Copilot Insights server. Make sure it's running (npm start) and try refreshing."
     );
   } finally {
     clearTimeout(timeout);
+    if (signal) signal.removeEventListener("abort", abortForwarder);
   }
   if (!res.ok) {
     let errorMessage;
@@ -98,8 +112,8 @@ function tfParams(timeframe, repo) {
   return params;
 }
 
-export async function fetchSessions(timeframe, repo) {
-  return safeFetch(`${API_BASE}/sessions?${tfParams(timeframe, repo)}`);
+export async function fetchSessions(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/sessions?${tfParams(timeframe, repo)}`, options);
 }
 
 export async function fetchSessionCatalog(timeframe, repo) {
@@ -110,12 +124,12 @@ export async function fetchSessionDetail(id) {
   return safeFetch(`${API_BASE}/sessions/${id}`);
 }
 
-export async function fetchTrends(timeframe, repo) {
-  return safeFetch(`${API_BASE}/trends?${tfParams(timeframe, repo)}`);
+export async function fetchTrends(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/trends?${tfParams(timeframe, repo)}`, options);
 }
 
-export async function fetchInsights(timeframe, repo) {
-  return safeFetch(`${API_BASE}/insights?${tfParams(timeframe, repo)}`);
+export async function fetchInsights(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/insights?${tfParams(timeframe, repo)}`, options);
 }
 
 export async function fetchClarity(timeframe, repo) {
@@ -182,12 +196,12 @@ export async function fetchRetro(timeframe, repo) {
   return safeFetch(`${API_BASE}/retro?${tfParams(timeframe, repo)}`);
 }
 
-export async function fetchPillarTrends(timeframe, repo) {
-  return safeFetch(`${API_BASE}/pillar-trends?${tfParams(timeframe, repo)}`);
+export async function fetchPillarTrends(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/pillar-trends?${tfParams(timeframe, repo)}`, options);
 }
 
-export async function fetchWorkStyle(timeframe, repo) {
-  return safeFetch(`${API_BASE}/work-style?${tfParams(timeframe, repo)}`);
+export async function fetchWorkStyle(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/work-style?${tfParams(timeframe, repo)}`, options);
 }
 
 export async function fetchSessionReplay(id) {
@@ -248,8 +262,8 @@ export async function fetchTokenPricing() {
   return safeFetch(`${API_BASE}/tokens/pricing`);
 }
 
-export async function fetchTokenSummary(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`);
+export async function fetchTokenSummary(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`, options);
 }
 
 export async function fetchTokensByModel(timeframe, repo) {
@@ -362,6 +376,6 @@ export async function deleteDevPlanGoal(id) {
 export async function fetchVSCodeSessions() {
   return safeFetch(`${API_BASE}/vscode/sessions`);
 }
-export async function fetchVSCodeSummary() {
-  return safeFetch(`${API_BASE}/vscode/summary`);
+export async function fetchVSCodeSummary(options) {
+  return safeFetch(`${API_BASE}/vscode/summary`, options);
 }

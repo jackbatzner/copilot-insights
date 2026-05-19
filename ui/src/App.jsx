@@ -4,6 +4,12 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
 import { ThemeToggle } from "./components/ThemeToggle.jsx";
 import { fetchSessionCatalog, clearCache } from "./api.js";
+import {
+  LEGACY_ONBOARDING_KEY,
+  ONBOARDING_COMPLETE_EVENT,
+  ONBOARDING_COMPLETE_KEY,
+  markOnboardingComplete,
+} from "./onboarding.js";
 import { TimeframeProvider } from "./TimeframeContext.jsx";
 
 const Overview = lazy(() => import("./pages/Overview.jsx"));
@@ -35,13 +41,13 @@ function useShowWelcome() {
 
   useEffect(() => {
     // Fast path: localStorage flag exists (including migrated old key)
-    if (localStorage.getItem("onboarding-complete") === "true") {
+    if (localStorage.getItem(ONBOARDING_COMPLETE_KEY) === "true") {
       setShowWelcome(false);
       return;
     }
     // Migrate old WelcomeModal flag if present
-    if (localStorage.getItem("copilot-insights-welcomed") === "true") {
-      localStorage.setItem("onboarding-complete", "true");
+    if (localStorage.getItem(LEGACY_ONBOARDING_KEY) === "true") {
+      markOnboardingComplete();
       setShowWelcome(false);
       return;
     }
@@ -52,7 +58,7 @@ function useShowWelcome() {
         const hasSessions = data?.sessions?.length > 0;
         if (hasSessions) {
           // User has data — they just cleared cache, skip onboarding
-          localStorage.setItem("onboarding-complete", "true");
+          markOnboardingComplete();
           setShowWelcome(false);
         } else {
           // True first-time user
@@ -63,6 +69,15 @@ function useShowWelcome() {
         // If API fails, show Welcome as safe default
         setShowWelcome(true);
       });
+
+    function handleOnboardingComplete() {
+      setShowWelcome(false);
+    }
+
+    window.addEventListener(ONBOARDING_COMPLETE_EVENT, handleOnboardingComplete);
+    return () => {
+      window.removeEventListener(ONBOARDING_COMPLETE_EVENT, handleOnboardingComplete);
+    };
   }, []);
 
   return showWelcome;

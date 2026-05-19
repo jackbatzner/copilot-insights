@@ -186,8 +186,8 @@ export default function SkillBuilding() {
               <button
                 key={pillarKey}
                 className={`stat-card pillar-card ${tab === tabKey ? "pillar-active" : ""}`}
+                type="button"
                 onClick={() => tabKey && setTab(tabKey)}
-                style={{ cursor: "pointer", textAlign: "left", background: "none", border: "1px solid var(--border)", width: "100%" }}
               >
                 <div className="stat-value" style={{ color: status.color }}>{score ?? "—"}</div>
                 <div className="stat-label">
@@ -198,15 +198,15 @@ export default function SkillBuilding() {
                     action={config.action}
                   />
                 </div>
-                <div style={{ fontSize: 10, color: "var(--accent)", fontStyle: "italic" }} title={config.wtiAnchor}>
+                <div className="pillar-subtitle" title={config.wtiAnchor}>
                   {config.subtitle}
                 </div>
                 <div className="stat-sub">score / 100</div>
-                <div className="stat-sub" style={{ color: status.color, fontSize: 11 }}>
+                <div className="stat-sub pillar-status" style={{ color: status.color }}>
                   {status.text} · Target: {config.target}+
                 </div>
                 {pillarDetailLines[pillarKey] && (
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                  <div className="pillar-detail">
                     {pillarDetailLines[pillarKey]}
                   </div>
                 )}
