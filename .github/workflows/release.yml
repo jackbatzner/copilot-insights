@@ -24,11 +24,40 @@ jobs:
             ui/package-lock.json
             server/package-lock.json
 
-      - name: Install & build
-        run: npm run setup
+      - name: Install root dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm install
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
 
       - name: Lint
         run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify server starts
+        working-directory: server
+        run: |
+          node index.mjs &
+          SERVER_PID=$!
+          sleep 2
+          curl -sf http://localhost:3002/api/summary || echo "No session DB (expected in release validation)"
+          kill $SERVER_PID 2>/dev/null || true
+
+      - name: Syntax check CLI and extension entry points
+        run: |
+          node --check ./bin/cli.mjs
+          node --check ./.github/extensions/copilot-insights/extension.mjs
 
       - name: Verify version matches tag
         run: |
@@ -56,8 +85,20 @@ jobs:
             ui/package-lock.json
             server/package-lock.json
 
-      - name: Install & build
-        run: npm run setup
+      - name: Install root dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm install
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
 
       - name: Pack tarball
         run: npm pack

@@ -6,12 +6,12 @@
 
 <p align="center">
   <strong>Understand how you work with AI. Build the skills to do it better.</strong><br/>
-  A community-built dashboard and Copilot CLI extension that analyzes your AI coding sessions<br/>to help you build stronger AI collaboration skills over time.
+  A local-first dashboard and Copilot CLI extension that analyzes your AI coding sessions,<br/>connects collaboration patterns to token usage, and helps you improve over time.
 </p>
 
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
-> **Scope:** Currently supports [GitHub Copilot CLI](https://docs.github.com/en/copilot) sessions only. IDE-based Copilot usage is not yet supported.
+> **Scope:** Copilot Insights is built around [GitHub Copilot CLI](https://docs.github.com/en/copilot) session history. The dashboard also includes a VS Code Sessions view that can analyze supported VS Code / VS Code Insiders Copilot session data when it is present locally.
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -65,6 +65,18 @@ It also detects **repeated file edits** — when the same file is edited 3+ time
 - **Node.js 20+**
 - **[Copilot CLI](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line)** installed and used at least once (creates `~/.copilot/session-store.db`)
 - **OS:** macOS, Linux, or Windows
+
+### Fastest Path
+
+Install, launch the dashboard, and optionally link the Copilot CLI extension:
+
+```bash
+npm i -g jackbatzner/copilot-insights
+copilot-insights
+copilot-insights link
+```
+
+Then open [http://localhost:3002](http://localhost:3002), and reload Copilot CLI extensions with `/extensions reload` if you linked the extension.
 
 ### 1. Install
 
@@ -295,7 +307,7 @@ npm run release 0.2.0-beta.1  # explicit version
 npm run release patch --dry-run  # preview without changes
 ```
 
-This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then creates the release automatically.
+This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then reruns install/build/lint/test validation, packages the tarball, and creates the GitHub Release automatically.
 
 ## Architecture
 
@@ -399,16 +411,16 @@ copilot-insights/
 
 ## Disclaimer
 
-This project is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" and "Copilot" are trademarks of GitHub, Inc. This project uses the name "Copilot Insights" solely to describe its function as a tool that works with GitHub Copilot CLI session data.
+This project is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" and "Copilot" are trademarks of GitHub, Inc. This project uses the name "Copilot Insights" solely to describe its function as a tool that works with locally available GitHub Copilot session data.
 
 ## Troubleshooting
 
 **"No sessions found" / empty dashboard**
 - You need at least one Copilot CLI session. Run `copilot` in any repo to create one.
-- Check the database exists: `ls ~/.copilot/session-store.db`
+- Confirm that `~/.copilot/session-store.db` exists on your machine.
 
 **"Port 3002 already in use"**
-- Kill the existing process, or use a different port: `PORT=3003 npm start`
+- Kill the existing process, or launch on a different port: `copilot-insights --port 3003`
 
 **"Cannot find module 'better-sqlite3'"**
 - Run `npm run setup` in the project root to install all dependencies.

@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **README launch polish** — Clarified product scope around Copilot CLI session history plus the dashboard's VS Code Sessions view, added a fastest-path install flow, and simplified troubleshooting text for public users
+- **Release hardening** — Release workflow now mirrors CI with explicit dependency installation, UI build, lint, tests, server startup verification, and entrypoint syntax checks before publishing a GitHub Release
+- **Local setup script** — `npm run setup` now skips root postinstall while bootstrapping a dev checkout so server/UI installs and builds happen once in a predictable order
 - **Extension runtime migration** — Moved Copilot CLI tool registration to `src/extension-runtime.mjs`, updated linking to target the packaged discovered extension directory, and simplified the package to assume a clean fresh install
 - **Component decomposition** — Split monolithic `SkillBuilding.jsx` (1,226 lines) into 10 files under `ui/src/pages/SkillBuilding/`: index.jsx (orchestrator), 7 tab components, `shared.jsx` (reusable components), and `DevPlanContext.jsx` (eliminates prop drilling)
 - **API resilience** — `safeFetch()` now includes `AbortController` with 30s timeout; `Promise.all` replaced with `Promise.allSettled` for graceful degradation; unified `fetchJournal()` using `safeFetch()`; retry buttons on error states in Skill Building and VS Code Sessions

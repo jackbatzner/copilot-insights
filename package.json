@@ -20,7 +20,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "setup": "npm install --legacy-peer-deps && cd server && npm install && cd ../ui && npm install && npm run build",
+    "setup": "npm install --legacy-peer-deps --ignore-scripts && cd server && npm install && cd ../ui && npm install && npm run build",
     "build": "cd ui && npm run build",
     "start": "cd server && node index.mjs",
     "dev": "cd server && node --watch index.mjs",
