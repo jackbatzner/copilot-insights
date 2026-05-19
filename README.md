@@ -301,6 +301,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ### Releasing
 
+**Recommended:** merge what you want into `main`, then run the **Manual release** GitHub Actions workflow from the `main` branch. Pick `patch`, `minor`, `major`, or `explicit`, and the workflow will bump versions, update the changelog, commit, tag, and push. The existing tag-based release workflow then validates the tag, packages the tarball, and creates the GitHub Release.
+
+**Local fallback:**
+
 ```bash
 npm run release patch         # 0.1.0 → 0.1.1
 npm run release minor         # 0.1.0 → 0.2.0
@@ -309,7 +313,7 @@ npm run release 0.2.0-beta.1  # explicit version
 npm run release patch --dry-run  # preview without changes
 ```
 
-This bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then reruns install/build/lint/test validation, packages the tarball, and creates the GitHub Release automatically.
+The local script follows the same flow: it bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then reruns install/build/lint/test validation, packages the tarball, and creates the GitHub Release automatically.
 
 ## Architecture
 
