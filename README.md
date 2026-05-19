@@ -68,19 +68,57 @@ It also detects **repeated file edits** — when the same file is edited 3+ time
 
 ### Fastest Path
 
-Install, launch the dashboard, and optionally link the Copilot CLI extension:
+Install or upgrade to the latest release, then launch the dashboard and optionally link the Copilot CLI extension:
 
-```bash
-npm i -g jackbatzner/copilot-insights
+**Windows**
+
+```powershell
+irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
 copilot-insights
 copilot-insights link
 ```
 
-Then open [http://localhost:3002](http://localhost:3002), and reload Copilot CLI extensions with `/extensions reload` if you linked the extension.
+**macOS / Linux**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash
+copilot-insights
+copilot-insights link
+```
+
+Run the same installer command again any time you want to upgrade to the newest release. Then open [http://localhost:3002](http://localhost:3002), and reload Copilot CLI extensions with `/extensions reload` if you linked the extension.
 
 ### 1. Install
 
-**Option A: Install from GitHub**
+**Option A: Recommended installer scripts**
+
+**Windows**
+
+```powershell
+irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
+```
+
+**macOS / Linux**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash
+```
+
+Both scripts download the latest GitHub Release tarball, verify its SHA-256 checksum, and install it globally with npm. Rerun the same command later to upgrade.
+
+```powershell
+$env:COPILOT_INSIGHTS_VERSION = "v0.2.1"
+irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
+Remove-Item Env:\COPILOT_INSIGHTS_VERSION
+```
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash -s -- v0.2.1
+```
+
+Use `-Force` or `--force` after downloading the script locally if you want to reinstall the currently installed version, and `-DryRun` or `--dry-run` to resolve the release without changing your machine.
+
+**Option B: GitHub shorthand fallback**
 
 ```bash
 npm i -g jackbatzner/copilot-insights
@@ -88,7 +126,9 @@ copilot-insights
 # → http://localhost:3002
 ```
 
-**Option B: From source**
+This still works for many environments, but the installer scripts are more reliable on Windows because they install from the packaged GitHub Release tarball instead of npm's git dependency path.
+
+**Option C: From source**
 
 ```bash
 git clone https://github.com/jackbatzner/copilot-insights.git

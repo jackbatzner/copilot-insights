@@ -58,6 +58,8 @@ jobs:
         run: |
           node --check ./bin/cli.mjs
           node --check ./.github/extensions/copilot-insights/extension.mjs
+          bash -n ./scripts/install.sh
+          pwsh -NoLogo -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "./scripts/install.ps1"), [ref]$null, [ref]$errors) | Out-Null; if ($errors.Count) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }'
 
       - name: Verify version matches tag
         run: |
