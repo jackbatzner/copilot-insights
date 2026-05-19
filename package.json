@@ -44,6 +44,11 @@
   "peerDependencies": {
     "@github/copilot-sdk": ">=1.0.43"
   },
+  "peerDependenciesMeta": {
+    "@github/copilot-sdk": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=20.0.0"
   },

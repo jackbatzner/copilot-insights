@@ -112,6 +112,8 @@ This repo follows the official Copilot CLI extension layout: `.github/extensions
 
 To get insights directly inside Copilot CLI chat from a global or source install, link the packaged extension directory into your Copilot user extensions folder:
 
+The Copilot SDK is supplied by Copilot CLI when the extension runs, so a normal `npm i -g jackbatzner/copilot-insights` install does not need a separate `@github/copilot-sdk` package.
+
 ```bash
 copilot-insights link    # if installed globally
 node bin/cli.mjs link    # if running from source
