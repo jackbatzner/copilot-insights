@@ -1,6 +1,6 @@
 {
   "name": "copilot-insights",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Copilot CLI extension that analyzes AI coding sessions for collaboration patterns, skill development, and actionable coaching.",
   "type": "module",
   "main": ".github/extensions/copilot-insights/extension.mjs",
