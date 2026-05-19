@@ -1,6 +1,11 @@
 # Changelog
 
 
+## [0.2.3] - 2026-05-19
+
+_See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.2.3) for full release notes._
+
+
 ## [0.2.2] - 2026-05-19
 
 _See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.2.2) for full release notes._
