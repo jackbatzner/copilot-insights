@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { markOnboardingComplete } from "../onboarding.js";
 
 const STEPS = [
   {
@@ -104,7 +105,7 @@ function StartOption({ icon, title, description, path }) {
   const navigate = useNavigate();
 
   function handleClick() {
-    localStorage.setItem("onboarding-complete", "true");
+    markOnboardingComplete();
     navigate(path);
   }
 
@@ -125,7 +126,7 @@ export default function Welcome() {
   const navigate = useNavigate();
 
   function handleSkip() {
-    localStorage.setItem("onboarding-complete", "true");
+    markOnboardingComplete();
     navigate("/");
   }
 
