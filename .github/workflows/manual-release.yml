@@ -1,0 +1,71 @@
+name: Manual release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Release type to create from main"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - explicit
+      explicit_version:
+        description: "Exact version to release when bump=explicit (example: 0.3.0-beta.1)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: manual-release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Bump, tag, and push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch dispatch
+        if: github.ref_name != 'main'
+        run: |
+          echo "This workflow must be started from the main branch in the Actions UI."
+          exit 1
+
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync local main with origin
+        run: git pull --ff-only origin main
+
+      - name: Resolve release argument
+        id: release_arg
+        shell: bash
+        run: |
+          if [[ "${{ inputs.bump }}" == "explicit" ]]; then
+            if [[ -z "${{ inputs.explicit_version }}" ]]; then
+              echo "explicit_version is required when bump=explicit" >&2
+              exit 1
+            fi
+            echo "value=${{ inputs.explicit_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.bump }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run release script
+        run: node scripts/release.mjs "${{ steps.release_arg.outputs.value }}"
