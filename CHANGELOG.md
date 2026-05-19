@@ -1,5 +1,10 @@
 # Changelog
 
+
+## [0.2.0] - 2026-05-19
+
+_See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.2.0) for full release notes._
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
