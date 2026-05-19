@@ -13,7 +13,7 @@
 |---------|----------|
 | "No sessions found" / empty dashboard | Run `copilot` in any repo to create a session. Confirm that `~/.copilot/session-store.db` exists on your machine. |
 | "Port 3002 already in use" | Kill the existing process, or launch on another port with `copilot-insights --port 3003`. |
-| "Cannot find module 'better-sqlite3'" | Run `npm run setup` in the project root. |
+| "Cannot find module 'better-sqlite3'" | From a source checkout, run `npm install` in the project root. If you need to bypass root install scripts, run `npm run setup` instead. |
 | Dashboard loads but shows errors | Ensure the server is running (`npm start`). Check the terminal for errors. |
 | UI build fails with dependency errors | Run `cd ui && npm install --legacy-peer-deps && npm run build`. |
 

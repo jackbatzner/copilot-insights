@@ -261,7 +261,7 @@ export default function Analytics() {
         </>
       </TabPanel>
 
-      <SuggestedNext to="/coaching" icon="🎓" label="Coaching" description="Personalized tips for your work style" />
+      <SuggestedNext to="/skills" icon="🎓" label="Skill Building" description="Review the WTI workspace and follow-up tips for your work style" />
     </div>
   );
 }

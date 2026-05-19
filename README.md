@@ -68,7 +68,7 @@ It also detects **repeated file edits** — when the same file is edited 3+ time
 
 ### Fastest Path
 
-Install or upgrade to the latest release, then launch the dashboard and optionally link the Copilot CLI extension:
+Install or upgrade to the latest release, then launch the dashboard and optionally link the Copilot CLI extension. If the dashboard is empty, run `copilot` once first so Copilot CLI creates `~/.copilot/session-store.db`.
 
 **Windows**
 
@@ -107,13 +107,13 @@ curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/s
 Both scripts download the latest GitHub Release tarball, verify its SHA-256 checksum, and install it globally with npm. Rerun the same command later to upgrade.
 
 ```powershell
-$env:COPILOT_INSIGHTS_VERSION = "v0.2.1"
+$env:COPILOT_INSIGHTS_VERSION = "v0.2.4"
 irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
 Remove-Item Env:\COPILOT_INSIGHTS_VERSION
 ```
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash -s -- v0.2.1
+curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash -s -- v0.2.4
 ```
 
 Use `-Force` or `--force` after downloading the script locally if you want to reinstall the currently installed version, and `-DryRun` or `--dry-run` to resolve the release without changing your machine.
@@ -133,8 +133,10 @@ This still works for many environments, but the installer scripts are more relia
 ```bash
 git clone https://github.com/jackbatzner/copilot-insights.git
 cd copilot-insights
-npm run setup
+npm install
 ```
+
+`npm install` is the normal source-checkout path. It installs the nested `server/` and `ui/` dependencies and builds the UI via the root `postinstall` script. Use `npm run setup` if you want the same bootstrap flow without relying on root install scripts.
 
 ### 2. Launch the Dashboard
 
@@ -144,7 +146,7 @@ npm start          # if installed from source
 # → http://localhost:3002
 ```
 
-Open [http://localhost:3002](http://localhost:3002) to see your dashboard.
+Open [http://localhost:3002](http://localhost:3002) to see your dashboard. Run `copilot-insights --help` any time to see the available commands and flags.
 
 ### 3. Use as a Copilot CLI Extension (optional)
 
@@ -203,21 +205,21 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/sessions.png" alt="Sessions list" width="800" />
 
-**Skill Building** — 7-pillar WTI framework with dev plan, retros, and Chronicle tips
+**Skill Building overview** — 7-part WTI workspace with pillar cards, quick wins, retro, and dev plan entry points
 
 <img src="docs/screenshots/skill-building.png" alt="Skill Building" width="800" />
 
-**Coaching** — delegation, judgment, and feedback analysis with tips
+**Skill Building: Intent** — drill into one scored pillar with evidence, guidance, and targeted improvements
 
-<img src="docs/screenshots/coaching.png" alt="Agent coaching" width="800" />
+<img src="docs/screenshots/skill-building-intent.png" alt="Skill Building Intent tab" width="800" />
 
 **Analytics** — work style, prompt length, session depth
 
 <img src="docs/screenshots/analytics.png" alt="Analytics" width="800" />
 
-**Learn & Grow** — personalized dev plan, check-ins, retros
+**Skill Building: Dev Plan** — track improvement goals, habits, and follow-up actions in one place
 
-<img src="docs/screenshots/learn.png" alt="Learn and grow" width="800" />
+<img src="docs/screenshots/skill-building-devplan.png" alt="Skill Building Dev Plan tab" width="800" />
 
 **Practice Lab** — sandbox for instant prompt feedback + rewrite challenges with coaching panel
 
@@ -469,7 +471,8 @@ This project is not affiliated with, endorsed by, or sponsored by GitHub or Micr
 - Kill the existing process, or launch on a different port: `copilot-insights --port 3003`
 
 **"Cannot find module 'better-sqlite3'"**
-- Run `npm run setup` in the project root to install all dependencies.
+- From a source checkout, run `npm install` in the project root to install all dependencies.
+- If you need to bypass root install scripts, run `npm run setup` instead.
 
 **"Copilot session DB is missing required tables"**
 - Your `~/.copilot/session-store.db` may be from an incompatible Copilot CLI version.

@@ -11,10 +11,38 @@ import { DEFAULT_PORT } from "../src/defaults.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const SERVER_DIR = resolve(ROOT, "server");
+const args = process.argv.slice(2);
+
+function printHelp() {
+  console.log(`Copilot Insights
+
+Usage:
+  copilot-insights
+  copilot-insights --port <port>
+  copilot-insights --port=<port>
+  copilot-insights link
+  copilot-insights unlink
+  copilot-insights help
+
+Commands:
+  link        Link the Copilot CLI extension into ~/.copilot/extensions
+  unlink      Remove the linked Copilot CLI extension
+  help        Show this help message
+
+Options:
+  -h, --help  Show this help message
+  --port      Start the dashboard on a custom port (${DEFAULT_PORT} by default)
+`);
+}
+
+if (args.includes("--help") || args.includes("-h") || args[0] === "help") {
+  printHelp();
+  process.exit(0);
+}
 
 // --- Subcommands: link / unlink ---
 
-const subcommand = process.argv[2];
+const subcommand = args[0];
 
 if (subcommand === "link") {
   const { linkExtension } = await import("../src/link.mjs");
@@ -30,10 +58,21 @@ if (subcommand === "unlink") {
   process.exit(0);
 }
 
+if (subcommand && !subcommand.startsWith("-")) {
+  console.error(`❌ Unknown command: ${subcommand}\n`);
+  printHelp();
+  process.exit(1);
+}
+
 // --- Default: start the dashboard server ---
 
-const portArg = process.argv.indexOf("--port");
-const port = portArg !== -1 ? process.argv[portArg + 1] : process.env.PORT || String(DEFAULT_PORT);
+const portEqualsArg = args.find((arg) => arg.startsWith("--port="));
+const portArg = args.indexOf("--port");
+const port = portEqualsArg
+  ? portEqualsArg.slice("--port=".length)
+  : portArg !== -1
+    ? args[portArg + 1]
+    : process.env.PORT || String(DEFAULT_PORT);
 
 const portNum = Number(port);
 if (!Number.isInteger(portNum) || portNum < 1024 || portNum > 65535) {
