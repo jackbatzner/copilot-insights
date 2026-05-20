@@ -165,6 +165,82 @@ export function batchGetSessionTurns(sessionIds) {
 }
 
 /**
+ * Batch-fetch files touched for multiple sessions.
+ * Returns a Map of sessionId → file rows array ordered by turn_index.
+ */
+export function batchGetSessionFiles(sessionIds) {
+  const db = getDb();
+  const result = new Map();
+  if (!sessionIds || sessionIds.length === 0) return result;
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db
+      .prepare(
+        `SELECT session_id, file_path, tool_name, turn_index
+         FROM session_files
+         WHERE session_id IN (${placeholders})
+         ORDER BY session_id, turn_index`
+      )
+      .all(...chunk);
+
+    for (const row of rows) {
+      if (!result.has(row.session_id)) result.set(row.session_id, []);
+      result.get(row.session_id).push({
+        file_path: row.file_path,
+        tool_name: row.tool_name,
+        turn_index: row.turn_index,
+      });
+    }
+  }
+
+  for (const id of sessionIds) {
+    if (!result.has(id)) result.set(id, []);
+  }
+  return result;
+}
+
+/**
+ * Batch-count file edits for multiple sessions (detects file thrashing).
+ * Returns a Map of sessionId → [{ file_path, edit_count }] sorted desc by edit_count.
+ */
+export function batchGetFileEditCounts(sessionIds) {
+  const db = getDb();
+  const result = new Map();
+  if (!sessionIds || sessionIds.length === 0) return result;
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(",");
+    const rows = db
+      .prepare(
+        `SELECT session_id, file_path, COUNT(*) as edit_count
+         FROM session_files
+         WHERE session_id IN (${placeholders}) AND tool_name = 'edit'
+         GROUP BY session_id, file_path
+         ORDER BY session_id, edit_count DESC`
+      )
+      .all(...chunk);
+
+    for (const row of rows) {
+      if (!result.has(row.session_id)) result.set(row.session_id, []);
+      result.get(row.session_id).push({
+        file_path: row.file_path,
+        edit_count: row.edit_count,
+      });
+    }
+  }
+
+  for (const id of sessionIds) {
+    if (!result.has(id)) result.set(id, []);
+  }
+  return result;
+}
+
+/**
  * Get session metadata by ID.
  */
 export function getSession(sessionId) {
@@ -221,4 +297,94 @@ export function getSessionRefs(sessionId) {
   } catch {
     return []; // table may not exist in older DBs
   }
+}
+
+/**
+ * Batch-fetch session refs for multiple sessions.
+ * Returns a Map of sessionId → refs array.
+ */
+export function batchGetSessionRefs(sessionIds) {
+  const result = new Map();
+  if (!sessionIds || sessionIds.length === 0) return result;
+  if (!hasTable("session_refs")) {
+    for (const id of sessionIds) result.set(id, []);
+    return result;
+  }
+
+  const db = getDb();
+  const CHUNK_SIZE = 500;
+  try {
+    for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+      const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = db
+        .prepare(
+          `SELECT session_id, ref_type, ref_value, turn_index, created_at
+           FROM session_refs
+           WHERE session_id IN (${placeholders})
+           ORDER BY session_id, turn_index`
+        )
+        .all(...chunk);
+
+      for (const row of rows) {
+        if (!result.has(row.session_id)) result.set(row.session_id, []);
+        result.get(row.session_id).push({
+          ref_type: row.ref_type,
+          ref_value: row.ref_value,
+          turn_index: row.turn_index,
+          created_at: row.created_at,
+        });
+      }
+    }
+  } catch {
+    for (const id of sessionIds) result.set(id, []);
+    return result;
+  }
+
+  for (const id of sessionIds) {
+    if (!result.has(id)) result.set(id, []);
+  }
+  return result;
+}
+
+/**
+ * Batch-count checkpoints for multiple sessions.
+ * Returns a Map of sessionId → checkpoint count.
+ */
+export function batchGetCheckpointCounts(sessionIds) {
+  const result = new Map();
+  if (!sessionIds || sessionIds.length === 0) return result;
+  if (!hasTable("checkpoints")) {
+    for (const id of sessionIds) result.set(id, 0);
+    return result;
+  }
+
+  const db = getDb();
+  const CHUNK_SIZE = 500;
+  try {
+    for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
+      const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = db
+        .prepare(
+          `SELECT session_id, COUNT(*) as checkpoint_count
+           FROM checkpoints
+           WHERE session_id IN (${placeholders})
+           GROUP BY session_id`
+        )
+        .all(...chunk);
+
+      for (const row of rows) {
+        result.set(row.session_id, row.checkpoint_count);
+      }
+    }
+  } catch {
+    for (const id of sessionIds) result.set(id, 0);
+    return result;
+  }
+
+  for (const id of sessionIds) {
+    if (!result.has(id)) result.set(id, 0);
+  }
+  return result;
 }

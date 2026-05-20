@@ -2876,6 +2876,21 @@ a:hover {
   margin-bottom: 0;
 }
 
+.overview-hero-card {
+  min-height: 164px;
+}
+
+.overview-stats-row {
+  align-items: stretch;
+}
+
+.overview-stat-card {
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .tier-hero-content {
   display: flex;
   align-items: center;

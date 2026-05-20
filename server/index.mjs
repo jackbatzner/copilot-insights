@@ -177,6 +177,64 @@ function buildFilterOpts(req, res) {
   return { repo, since, excludeIds };
 }
 
+const ANALYTICS_CACHE_TTL_MS = 30_000;
+const ANALYTICS_CACHE_MAX = 100;
+const analyticsCache = new Map();
+
+function clearAnalyticsCache() {
+  analyticsCache.clear();
+}
+
+function serializeExcludeIds(excludeIds) {
+  return excludeIds && excludeIds.size > 0
+    ? [...excludeIds].sort().join(",")
+    : "";
+}
+
+function buildAnalyticsCacheKey(scope, { repo, since, excludeIds } = {}) {
+  return `${scope}|repo=${repo || ""}|since=${since || ""}|exclude=${serializeExcludeIds(excludeIds)}`;
+}
+
+function getCachedAnalytics(scope, opts, compute, ttlMs = ANALYTICS_CACHE_TTL_MS) {
+  const key = buildAnalyticsCacheKey(scope, opts);
+  const cached = analyticsCache.get(key);
+  const now = Date.now();
+
+  if (cached && now - cached.ts < ttlMs) {
+    analyticsCache.delete(key);
+    analyticsCache.set(key, cached);
+    return cached.value;
+  }
+
+  const value = compute();
+  if (analyticsCache.size >= ANALYTICS_CACHE_MAX) {
+    const oldestKey = analyticsCache.keys().next().value;
+    analyticsCache.delete(oldestKey);
+  }
+  analyticsCache.set(key, { ts: now, value });
+  return value;
+}
+
+function getRecentAnalysis(opts) {
+  return getCachedAnalytics("recent-analysis", opts, () => analyzeRecent(opts));
+}
+
+function getPatternAnalysis(opts) {
+  return getCachedAnalytics("pattern-analysis", opts, () => findTopPatterns(opts));
+}
+
+function getPillarTrendAnalysis(opts) {
+  return getCachedAnalytics("pillar-trends", opts, () => computePillarTrends({ ...opts, sessionIntents: sessionTags }));
+}
+
+function getWorkStyleAnalysis(opts) {
+  return getCachedAnalytics("work-style", opts, () => analyzeWorkStyle(opts));
+}
+
+function getTokenSummaryAnalysis(opts) {
+  return getCachedAnalytics("token-summary", opts, () => analyzeTokensBatch(opts));
+}
+
 function parseTimeframeQuery(query) {
   const repo = typeof query.repo === "string" && query.repo !== "" ? query.repo : undefined;
   if (typeof query.since === "string" && query.since !== "") {
@@ -297,6 +355,7 @@ app.post("/api/sessions/:id/hide", (req, res) => {
   }
   hiddenSessions.add(id);
   saveHiddenSessions(hiddenSessions);
+  clearAnalyticsCache();
   res.json({ ok: true });
 });
 
@@ -312,6 +371,7 @@ app.delete("/api/sessions/:id/hide", (req, res) => {
   }
   hiddenSessions.delete(id);
   saveHiddenSessions(hiddenSessions);
+  clearAnalyticsCache();
   res.json({ ok: true });
 });
 
@@ -343,6 +403,7 @@ app.put("/api/sessions/:id/intent", (req, res) => {
   if (!intent) {
     delete sessionTags[id];
     saveSessionTags(sessionTags);
+    clearAnalyticsCache();
     return res.json({ ok: true, intent: null });
   }
   if (!VALID_INTENTS.has(intent)) {
@@ -350,6 +411,7 @@ app.put("/api/sessions/:id/intent", (req, res) => {
   }
   sessionTags[id] = intent;
   saveSessionTags(sessionTags);
+  clearAnalyticsCache();
   res.json({ ok: true, intent });
 });
 
@@ -603,11 +665,9 @@ app.delete("/api/devplan/goals/:id", async (req, res) => {
  */
 app.get("/api/summary", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    const result = getRecentAnalysis(filter);
     res.json(result.aggregate);
   } catch (err) {
     handleRouteError(res, err, "GET /api/summary");
@@ -620,11 +680,9 @@ app.get("/api/summary", (req, res) => {
  */
 app.get("/api/sessions", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    const result = getRecentAnalysis(filter);
 
     const sessions = result.sessions.map((s) => ({
       id: s.session.id,
@@ -773,11 +831,9 @@ app.get("/api/vscode/summary", (_req, res) => {
  */
 app.get("/api/trends", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    const result = getRecentAnalysis(filter);
 
     // Bucket sessions by date
     const buckets = {};
@@ -818,12 +874,10 @@ app.get("/api/trends", (req, res) => {
  */
 app.get("/api/insights", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    const result = analyzeRecent({ repo, since, excludeIds: hiddenSessions });
-    const patterns = findTopPatterns({ repo, since, excludeIds: hiddenSessions });
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    const result = getRecentAnalysis(filter);
+    const patterns = getPatternAnalysis(filter);
 
     const insights = generateInsights(result, patterns);
     res.json({ insights });
@@ -1140,11 +1194,9 @@ app.get("/api/retro", (req, res) => {
  */
 app.get("/api/pillar-trends", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    res.json(computePillarTrends({ repo, since, excludeIds: hiddenSessions, sessionIntents: sessionTags }));
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    res.json(getPillarTrendAnalysis(filter));
   } catch (err) {
     handleRouteError(res, err, "GET /api/pillar-trends");
   }
@@ -1180,11 +1232,9 @@ app.get("/api/sessions/:id/complexity", (req, res) => {
  */
 app.get("/api/work-style", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    res.json(analyzeWorkStyle({ repo, since, excludeIds: hiddenSessions }));
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    res.json(getWorkStyleAnalysis(filter));
   } catch (err) {
     handleRouteError(res, err, "GET /api/work-style");
   }
@@ -1513,11 +1563,9 @@ app.get("/api/tokens/pricing", async (req, res) => {
  */
 app.get("/api/tokens/summary", (req, res) => {
   try {
-    const repo = validateRepo(req, res);
-    if (repo === null) return;
-    const since = validateTimeframe(req, res);
-    if (since === null) return;
-    res.json(analyzeTokensBatch({ repo, since, excludeIds: hiddenSessions }));
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    res.json(getTokenSummaryAnalysis(filter));
   } catch (err) {
     handleRouteError(res, err, "GET /api/tokens/summary");
   }

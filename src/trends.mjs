@@ -2,7 +2,12 @@
 // Uses the SAME analysis primitives as dev-plan.mjs so Coaching and Learn
 // tabs always show consistent scores.
 
-import { listSessions, getSessionTurns, getSessionFiles, getSessionRefs } from "./db.mjs";
+import {
+  listSessions,
+  batchGetSessionTurns,
+  batchGetSessionFiles,
+  batchGetSessionRefs,
+} from "./db.mjs";
 import { classifyMessage } from "./delegation.mjs";
 import { scoreClarity } from "./clarity.mjs";
 import { analyzeEfficiency } from "./efficiency.mjs";
@@ -146,6 +151,12 @@ function scoreSessionEfficiency(session, effResult, refs) {
  */
 export function computePillarTrends({ repo, since, excludeIds, sessionIntents } = {}) {
   const sessions = listSessions({ repo, since, excludeIds, limit: 10000 });
+  const sessionIds = sessions
+    .filter((session) => session.turn_count >= 2)
+    .map((session) => session.id);
+  const turnsBySession = batchGetSessionTurns(sessionIds);
+  const filesBySession = batchGetSessionFiles(sessionIds);
+  const refsBySession = batchGetSessionRefs(sessionIds);
 
   // Group sessions by ISO week
   const weekMap = new Map();
@@ -175,12 +186,12 @@ export function computePillarTrends({ repo, since, excludeIds, sessionIntents } 
 
     for (const session of entry.sessions) {
       if (session.turn_count < 2) continue;
-      const turns = getSessionTurns(session.id);
+      const turns = turnsBySession.get(session.id) || [];
       if (turns.length === 0) continue;
       scored++;
 
-      const refs = getSessionRefs(session.id);
-      const files = getSessionFiles(session.id);
+      const refs = refsBySession.get(session.id) || [];
+      const files = filesBySession.get(session.id) || [];
 
       // Delegation — same formula as dev-plan.mjs
       const del = scoreSessionDelegation(turns);

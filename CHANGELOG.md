@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.5] - 2026-05-20
+
+_See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.2.5) for full release notes._
+
+### Changed
+
+- **Homepage analytics performance** — Added short-lived server-side caching for the main overview endpoints and refactored core analyzers to batch session data instead of re-querying per session, reducing stalls and client-side timeouts during load
+- **Homepage loading layout stability** — Overview hero cards and stat cards now keep a consistent footprint while loading, empty, and loaded so tiles do not expand after data arrives
+
 
 ## [0.2.4] - 2026-05-19
 
