@@ -5,7 +5,13 @@
 // ALL SIGNALS ARE USER-DRIVEN — we only look at what the user typed/decided,
 // not what the agent chose to do.
 
-import { listSessions, hasTable } from "./db.mjs";
+import {
+  listSessions,
+  hasTable,
+  batchGetSessionTurns,
+  batchGetSessionFiles,
+  batchGetCheckpointCounts,
+} from "./db.mjs";
 import { getDb } from "./db.mjs";
 
 const PLAN_WORDS =
@@ -28,25 +34,7 @@ function cleanMsg(msg) {
 /**
  * Classify a single session's work style.
  */
-function classifySession(sessionId) {
-  const db = getDb();
-
-  const turns = db
-    .prepare(
-      "SELECT turn_index, user_message, assistant_response FROM turns WHERE session_id = ? ORDER BY turn_index"
-    )
-    .all(sessionId);
-
-  const files = db
-    .prepare(
-      "SELECT turn_index, tool_name FROM session_files WHERE session_id = ? ORDER BY turn_index"
-    )
-    .all(sessionId);
-
-  const checkpoints = hasTable("checkpoints")
-    ? db.prepare("SELECT checkpoint_number FROM checkpoints WHERE session_id = ?").all(sessionId)
-    : [];
-
+function classifySession(sessionId, turns, files, checkpointCount = 0) {
   if (turns.length === 0) return null;
 
   const firstFileTurn = files.length > 0 ? Math.min(...files.map((f) => f.turn_index)) : turns.length;
@@ -104,8 +92,8 @@ function classifySession(sessionId) {
     firstFileTurn,
     totalTurns,
     phases: { plan: planTurns, implement: implementTurns, review: reviewTurns, iterate: iterateTurns, other: phases.length - planTurns - implementTurns - reviewTurns - iterateTurns },
-    hasCheckpoints: checkpoints.length > 0,
-    checkpointCount: checkpoints.length,
+    hasCheckpoints: checkpointCount > 0,
+    checkpointCount,
     fileOps: files.length,
   };
 }
@@ -115,9 +103,20 @@ function classifySession(sessionId) {
  */
 export function analyzeWorkStyle({ repo, since, excludeIds } = {}) {
   const sessions = listSessions({ repo, since, excludeIds });
+  const sessionIds = sessions.map((session) => session.id);
+  const turnsBySession = batchGetSessionTurns(sessionIds);
+  const filesBySession = batchGetSessionFiles(sessionIds);
+  const checkpointCounts = hasTable("checkpoints")
+    ? batchGetCheckpointCounts(sessionIds)
+    : new Map(sessionIds.map((id) => [id, 0]));
 
   const results = sessions
-    .map((s) => classifySession(s.id))
+    .map((session) => classifySession(
+      session.id,
+      turnsBySession.get(session.id) || [],
+      filesBySession.get(session.id) || [],
+      checkpointCounts.get(session.id) || 0
+    ))
     .filter(Boolean);
 
   const styleCounts = { structured: 0, iterative: 0, vibe: 0, mixed: 0 };

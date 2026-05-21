@@ -79,9 +79,9 @@ function useOverviewResource(loader, deps) {
   return state;
 }
 
-function OverviewSkeletonCard({ lines = 3 }) {
+function OverviewSkeletonCard({ lines = 3, className = "" }) {
   return (
-    <div className="card">
+    <div className={`card ${className}`.trim()}>
       <SkeletonCard lines={lines} />
     </div>
   );
@@ -89,10 +89,24 @@ function OverviewSkeletonCard({ lines = 3 }) {
 
 function OverviewStatSkeletons({ count }) {
   return Array.from({ length: count }, (_, index) => (
-    <div key={`overview-stat-skeleton-${index}`} className="card" style={{ padding: "12px 8px" }}>
+    <div key={`overview-stat-skeleton-${index}`} className="card overview-stat-card" style={{ padding: "12px 8px" }}>
       <SkeletonCard variant="stat" />
     </div>
   ));
+}
+
+function OverviewStatCard({ label, value, valueClassName, children }) {
+  return (
+    <div className="card overview-stat-card" style={{ textAlign: "center", padding: "12px 8px" }}>
+      <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+        {label}
+      </div>
+      <div className={valueClassName} style={{ fontSize: 24, fontWeight: 600 }}>
+        {value}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function OverviewInlineNotice({ children, tone = "neutral" }) {
@@ -228,9 +242,9 @@ export default function Overview() {
       <div className="hero-row">
         {/* Tier Hero — your level at a glance */}
         {pillarTrendsState.loading ? (
-          <OverviewSkeletonCard lines={4} />
+          <OverviewSkeletonCard lines={4} className="overview-hero-card" />
         ) : pillarTrends ? (
-          <div className="tier-hero-card card">
+          <div className="tier-hero-card card overview-hero-card">
             <div className="tier-hero-content">
               <div style={{ fontSize: 36, lineHeight: 1 }}>{tier.emoji}</div>
               <div className="tier-hero-info">
@@ -261,14 +275,26 @@ export default function Overview() {
             </div>
           </div>
         ) : pillarTrendsState.error ? (
-          <OverviewInlineNotice tone="error">Skill growth is unavailable right now.</OverviewInlineNotice>
-        ) : null}
+          <div className="card overview-hero-card">
+            <div className="card-header">📈 Skill Growth</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+              Skill growth is unavailable right now.
+            </div>
+          </div>
+        ) : (
+          <div className="card overview-hero-card">
+            <div className="card-header">📈 Skill Growth</div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+              Tier data will appear once enough sessions are available.
+            </div>
+          </div>
+        )}
 
         {/* Top Insight — the ONE thing that makes you go "oh, I do that" */}
         {insightsState.loading ? (
-          <OverviewSkeletonCard lines={4} />
+          <OverviewSkeletonCard lines={4} className="overview-hero-card" />
         ) : insights && insights.length > 0 ? (
-          <div className="top-insight-card">
+          <div className="top-insight-card overview-hero-card">
             <div className="top-insight-header">
               💡 <strong>{insights[0].title}</strong>
             </div>
@@ -282,75 +308,91 @@ export default function Overview() {
             )}
           </div>
         ) : insightsState.error ? (
-          <OverviewInlineNotice tone="error">Insights are unavailable right now.</OverviewInlineNotice>
-        ) : null}
+          <div className="top-insight-card overview-hero-card">
+            <div className="top-insight-header">
+              💡 <strong>Insights unavailable</strong>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
+              Insights are unavailable right now.
+            </div>
+          </div>
+        ) : (
+          <div className="top-insight-card overview-hero-card">
+            <div className="top-insight-header">
+              💡 <strong>No insights yet</strong>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5 }}>
+              Complete a few more sessions to unlock top coaching insights.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Stats — just the headline numbers */}
-      <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 16 }}>
+      <div className="stats-row overview-stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 16 }}>
         {sessionsState.loading ? (
           <OverviewStatSkeletons count={3} />
         ) : aggregate ? (
           <>
-            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>Sessions</div>
-              <div style={{ fontSize: 24, fontWeight: 600 }}>{aggregate.sessionsAnalyzed}</div>
-            </div>
-            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+            <OverviewStatCard label="Sessions" value={aggregate.sessionsAnalyzed} />
+            <OverviewStatCard
+              label={
                 <MetricHelp
                   label="Redirections"
                   definition="Total turns where you corrected, redirected, or re-explained something to the agent. Each one means the agent didn't do what you wanted on the first try."
                   target="Fewer is better — each redirection is a chance to improve your opening prompt."
                 />
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {aggregate.totalRedirections}
-              </div>
-            </div>
-            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+              }
+              value={aggregate.totalRedirections}
+            />
+            <OverviewStatCard
+              label={
                 <MetricHelp
                   label="Avg Rate"
                   definition="Percentage of your turns that correct or redirect the agent."
                   target="Under 10% is smooth. 10-25% is some friction. Over 25% needs attention."
                 />
-              </div>
-              <div className={`${rateColor(avgRate)}`} style={{ fontSize: 24, fontWeight: 600 }}>
-                {(avgRate * 100).toFixed(1)}%
-              </div>
-            </div>
+              }
+              value={`${(avgRate * 100).toFixed(1)}%`}
+              valueClassName={rateColor(avgRate)}
+            />
           </>
         ) : (
-          <OverviewInlineNotice tone="error">Session summary is unavailable right now.</OverviewInlineNotice>
-        )}
-        {tokenState.loading && <OverviewStatSkeletons count={2} />}
-        {tokenData && tokenData.sessionsAnalyzed > 0 && (
           <>
-            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+            <OverviewStatCard label="Sessions" value="—" />
+            <OverviewStatCard label="Redirections" value="—" />
+            <OverviewStatCard label="Avg Rate" value="—" />
+          </>
+        )}
+        {tokenState.loading ? (
+          <OverviewStatSkeletons count={2} />
+        ) : tokenData && tokenData.sessionsAnalyzed > 0 ? (
+          <>
+            <OverviewStatCard
+              label={
                 <MetricHelp
                   label="Est. Tokens"
                   definition="Estimated total token usage across all sessions, calculated from message text length (~4 chars per token)."
                   target="Lower is more efficient — reduce redirections to save tokens."
                 />
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {formatTokens(tokenData.totals.total)}
-              </div>
-            </div>
-            <div className="card" style={{ textAlign: "center", padding: "12px 8px" }}>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+              }
+              value={formatTokens(tokenData.totals.total)}
+            />
+            <OverviewStatCard
+              label={
                 <MetricHelp
                   label="Est. Cost"
                   definition="Estimated cost based on token usage and model pricing. This is an approximation — actual costs depend on your plan and provider."
                   target="Optimize by reducing redirections and choosing appropriate models for each task."
                 />
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 600 }}>
-                {formatCost(tokenData.estimatedCost)}
-              </div>
-            </div>
+              }
+              value={formatCost(tokenData.estimatedCost)}
+            />
+          </>
+        ) : (
+          <>
+            <OverviewStatCard label="Est. Tokens" value="—" />
+            <OverviewStatCard label="Est. Cost" value="—" />
           </>
         )}
       </div>
