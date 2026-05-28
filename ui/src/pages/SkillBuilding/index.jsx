@@ -26,6 +26,7 @@ import { EvaluationTab } from "./EvaluationTab.jsx";
 import { RetroTab } from "./RetroTab.jsx";
 import { DevPlanTab } from "./DevPlanTab.jsx";
 import { useProgressivePageData } from "../../hooks/useProgressivePageData.js";
+import { useSettings } from "../../SettingsContext.jsx";
 
 const PILLAR_TABS = [
   { id: "overview", label: "📊 Overview" },
@@ -39,7 +40,9 @@ const PILLAR_TABS = [
 
 export default function SkillBuilding() {
   const { key: refreshKey } = useRefresh();
+  const { settings } = useSettings();
   const { timeframe, setTimeframe } = useTimeframe();
+  const vscodeSessionsEnabled = settings.vscodeSessionsEnabled;
 
   const [tab, setTab] = useState("overview");
 
@@ -52,8 +55,8 @@ export default function SkillBuilding() {
     judgment: () => fetchJudgment(timeframe),
     plan: () => fetchDevPlan(timeframe),
     tips: () => fetchChronicleTips(timeframe).then((value) => Array.isArray(value) ? { tips: value } : value),
-    vscodeSummary: () => fetchVSCodeSummary(),
-  }), [timeframe]);
+    ...(vscodeSessionsEnabled ? { vscodeSummary: () => fetchVSCodeSummary() } : {}),
+  }), [timeframe, vscodeSessionsEnabled]);
   const deferredByTab = useMemo(() => ({
     efficiency: { retro: () => fetchRetro(timeframe) },
     retro: { retro: () => fetchRetro(timeframe) },

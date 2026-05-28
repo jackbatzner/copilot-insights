@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchTokenSummary, fetchVSCodeSummary } from "../api.js";
+import { fetchSessions, fetchTrends, fetchInsights, fetchPillarTrends, fetchWorkStyle, fetchVSCodeSummary } from "../api.js";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendChart } from "../components/TrendChart.jsx";
 import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
@@ -11,6 +11,8 @@ import { SinceLastVisit } from "../components/SinceLastVisit.jsx";
 import { rateColor } from "../components/ScoreBadge.jsx";
 import { SkeletonCard } from "../components/SkeletonCard.jsx";
 import { useRefresh } from "../App.jsx";
+import { useSettings } from "../SettingsContext.jsx";
+import { useProgressiveTokenSummary } from "../hooks/useProgressiveTokenSummary.js";
 import { useTimeframe } from "../TimeframeContext.jsx";
 import { getTier } from "@shared/tiers.mjs";
 import { PageBanner } from "../components/PageBanner.jsx";
@@ -44,7 +46,8 @@ const PILLAR_DISPLAY = {
   efficiency: "Evaluation",
 };
 
-function useOverviewResource(loader, deps) {
+function useOverviewResource(loader, deps, options = {}) {
+  const { delayMs = 0 } = options;
   const [state, setState] = useState({
     data: null,
     error: null,
@@ -54,27 +57,37 @@ function useOverviewResource(loader, deps) {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
+    let delayHandle = null;
 
     setState({ data: null, error: null, loading: true });
 
-    Promise.resolve()
-      .then(() => loader(controller.signal))
-      .then((data) => {
-        if (!cancelled) {
-          setState({ data, error: null, loading: false });
-        }
-      })
-      .catch((err) => {
-        if (!cancelled && err.name !== "AbortError") {
-          setState({ data: null, error: err.message || "Failed to load section.", loading: false });
-        }
-      });
+    const startLoad = () => {
+      Promise.resolve()
+        .then(() => loader(controller.signal))
+        .then((data) => {
+          if (!cancelled) {
+            setState({ data, error: null, loading: false });
+          }
+        })
+        .catch((err) => {
+          if (!cancelled && err.name !== "AbortError") {
+            setState({ data: null, error: err.message || "Failed to load section.", loading: false });
+          }
+        });
+    };
+
+    if (delayMs > 0) {
+      delayHandle = window.setTimeout(startLoad, delayMs);
+    } else {
+      startLoad();
+    }
 
     return () => {
       cancelled = true;
+      if (delayHandle) window.clearTimeout(delayHandle);
       controller.abort();
     };
-  }, deps);
+  }, [delayMs, ...deps]);
 
   return state;
 }
@@ -126,7 +139,9 @@ function OverviewInlineNotice({ children, tone = "neutral" }) {
 
 export default function Overview() {
   const { key: refreshKey } = useRefresh();
+  const { settings } = useSettings();
   const { timeframe, setTimeframe } = useTimeframe();
+  const vscodeSessionsEnabled = settings.vscodeSessionsEnabled;
   const sessionsState = useOverviewResource(
     (signal) => fetchSessions(timeframe, undefined, { signal }),
     [timeframe, refreshKey]
@@ -147,13 +162,19 @@ export default function Overview() {
     (signal) => fetchWorkStyle(timeframe, undefined, { signal }),
     [timeframe, refreshKey]
   );
-  const tokenState = useOverviewResource(
-    (signal) => fetchTokenSummary(timeframe, undefined, { signal }),
-    [timeframe, refreshKey]
-  );
+  const progressiveTokenState = useProgressiveTokenSummary(timeframe, refreshKey, { delayMs: 1200 });
+  const tokenState = {
+    data: progressiveTokenState.data,
+    loading: progressiveTokenState.loading,
+    error: progressiveTokenState.error,
+    isUpdating: progressiveTokenState.isUpdating,
+  };
   const vscodeState = useOverviewResource(
-    (signal) => fetchVSCodeSummary({ signal }),
-    [timeframe, refreshKey]
+    (signal) => (vscodeSessionsEnabled
+      ? fetchVSCodeSummary({ signal })
+      : Promise.resolve({ enabled: false, totalSessions: 0 })),
+    [refreshKey, vscodeSessionsEnabled],
+    { delayMs: 1500 }
   );
 
   useEffect(() => { localStorage.setItem("overview-visited", "true"); }, []);
@@ -172,7 +193,7 @@ export default function Overview() {
     pillarTrendsState.error && "skill growth",
     workStyleState.error && "work style",
     tokenState.error && "token usage",
-    vscodeState.error && "VS Code summary",
+    vscodeSessionsEnabled && vscodeState.error && "VS Code summary",
   ].filter(Boolean);
   const primaryErrors = [
     sessionsState.error,
@@ -222,7 +243,7 @@ export default function Overview() {
           </div>
         </div>
       )}
-      {vscodeState.error && (
+      {vscodeSessionsEnabled && vscodeState.error && (
         <OverviewInlineNotice tone="error">
           VS Code session summary couldn&apos;t load right now.
         </OverviewInlineNotice>
@@ -400,6 +421,11 @@ export default function Overview() {
       {tokenState.loading && <OverviewSkeletonCard lines={3} />}
       {tokenState.error && (
         <OverviewInlineNotice tone="error">Token usage is unavailable right now.</OverviewInlineNotice>
+      )}
+      {tokenState.isUpdating && tokenData && (
+        <OverviewInlineNotice tone="info">
+          Updating token totals… {tokenData.progress?.processedSessions || 0}/{tokenData.progress?.totalSessions || 0} sessions processed.
+        </OverviewInlineNotice>
       )}
       {tokenData && tokenData.sessionsAnalyzed > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>

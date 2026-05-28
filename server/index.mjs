@@ -36,7 +36,17 @@ import { analyzeWorkStyle } from "../src/work-style.mjs";
 import { computeSessionComplexity, computeCreateEditRatio, computeFileTypeDiversity } from "../src/session-insights.mjs";
 import { readVSCodeSessions, summarizeVSCodeSessions } from "../src/vscode-sessions.mjs";
 
-import { analyzeSessionTokens, analyzeTokensBatch, computeTokenEfficiencyScore, fetchLivePricing, getLivePricingOrFallback } from "../src/tokens.mjs";
+import {
+  analyzeSessionTokens,
+  analyzeTokensBatch,
+  analyzeTokenSessionsChunk,
+  computeTokenEfficiencyScore,
+  createEmptyTokenBatchAnalysis,
+  createTokenBatchAccumulator,
+  fetchLivePricing,
+  finalizeTokenBatchAccumulator,
+  getLivePricingOrFallback,
+} from "../src/tokens.mjs";
 import {
   tokensByModel,
   tokensPerRedirection,
@@ -180,9 +190,11 @@ function buildFilterOpts(req, res) {
 const ANALYTICS_CACHE_TTL_MS = 30_000;
 const ANALYTICS_CACHE_MAX = 100;
 const analyticsCache = new Map();
+const tokenSummaryJobs = new Map();
 
 function clearAnalyticsCache() {
   analyticsCache.clear();
+  tokenSummaryJobs.clear();
 }
 
 function serializeExcludeIds(excludeIds) {
@@ -213,6 +225,90 @@ function getCachedAnalytics(scope, opts, compute, ttlMs = ANALYTICS_CACHE_TTL_MS
   }
   analyticsCache.set(key, { ts: now, value });
   return value;
+}
+
+function setCachedAnalytics(scope, opts, value) {
+  const key = buildAnalyticsCacheKey(scope, opts);
+  if (analyticsCache.size >= ANALYTICS_CACHE_MAX) {
+    const oldestKey = analyticsCache.keys().next().value;
+    analyticsCache.delete(oldestKey);
+  }
+  analyticsCache.set(key, { ts: Date.now(), value });
+}
+
+function getAnalyticsCacheValue(scope, opts, ttlMs = ANALYTICS_CACHE_TTL_MS) {
+  const key = buildAnalyticsCacheKey(scope, opts);
+  const cached = analyticsCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.ts >= ttlMs) {
+    analyticsCache.delete(key);
+    return null;
+  }
+  analyticsCache.delete(key);
+  analyticsCache.set(key, cached);
+  return cached.value;
+}
+
+function buildTokenSummaryProgressPayload(job) {
+  const result = finalizeTokenBatchAccumulator(job.accumulator);
+  return {
+    ...result,
+    progress: {
+      totalSessions: job.totalSessions,
+      processedSessions: job.processedSessions,
+      percent: job.totalSessions > 0 ? Math.round((job.processedSessions / job.totalSessions) * 100) : 100,
+      complete: job.status === "complete",
+    },
+  };
+}
+
+function startTokenSummaryJob(opts) {
+  const key = buildAnalyticsCacheKey("token-summary", opts);
+  const existing = tokenSummaryJobs.get(key);
+  if (existing && (existing.status === "running" || existing.status === "complete")) {
+    return existing;
+  }
+
+  const sessions = listSessions(opts);
+  const job = {
+    key,
+    status: "running",
+    totalSessions: sessions.length,
+    processedSessions: 0,
+    accumulator: createTokenBatchAccumulator(sessions.length),
+  };
+  if (tokenSummaryJobs.size >= ANALYTICS_CACHE_MAX) {
+    const oldestKey = tokenSummaryJobs.keys().next().value;
+    tokenSummaryJobs.delete(oldestKey);
+  }
+  tokenSummaryJobs.set(key, job);
+
+  if (sessions.length === 0) {
+    const empty = createEmptyTokenBatchAnalysis();
+    setCachedAnalytics("token-summary", opts, empty);
+    job.status = "complete";
+    return job;
+  }
+
+  const CHUNK_SIZE = 25;
+  let index = 0;
+  const runNextChunk = () => {
+    if (index >= sessions.length) {
+      const finalResult = finalizeTokenBatchAccumulator(job.accumulator);
+      setCachedAnalytics("token-summary", opts, finalResult);
+      job.status = "complete";
+      return;
+    }
+
+    const chunk = sessions.slice(index, index + CHUNK_SIZE);
+    analyzeTokenSessionsChunk(chunk, job.accumulator);
+    index += chunk.length;
+    job.processedSessions = index;
+    setTimeout(runNextChunk, 0);
+  };
+
+  setTimeout(runNextChunk, 0);
+  return job;
 }
 
 function getRecentAnalysis(opts) {
@@ -265,6 +361,47 @@ function handleRouteError(res, err, route) {
 
   res.status(500).json({ error: "Something went wrong — check the server logs for details." });
 }
+// -- App settings (persisted to disk) ----------------------
+
+const SETTINGS_FILE =
+  process.env.COPILOT_INSIGHTS_SETTINGS_FILE ||
+  join(homedir(), ".copilot", "copilot-insights-settings.json");
+const DEFAULT_SETTINGS = Object.freeze({
+  vscodeSessionsEnabled: false,
+});
+
+function normalizeSettings(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(typeof value.vscodeSessionsEnabled === "boolean"
+      ? { vscodeSessionsEnabled: value.vscodeSessionsEnabled }
+      : {}),
+  };
+}
+
+function loadSettings() {
+  try {
+    if (!existsSync(SETTINGS_FILE)) return { ...DEFAULT_SETTINGS };
+    return normalizeSettings(JSON.parse(readFileSync(SETTINGS_FILE, "utf-8")));
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings(settings) {
+  atomicWriteFileSync(SETTINGS_FILE, JSON.stringify(normalizeSettings(settings), null, 2));
+}
+
+let appSettings = loadSettings();
+
+function getSettings() {
+  return normalizeSettings(appSettings);
+}
+
 // -- Session Hiding (persisted to disk) ---------------------- 
 
 const HIDDEN_FILE = join(homedir(), ".copilot", "copilot-insights-hidden.json");
@@ -421,6 +558,63 @@ app.put("/api/sessions/:id/intent", (req, res) => {
  */
 app.get("/api/session-intents", (_req, res) => {
   res.json({ intents: { ...sessionTags } });
+});
+
+/**
+ * GET /api/settings
+ * Return persisted app settings.
+ */
+app.get("/api/settings", (_req, res) => {
+  res.json(getSettings());
+});
+
+/**
+ * PATCH /api/settings
+ * Update persisted app settings.
+ */
+app.patch("/api/settings", async (req, res) => {
+  try {
+    await withWriteLock("settings", () => {
+      const body = req.body;
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        res.status(400).json({ error: "Settings payload must be an object" });
+        return;
+      }
+
+      const allowedKeys = new Set(["vscodeSessionsEnabled"]);
+      const keys = Object.keys(body);
+      const unknownKeys = keys.filter((key) => !allowedKeys.has(key));
+      if (unknownKeys.length > 0) {
+        res.status(400).json({ error: `Unknown setting keys: ${unknownKeys.join(", ")}` });
+        return;
+      }
+
+      if ("vscodeSessionsEnabled" in body && typeof body.vscodeSessionsEnabled !== "boolean") {
+        res.status(400).json({ error: "vscodeSessionsEnabled must be a boolean" });
+        return;
+      }
+
+      const current = getSettings();
+      const next = {
+        ...current,
+        ...("vscodeSessionsEnabled" in body
+          ? { vscodeSessionsEnabled: body.vscodeSessionsEnabled }
+          : {}),
+      };
+
+      const vscodeSettingChanged = next.vscodeSessionsEnabled !== current.vscodeSessionsEnabled;
+      appSettings = next;
+      saveSettings(appSettings);
+
+      if (vscodeSettingChanged) {
+        clearVSCodeCache();
+      }
+
+      res.json(getSettings());
+    });
+  } catch (err) {
+    handleRouteError(res, err, "PATCH /api/settings");
+  }
 });
 
 /**
@@ -778,11 +972,29 @@ let vscodeCacheData = null;
 let vscodeCacheTime = 0;
 const VSCODE_CACHE_TTL = 30_000; // 30 seconds
 
+function clearVSCodeCache() {
+  vscodeCacheData = null;
+  vscodeCacheTime = 0;
+}
+
 function getCachedVSCodeSessions() {
   if (vscodeCacheData && Date.now() - vscodeCacheTime < VSCODE_CACHE_TTL) return vscodeCacheData;
   vscodeCacheData = readVSCodeSessions();
   vscodeCacheTime = Date.now();
   return vscodeCacheData;
+}
+
+function getDisabledVSCodeSummary() {
+  return {
+    enabled: false,
+    totalSessions: 0,
+    totalTurns: 0,
+    avgTurnsPerSession: 0,
+    sessionsWithAttachments: 0,
+    models: [],
+    modes: [],
+    pillarScores: null,
+  };
 }
 
 /**
@@ -791,7 +1003,10 @@ function getCachedVSCodeSessions() {
  */
 app.get("/api/vscode/sessions", (_req, res) => {
   try {
-    res.json(getCachedVSCodeSessions());
+    if (!getSettings().vscodeSessionsEnabled) {
+      return res.json({ enabled: false, sessions: [] });
+    }
+    res.json({ enabled: true, sessions: getCachedVSCodeSessions() });
   } catch (err) {
     handleRouteError(res, err, "GET /api/vscode/sessions");
   }
@@ -803,6 +1018,9 @@ app.get("/api/vscode/sessions", (_req, res) => {
  */
 app.get("/api/vscode/sessions/:workspaceId", (req, res) => {
   try {
+    if (!getSettings().vscodeSessionsEnabled) {
+      return res.status(403).json({ error: "VS Code session loading is disabled in Settings." });
+    }
     const session = getCachedVSCodeSessions().find((item) => item.workspaceId === req.params.workspaceId);
     if (!session) {
       return res.status(404).json({ error: "VS Code workspace session not found" });
@@ -819,7 +1037,13 @@ app.get("/api/vscode/sessions/:workspaceId", (req, res) => {
  */
 app.get("/api/vscode/summary", (_req, res) => {
   try {
-    res.json(summarizeVSCodeSessions(getCachedVSCodeSessions()));
+    if (!getSettings().vscodeSessionsEnabled) {
+      return res.json(getDisabledVSCodeSummary());
+    }
+    res.json({
+      enabled: true,
+      ...summarizeVSCodeSessions(getCachedVSCodeSessions()),
+    });
   } catch (err) {
     handleRouteError(res, err, "GET /api/vscode/summary");
   }
@@ -1568,6 +1792,40 @@ app.get("/api/tokens/summary", (req, res) => {
     res.json(getTokenSummaryAnalysis(filter));
   } catch (err) {
     handleRouteError(res, err, "GET /api/tokens/summary");
+  }
+});
+
+/**
+ * GET /api/tokens/summary/progressive
+ * Starts or polls a chunked token-summary job and returns partial totals as work completes.
+ */
+app.get("/api/tokens/summary/progressive", (req, res) => {
+  try {
+    const filter = buildFilterOpts(req, res);
+    if (!filter) return;
+    const cacheKey = buildAnalyticsCacheKey("token-summary", filter);
+
+    const cached = getAnalyticsCacheValue("token-summary", filter);
+    if (cached) {
+      const completedJob = tokenSummaryJobs.get(cacheKey);
+      if (completedJob?.status === "complete") {
+        return res.json(buildTokenSummaryProgressPayload(completedJob));
+      }
+      return res.json({
+        ...cached,
+        progress: {
+          totalSessions: cached.sessionsAnalyzed,
+          processedSessions: cached.sessionsAnalyzed,
+          percent: 100,
+          complete: true,
+        },
+      });
+    }
+
+    const job = startTokenSummaryJob(filter);
+    res.json(buildTokenSummaryProgressPayload(job));
+  } catch (err) {
+    handleRouteError(res, err, "GET /api/tokens/summary/progressive");
   }
 });
 
