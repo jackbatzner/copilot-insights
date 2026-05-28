@@ -39,6 +39,7 @@ describe("scanJsonlFile", () => {
       "utf-8"
     );
 
+    process.env.COPILOT_SESSION_STATE_PATH = sessionStateRoot;
     const { scanJsonlFile } = await importFresh("../src/session-state.mjs");
     const parsed = [];
     scanJsonlFile(
