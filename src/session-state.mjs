@@ -45,7 +45,9 @@ export function parseJsonlFile(filePath) {
   if (typeof filePath !== "string" || !isPathInsideRoot(filePath)) return [];
   const safePath = resolve(filePath);
   try {
-    const content = readFileSync(safePath, "utf-8");
+    // Path is validated against SESSION_STATE_ROOT above; sessionId is also
+    // regex-sanitized in getSessionStateDir at the public boundary.
+    const content = readFileSync(safePath, "utf-8"); // lgtm[js/path-injection]
     const results = [];
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
@@ -74,7 +76,9 @@ export function scanJsonlFile(filePath, shouldParseLine, onObject) {
   if (typeof filePath !== "string" || !isPathInsideRoot(filePath)) return;
   const safePath = resolve(filePath);
   try {
-    const content = readFileSync(safePath, "utf-8");
+    // Path is validated against SESSION_STATE_ROOT above; sessionId is also
+    // regex-sanitized in getSessionStateDir at the public boundary.
+    const content = readFileSync(safePath, "utf-8"); // lgtm[js/path-injection]
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
