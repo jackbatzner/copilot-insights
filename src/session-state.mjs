@@ -1,14 +1,22 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 export const SESSION_STATE_PATH =
   process.env.COPILOT_SESSION_STATE_PATH ||
   join(homedir(), ".copilot", "session-state");
 
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const SESSION_STATE_ROOT = resolve(SESSION_STATE_PATH);
+
 export function getSessionStateDir(sessionId) {
-  if (!sessionId) return null;
-  const dir = join(SESSION_STATE_PATH, sessionId);
+  if (!sessionId || typeof sessionId !== "string") return null;
+  if (!SESSION_ID_PATTERN.test(sessionId)) return null;
+  const dir = resolve(SESSION_STATE_ROOT, sessionId);
+  // Defense in depth: ensure resolved path is still inside the root.
+  if (dir !== SESSION_STATE_ROOT && !dir.startsWith(SESSION_STATE_ROOT + (process.platform === "win32" ? "\\" : "/"))) {
+    return null;
+  }
   return existsSync(dir) ? dir : null;
 }
 
