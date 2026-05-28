@@ -4,6 +4,7 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { NavGroup } from "./components/NavGroup.jsx";
 import { ThemeToggle } from "./components/ThemeToggle.jsx";
 import { fetchSessionCatalog, clearCache } from "./api.js";
+import { SettingsProvider, useSettings } from "./SettingsContext.jsx";
 import {
   LEGACY_ONBOARDING_KEY,
   ONBOARDING_COMPLETE_EVENT,
@@ -23,6 +24,7 @@ const Practice = lazy(() => import("./pages/Practice.jsx"));
 const VSCodeSessions = lazy(() => import("./pages/VSCodeSessions.jsx"));
 const LiveMonitor = lazy(() => import("./pages/LiveMonitor.jsx"));
 const TokenUsage = lazy(() => import("./pages/TokenUsage.jsx"));
+const SettingsPage = lazy(() => import("./pages/Settings.jsx"));
 
 export const RefreshContext = createContext({ key: 0, refresh: () => {}, lastRefresh: null });
 export function useRefresh() { return useContext(RefreshContext); }
@@ -88,11 +90,22 @@ function RouteLoading() {
 }
 
 function App() {
+  return (
+    <TimeframeProvider>
+      <SettingsProvider>
+        <AppShell />
+      </SettingsProvider>
+    </TimeframeProvider>
+  );
+}
+
+function AppShell() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const showWelcome = useShowWelcome();
+  const { loading: settingsLoading } = useSettings();
   const location = useLocation();
   const isWelcomePage = showWelcome || location.pathname === "/welcome";
   const refresh = useCallback(() => {
@@ -109,13 +122,12 @@ function App() {
   }, [location.pathname]);
 
   // Show nothing while checking onboarding status
-  if (showWelcome === null) {
+  if (showWelcome === null || settingsLoading) {
     return <div className="loading">Loading…</div>;
   }
 
   return (
     <RefreshContext.Provider value={{ key: refreshKey, refresh, lastRefresh }}>
-      <TimeframeProvider>
       <div className="app-layout">
         {/* Mobile hamburger toggle */}
         {!isWelcomePage && (
@@ -145,11 +157,11 @@ function App() {
                 <span className="nav-icon">🎯</span><span className="nav-label">Skill Building</span>
               </NavLink>
               <NavLink to="/practice">
-                <span className="nav-icon">🧪</span><span className="nav-label">Practice Lab</span>
+                <span className="nav-icon">🧠</span><span className="nav-label">Practice Lab</span>
                 <span className="nav-badge">✨ New</span>
               </NavLink>
               <NavLink to="/sessions">
-                <span className="nav-icon">📋</span><span className="nav-label">Sessions</span>
+                <span className="nav-icon">🗂️</span><span className="nav-label">Sessions</span>
               </NavLink>
             </NavGroup>
             <NavGroup label="ADVANCED">
@@ -163,7 +175,10 @@ function App() {
                 <span className="nav-icon">📡</span><span className="nav-label">Live</span>
               </NavLink>
               <NavLink to="/instructions">
-                <span className="nav-icon">⚙️</span><span className="nav-label">Instructions</span>
+                <span className="nav-icon">📘</span><span className="nav-label">Instructions</span>
+              </NavLink>
+              <NavLink to="/settings">
+                <span className="nav-icon">⚙️</span><span className="nav-label">Settings</span>
               </NavLink>
               <NavLink to="/vscode">
                 <span className="nav-icon">💻</span><span className="nav-label">VS Code</span>
@@ -195,6 +210,7 @@ function App() {
                     <Route path="/live" element={<LiveMonitor />} />
                     <Route path="/tokens" element={<TokenUsage />} />
                     <Route path="/instructions" element={<Instructions />} />
+                    <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/sessions" element={<Sessions />} />
                     <Route path="/sessions/:id" element={<SessionDetail />} />
                     <Route path="/practice" element={<Practice />} />
@@ -206,7 +222,6 @@ function App() {
           </ErrorBoundary>
         </main>
       </div>
-      </TimeframeProvider>
     </RefreshContext.Provider>
   );
 }

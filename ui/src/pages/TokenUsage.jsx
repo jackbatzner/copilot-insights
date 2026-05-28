@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   fetchTokenPricing,
-  fetchTokenSummary,
   fetchTokensByModel,
   fetchTokenTrends,
   fetchTokenCorrelations,
@@ -18,10 +17,11 @@ import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection.jsx";
 import { MetricHelp } from "../components/MetricHelp.jsx";
-import { SkeletonGrid } from "../components/SkeletonCard.jsx";
+import { SkeletonCard, SkeletonGrid, SkeletonTable } from "../components/SkeletonCard.jsx";
 import { EmptyState } from "../components/EmptyState.jsx";
 import { TabBar, TabPanel } from "../components/TabBar.jsx";
 import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
+import { useProgressiveTokenSummary } from "../hooks/useProgressiveTokenSummary.js";
 
 const TT_STYLE = {
   background: "var(--bg-card)",
@@ -57,7 +57,6 @@ export default function TokenUsage() {
   }, []);
 
   const initialEntries = useMemo(() => ({
-    summary: () => fetchTokenSummary(timeframe),
     trends: () => fetchTokenTrends(timeframe),
   }), [timeframe]);
   const deferredByTab = useMemo(() => ({
@@ -66,26 +65,41 @@ export default function TokenUsage() {
     budget: { budget: () => fetchTokenBudget(timeframe) },
     tips: { tips: () => fetchTokenTips(timeframe) },
   }), [timeframe]);
+  const summaryState = useProgressiveTokenSummary(timeframe, refreshKey);
   const { data, loading, error } = useProgressivePageData({
     deps: [timeframe, refreshKey],
     initialEntries,
     deferredByTab,
     activeTab: tab,
-    validateInitial: (next, results) => {
-      if (next.summary) return null;
+    validateInitial: (_next, results) => {
       const firstRejected = results.find((result) => result.status === "rejected");
-      return firstRejected?.reason?.message || "Failed to load token usage.";
+      return firstRejected?.reason?.message || null;
     },
   });
-  const { summary, trends, byModel, correlations, budget, tips } = data;
+  const { trends, byModel, correlations, budget, tips } = data;
+  const summary = summaryState.data;
+  const loadingSummary = summaryState.loading;
+  const summaryError = summaryState.error;
+  const summaryUpdating = summaryState.isUpdating;
+  const loadingTrends = loading && !trends;
+  const summaryProgress = summary?.progress;
 
-  if (loading) return (
+  if (summaryError || error) return <div className="error-box">{summaryError || error}</div>;
+  if (!summary && loadingSummary) return (
     <>
-      <div className="page-header"><h1>💰 Token Usage</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
-      <SkeletonGrid count={6} />
+      <PageBanner pageId="token-usage">
+        Understand your token consumption, model costs, and optimization opportunities.
+      </PageBanner>
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div />
+        <TimeframeSelector value={timeframe} onChange={setTimeframe} />
+      </div>
+      <ProgressBanner />
+      <SkeletonGrid count={4} />
+      <SkeletonCard lines={6} />
+      <SkeletonTable rows={5} />
     </>
   );
-  if (error) return <div className="error-box">{error}</div>;
   if (!summary || summary.sessionsAnalyzed === 0) return (
     <>
       <div className="page-header"><h1>💰 Token Usage</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
@@ -123,6 +137,12 @@ export default function TokenUsage() {
       <div style={{ margin: "0 0 0.75rem", padding: "0.5rem 1rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
         💰 Cost estimates use <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot per-token pricing</a> (1 AI credit = $0.01). Your actual spend depends on your plan&apos;s included allowance.
       </div>
+      {summaryUpdating && (
+        <ProgressBanner
+          processed={summaryProgress?.processedSessions || 0}
+          total={summaryProgress?.totalSessions || 0}
+        />
+      )}
 
       {/* Hero Stats */}
       <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.75rem", marginBottom: "1.5rem" }}>
@@ -135,7 +155,7 @@ export default function TokenUsage() {
       <TabBar tabs={tabs} activeTab={tab} onTabChange={setTab} />
 
       <TabPanel id="overview" activeTab={tab}>
-        <OverviewTab trends={trends} summary={summary} />
+        <OverviewTab trends={trends} summary={summary} loadingTrends={loadingTrends} />
       </TabPanel>
 
       <TabPanel id="models" activeTab={tab}>
@@ -159,6 +179,20 @@ export default function TokenUsage() {
 
 // ── Stat Card ────────────────────────────────────────────────
 
+function ProgressBanner({ processed = 0, total = 0 }) {
+  const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+  return (
+    <div className="info-banner token-progress-banner">
+      <div className="token-progress-copy">
+        <strong>Updating token totals and dollar amounts…</strong> {processed}/{total || "?"} sessions processed.
+      </div>
+      <div className="token-progress-bar" aria-hidden="true">
+        <div className="token-progress-fill" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, sub }) {
   return (
     <div className="card" style={{ padding: "1rem", textAlign: "center" }}>
@@ -171,44 +205,56 @@ function StatCard({ label, value, sub }) {
 
 // ── Overview Tab ─────────────────────────────────────────────
 
-function OverviewTab({ trends, summary }) {
-  if (!trends || !trends.weeks || trends.weeks.length === 0) {
-    return <EmptyState message="Not enough data for token trends yet." />;
-  }
-
-  const chartData = trends.weeks.map((w) => ({
-    week: w.week.replace(/^\d{4}-/, ""),
-    input: w.input,
-    output: w.output,
-    cost: w.cost,
-    sessions: w.sessions,
-  }));
-
-  const trendLabel = { increasing: "📈 Increasing", decreasing: "📉 Decreasing", stable: "➡️ Stable" }[trends.trend] || "➡️ Stable";
+function OverviewTab({ trends, summary, loadingTrends }) {
+  const hasTrends = Array.isArray(trends?.weeks) && trends.weeks.length > 0;
+  const chartData = hasTrends
+    ? trends.weeks.map((w) => ({
+      week: w.week.replace(/^\d{4}-/, ""),
+      input: w.input,
+      output: w.output,
+      cost: w.cost,
+      sessions: w.sessions,
+    }))
+    : [];
+  const trendLabel = hasTrends
+    ? ({ increasing: "📈 Increasing", decreasing: "📉 Decreasing", stable: "➡️ Stable" }[trends.trend] || "➡️ Stable")
+    : "⏳ Loading";
 
   return (
     <>
       <CollapsibleSection title={`Weekly Token Trends — ${trendLabel}`} defaultOpen>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData}>
-            <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={formatTokens} tick={{ fontSize: 12 }} />
-            <Tooltip contentStyle={TT_STYLE} formatter={(v) => formatTokens(v)} />
-            <Bar dataKey="input" name="Input" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="output" name="Output" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {hasTrends ? (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData}>
+              <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={formatTokens} tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={TT_STYLE} formatter={(v) => formatTokens(v)} />
+              <Bar dataKey="input" name="Input" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="output" name="Output" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : loadingTrends ? (
+          <SkeletonCard lines={6} />
+        ) : (
+          <EmptyState message="Not enough data for token trends yet." />
+        )}
       </CollapsibleSection>
 
       <CollapsibleSection title="Weekly Cost Trend" defaultOpen>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={chartData}>
-            <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={(v) => formatCost(v)} tick={{ fontSize: 12 }} />
-            <Tooltip contentStyle={TT_STYLE} formatter={(v) => formatCost(v)} />
-            <Line type="monotone" dataKey="cost" name="Est. Cost" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
-          </LineChart>
-        </ResponsiveContainer>
+        {hasTrends ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData}>
+              <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => formatCost(v)} tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={TT_STYLE} formatter={(v) => formatCost(v)} />
+              <Line type="monotone" dataKey="cost" name="Est. Cost" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : loadingTrends ? (
+          <SkeletonCard lines={5} />
+        ) : (
+          <EmptyState message="Not enough cost trend data yet." />
+        )}
       </CollapsibleSection>
 
       {/* Top sessions by token usage */}

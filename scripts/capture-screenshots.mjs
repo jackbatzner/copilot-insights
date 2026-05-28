@@ -10,12 +10,13 @@ import { chromium } from "@playwright/test";
 import { spawn, execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const MOCK_DB = resolve(ROOT, "mock-session-store.db");
 const MOCK_SESSION_STATE = resolve(ROOT, "mock-session-state");
+const MOCK_SETTINGS = resolve(ROOT, "mock-copilot-insights-settings.json");
 const SCREENSHOTS_DIR = resolve(ROOT, "docs", "screenshots");
 const PORT = 3099; // avoid clashing with a running dev server
 
@@ -37,6 +38,9 @@ try {
     process.exit(1);
   }
 }
+if (doGif && (!ffmpegPath || !existsSync(ffmpegPath))) {
+  ffmpegPath = "ffmpeg";
+}
 
 // ── 1. Seed the mock database ───────────────────────────────────
 
@@ -50,6 +54,8 @@ if (!existsSync(MOCK_DB)) {
   console.error("❌ Mock database not found at", MOCK_DB); process.exit(1);
 }
 
+writeFileSync(MOCK_SETTINGS, JSON.stringify({ vscodeSessionsEnabled: false }, null, 2));
+
 mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 // ── 2. Start the server with the mock database ──────────────────
@@ -61,6 +67,7 @@ const server = spawn(process.execPath, ["index.mjs"], {
     ...process.env,
     COPILOT_SESSION_DB: MOCK_DB,
     COPILOT_SESSION_STATE_PATH: MOCK_SESSION_STATE,
+    COPILOT_INSIGHTS_SETTINGS_FILE: MOCK_SETTINGS,
     PORT: String(PORT),
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -73,6 +80,9 @@ server.stderr.on("data", (d) => { serverOutput += d.toString(); });
 // Wait for the server to be ready
 await waitForServer(`http://127.0.0.1:${PORT}/api/sessions`, 20_000);
 console.log("✅ Server is ready");
+const baseUrl = `http://127.0.0.1:${PORT}`;
+await updateSettings(baseUrl, { vscodeSessionsEnabled: true });
+console.log("✅ Mock VS Code loading enabled");
 
 // ── 3. Capture screenshots ─────────────────────────────────────
 
@@ -83,7 +93,6 @@ try {
     colorScheme: "dark",
   });
   const page = await context.newPage();
-  const baseUrl = `http://127.0.0.1:${PORT}`;
 
   const allPages = [
     { path: "/welcome",   name: "welcome" },
@@ -93,6 +102,7 @@ try {
     { path: "/analytics", name: "analytics" },
     { path: "/practice",      name: "practice" },
     { path: "/instructions",  name: "instructions" },
+    { path: "/settings",      name: "settings" },
     { path: "/live",          name: "live" },
     { path: "/vscode",        name: "vscode" },
     { path: "/tokens",        name: "token-usage" },
@@ -153,6 +163,16 @@ try {
       continue;
     }
 
+    if (p.name === "settings") {
+      console.log("📸 Capturing settings…");
+      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(1500);
+      const outPath = resolve(SCREENSHOTS_DIR, "settings.png");
+      await page.screenshot({ path: outPath, fullPage: false });
+      console.log(`   → ${outPath}`);
+      continue;
+    }
+
     // Practice page: navigate to Rewrite Challenge with a loaded challenge
     if (p.name === "practice") {
       console.log("📸 Capturing practice (Rewrite Challenge with coaching panel)…");
@@ -191,7 +211,7 @@ try {
     if (p.name === "token-usage") {
       console.log("📸 Capturing token-usage (Overview tab)…");
       await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(2500);
+      await waitForTokenFlow(page);
       let outPath = resolve(SCREENSHOTS_DIR, "token-usage.png");
       await page.screenshot({ path: outPath, fullPage: false });
       console.log(`   → ${outPath}`);
@@ -222,7 +242,11 @@ try {
 
     console.log(`📸 Capturing ${p.name}…`);
     await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000); // let charts animate
+    if (p.name === "overview") {
+      await waitForTokenFlow(page);
+    } else {
+      await page.waitForTimeout(2000); // let charts animate
+    }
     const outPath = resolve(SCREENSHOTS_DIR, `${p.name}.png`);
     await page.screenshot({ path: outPath, fullPage: false });
     console.log(`   → ${outPath}`);
@@ -258,6 +282,7 @@ try {
   console.log("\n✅ All captures complete");
 } finally {
   server.kill();
+  try { unlinkSync(MOCK_SETTINGS); } catch { /* ignore */ }
 }
 
 // ── GIF recorder ────────────────────────────────────────────────
@@ -358,7 +383,7 @@ async function recordFullDemoGif(browser, baseUrl) {
 
   // ── Scene 7: Token Usage ───────────────────────────────────────
   await gifPage.goto(`${baseUrl}/tokens`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2500);
+  await waitForTokenFlow(gifPage);
 
   // Switch to Optimization tab
   const optimTab = gifPage.locator("button", { hasText: "Optimization" });
@@ -367,7 +392,24 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(2000);
   }
 
-  // ── Scene 8: VS Code Sessions ─────────────────────────────────
+  // ── Scene 8: Settings opt-in for VS Code loading ──────────────
+  await updateSettings(baseUrl, { vscodeSessionsEnabled: false });
+  await gifPage.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
+  await gifPage.waitForTimeout(1500);
+  const vscodeToggleRow = gifPage.locator(".settings-toggle-row").first();
+  if (await vscodeToggleRow.count()) {
+    await vscodeToggleRow.click({ force: true });
+    await gifPage.waitForFunction(
+      () => {
+        const el = document.querySelector("input[type='checkbox']");
+        return Boolean(el && el.checked);
+      },
+      { timeout: 5_000 }
+    ).catch(() => {});
+    await gifPage.waitForTimeout(1500);
+  }
+
+  // ── Scene 9: VS Code Sessions ─────────────────────────────────
   await gifPage.goto(`${baseUrl}/vscode`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(2000);
 
@@ -378,7 +420,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     await gifPage.waitForTimeout(1500);
   }
 
-  // ── Scene 9: Live Monitor ─────────────────────────────────────
+  // ── Scene 10: Live Monitor ────────────────────────────────────
   await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
   await gifPage.waitForTimeout(3000);
 
@@ -396,7 +438,7 @@ async function recordFullDemoGif(browser, baseUrl) {
     ], { stdio: "pipe" });
     console.log(`   → ${gifPath}`);
   } catch (err) {
-    console.error("⚠️  GIF conversion failed:", err.stderr?.toString().slice(0, 200));
+    console.error("⚠️  GIF conversion failed:", err.stderr?.toString().slice(-2000));
   }
 
   // Clean up temp video
@@ -427,4 +469,25 @@ async function waitForServer(url, timeoutMs) {
   }
   console.error("Server output:\n", serverOutput);
   throw new Error(`Server did not start within ${timeoutMs}ms`);
+}
+
+async function updateSettings(baseUrl, patch) {
+  const resp = await fetch(`${baseUrl}/api/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!resp.ok) {
+    throw new Error(`Failed to update mock settings: HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function waitForTokenFlow(page, timeoutMs = 8_000) {
+  await page.waitForTimeout(1200);
+  await page.waitForFunction(
+    () => !document.body.innerText.includes("Updating token totals"),
+    { timeout: timeoutMs }
+  ).catch(() => {});
+  await page.waitForTimeout(1500);
 }

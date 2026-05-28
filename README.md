@@ -11,7 +11,7 @@
 
 > **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
 
-> **Scope:** Copilot Insights is built around [GitHub Copilot CLI](https://docs.github.com/en/copilot) session history. The dashboard also includes a VS Code Sessions view that can analyze supported VS Code / VS Code Insiders Copilot session data when it is present locally.
+> **Scope:** Copilot Insights is built around [GitHub Copilot CLI](https://docs.github.com/en/copilot) session history. VS Code / VS Code Insiders Copilot session analysis is available as an optional data source that you can enable from **Settings** when you want the dashboard to read supported local workspace storage.
 
 <p align="center">
   <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -38,7 +38,7 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
 - 🔍 **Replay sessions** — Annotated turn-by-turn session replay
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
-- 💻 **VS Code Sessions** — Analyze Copilot sessions from VS Code / VS Code Insiders
+- 💻 **VS Code Sessions** — Optionally analyze Copilot sessions from VS Code / VS Code Insiders when enabled in Settings
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
 - 💰 **Token usage & cost** — Track spend by model, get optimization tips, budget projections
 - 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
@@ -188,7 +188,7 @@ First-time users are greeted with a **Welcome walkthrough** that explains what t
   <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
 </p>
 
-The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Skill Building, Practice Lab, Sessions) and **Advanced** (Token Usage, Analytics, Live, Instructions, VS Code) groups:
+The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Skill Building, Practice Lab, Sessions) and **Advanced** (Token Usage, Analytics, Live, Instructions, Settings, VS Code) groups:
 
 <p align="center">
   <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
@@ -229,6 +229,10 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/instructions.png" alt="Instructions" width="800" />
 
+**Settings** — enable optional VS Code loading without changing the default CLI-first workflow
+
+<img src="docs/screenshots/settings.png" alt="Settings page" width="800" />
+
 **Session Detail** — turn-by-turn replay with annotations
 
 <img src="docs/screenshots/session-detail.png" alt="Session detail" width="800" />
@@ -237,11 +241,11 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
 
-**VS Code Sessions** — analyze Copilot sessions from VS Code with turn-by-turn detail
+**VS Code Sessions** — opt in from Settings, then analyze Copilot sessions from VS Code with turn-by-turn detail
 
 <img src="docs/screenshots/vscode.png" alt="VS Code Sessions" width="800" />
 
-**Token Usage** — track spend by model, estimated costs, and usage trends
+**Token Usage** — progressive token and cost loading with spend by model, estimated costs, and usage trends
 
 <img src="docs/screenshots/token-usage.png" alt="Token Usage overview" width="800" />
 
@@ -265,9 +269,10 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 - **Analytics** — Hourly productivity, prompt length, repo health, tool usage
 - **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
 - **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
-- **VS Code Sessions** — Analyze Copilot sessions from VS Code and VS Code Insiders with turn-by-turn detail, retry on error, and expandable session cards
+- **Settings** — Enable optional data sources like VS Code loading while keeping the default workflow focused on Copilot CLI sessions
+- **VS Code Sessions** — Opt-in analysis for Copilot sessions from VS Code and VS Code Insiders with turn-by-turn detail, retry on error, and expandable session cards
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
-- **Token Usage** — 5-tab dashboard (Overview, Models, Cost Insights, Budget, Optimization) tracking token spend by model, personalized cost-saving insights, model recommendations, budget projections, and live pricing from GitHub docs
+- **Token Usage** — 5-tab dashboard (Overview, Models, Cost Insights, Budget, Optimization) with progressive token/cost loading, model breakdowns, personalized cost-saving insights, budget projections, and live pricing from GitHub docs
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
 

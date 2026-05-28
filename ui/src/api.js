@@ -1,4 +1,17 @@
 const API_BASE = "/api";
+const DEFAULT_SETTINGS = Object.freeze({
+  vscodeSessionsEnabled: false,
+});
+const DEFAULT_VSCODE_SUMMARY = Object.freeze({
+  enabled: false,
+  totalSessions: 0,
+  totalTurns: 0,
+  avgTurnsPerSession: 0,
+  sessionsWithAttachments: 0,
+  models: [],
+  modes: [],
+  pillarScores: null,
+});
 
 // ── TTL + LRU Cache ─────────────────────────────────────────
 const CACHE_TTL_MS = 60_000; // 60 seconds
@@ -31,6 +44,38 @@ function setCache(url, data) {
   cache.set(url, { data, ts: Date.now() });
 }
 
+function normalizeSettingsPayload(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ...DEFAULT_SETTINGS };
+  }
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(typeof data.vscodeSessionsEnabled === "boolean"
+      ? { vscodeSessionsEnabled: data.vscodeSessionsEnabled }
+      : {}),
+  };
+}
+
+function normalizeVSCodeSessionsPayload(data) {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object" && Array.isArray(data.sessions)) {
+    return data.sessions;
+  }
+  return [];
+}
+
+function normalizeVSCodeSummaryPayload(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { ...DEFAULT_VSCODE_SUMMARY };
+  }
+  return {
+    ...DEFAULT_VSCODE_SUMMARY,
+    ...data,
+    models: Array.isArray(data.models) ? data.models : [],
+    modes: Array.isArray(data.modes) ? data.modes : [],
+  };
+}
+
 const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
@@ -41,7 +86,8 @@ const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 async function safeFetch(url, options) {
   const isGet = !options || !options.method || options.method === "GET";
   const returnText = options?.text === true;
-  if (isGet && !returnText) {
+  const useCache = isGet && !returnText && options?.noCache !== true;
+  if (useCache) {
     const hit = getCached(url);
     if (hit !== undefined) return hit;
   }
@@ -54,7 +100,7 @@ async function safeFetch(url, options) {
   }, FETCH_TIMEOUT_MS);
 
   // Strip custom options before passing to fetch
-  const { text: _text, signal, ...fetchOptions } = options || {};
+  const { text: _text, noCache: _noCache, signal, ...fetchOptions } = options || {};
   const abortForwarder = () => controller.abort();
 
   if (signal) {
@@ -101,7 +147,7 @@ async function safeFetch(url, options) {
     throw new Error("Invalid JSON response from server");
   }
 
-  if (isGet) setCache(url, data);
+  if (useCache) setCache(url, data);
   return data;
 }
 
@@ -118,6 +164,21 @@ export async function fetchSessions(timeframe, repo, options) {
 
 export async function fetchSessionCatalog(timeframe, repo) {
   return safeFetch(`${API_BASE}/sessions/catalog?${tfParams(timeframe, repo)}`);
+}
+
+export async function fetchSettings(options) {
+  const data = await safeFetch(`${API_BASE}/settings`, options);
+  return normalizeSettingsPayload(data);
+}
+
+export async function updateSettings(patch) {
+  const data = await safeFetch(`${API_BASE}/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  clearCache();
+  return normalizeSettingsPayload(data);
 }
 
 export async function fetchSessionDetail(id) {
@@ -266,6 +327,13 @@ export async function fetchTokenSummary(timeframe, repo, options) {
   return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`, options);
 }
 
+export async function fetchTokenSummaryProgress(timeframe, repo, options) {
+  return safeFetch(`${API_BASE}/tokens/summary/progressive?${tfParams(timeframe, repo)}`, {
+    ...options,
+    noCache: true,
+  });
+}
+
 export async function fetchTokensByModel(timeframe, repo) {
   return safeFetch(`${API_BASE}/tokens/by-model?${tfParams(timeframe, repo)}`);
 }
@@ -373,9 +441,11 @@ export async function deleteDevPlanGoal(id) {
 }
 
 // VS Code sessions
-export async function fetchVSCodeSessions() {
-  return safeFetch(`${API_BASE}/vscode/sessions`);
+export async function fetchVSCodeSessions(options) {
+  const data = await safeFetch(`${API_BASE}/vscode/sessions`, options);
+  return normalizeVSCodeSessionsPayload(data);
 }
 export async function fetchVSCodeSummary(options) {
-  return safeFetch(`${API_BASE}/vscode/summary`, options);
+  const data = await safeFetch(`${API_BASE}/vscode/summary`, options);
+  return normalizeVSCodeSummaryPayload(data);
 }

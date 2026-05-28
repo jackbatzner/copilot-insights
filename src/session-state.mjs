@@ -45,3 +45,29 @@ export function parseJsonlFile(filePath) {
     return [];
   }
 }
+
+/**
+ * Scan a JSONL file line-by-line and only parse lines that match a cheap text predicate.
+ * Useful for hot paths that only need a small subset of events.
+ *
+ * @param {string} filePath
+ * @param {(line: string) => boolean} [shouldParseLine]
+ * @param {(obj: any) => void} onObject
+ */
+export function scanJsonlFile(filePath, shouldParseLine, onObject) {
+  try {
+    const content = readFileSync(filePath, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (shouldParseLine && !shouldParseLine(trimmed)) continue;
+      try {
+        onObject(JSON.parse(trimmed));
+      } catch {
+        // Skip malformed lines.
+      }
+    }
+  } catch {
+    // Ignore unreadable files.
+  }
+}

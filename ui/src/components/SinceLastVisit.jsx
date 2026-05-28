@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchSessions, fetchInsights } from "../api.js";
+import { fetchSessionCatalog, fetchInsights } from "../api.js";
 
 /**
  * "Since last visit" summary card shown at the top of Overview
@@ -22,7 +22,7 @@ export function SinceLastVisit({ refreshKey }) {
     }
 
     const startFetch = () => {
-      Promise.all([fetchSessions("all"), fetchInsights("7d")])
+      Promise.all([fetchSessionCatalog("all"), fetchInsights("7d")])
         .then(([sessionsData, insightsData]) => {
           if (cancelled) return;
           const sessions = sessionsData.sessions || [];
@@ -39,7 +39,6 @@ export function SinceLastVisit({ refreshKey }) {
           if (newSessions.length > 0 || tip) {
             setData({
               newCount: newSessions.length,
-              newRedirections: newSessions.reduce((sum, s) => sum + (s.redirectionCount || 0), 0),
               tip,
             });
           }
@@ -53,7 +52,7 @@ export function SinceLastVisit({ refreshKey }) {
         });
     };
 
-    const idleHandle = window.setTimeout(startFetch, 250);
+    const idleHandle = window.setTimeout(startFetch, 1500);
     return () => { cancelled = true; window.clearTimeout(idleHandle); };
   }, [refreshKey]);
 

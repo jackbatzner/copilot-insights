@@ -4,10 +4,16 @@
 
 import { before, after, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { setupTestDb, teardownTestDb, FIXTURES } from "./test-helpers.mjs";
 
 const TEST_PORT = 3099;
 const BASE = `http://127.0.0.1:${TEST_PORT}`;
+let testHomeDir = null;
+const originalHome = process.env.HOME;
+const originalUserProfile = process.env.USERPROFILE;
 
 // Merge all fixtures for comprehensive API testing
 const testData = {
@@ -48,6 +54,9 @@ async function waitForServer(maxAttempts = 30) {
 // ── Setup / Teardown ────────────────────────────────────────────
 
 before(async () => {
+  testHomeDir = mkdtempSync(join(tmpdir(), "copilot-insights-home-"));
+  process.env.HOME = testHomeDir;
+  process.env.USERPROFILE = testHomeDir;
   setupTestDb(testData);
   process.env.PORT = String(TEST_PORT);
   await import("../server/index.mjs");
@@ -65,6 +74,13 @@ after(() => {
     }
   }
   teardownTestDb();
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+  if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = originalUserProfile;
+  if (testHomeDir) {
+    rmSync(testHomeDir, { recursive: true, force: true });
+  }
 });
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -85,6 +101,25 @@ async function postJSON(path, data) {
   return { status: res.status, body: json };
 }
 
+async function patchJSON(path, data) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const body = await res.json();
+  return { status: res.status, body };
+}
+
+async function waitFor(checkFn, { attempts = 20, delayMs = 50 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const value = await checkFn();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error("Condition was not met in time");
+}
+
 // ── Tests ───────────────────────────────────────────────────────
 
 describe("GET /api/summary", () => {
@@ -95,6 +130,91 @@ describe("GET /api/summary", () => {
     assert.ok("sessionsWithRedirections" in body, "missing sessionsWithRedirections");
     assert.ok("totalRedirections" in body, "missing totalRedirections");
     assert.equal(typeof body.sessionsAnalyzed, "number");
+  });
+});
+
+describe("GET /api/tokens/summary/progressive", () => {
+  it("returns partial progress first and completes after chunk processing", async () => {
+    const initial = await getJSON("/api/tokens/summary/progressive?timeframe=all");
+    assert.equal(initial.status, 200);
+    assert.equal(initial.body.progress.complete, false);
+    assert.equal(initial.body.progress.processedSessions, 0);
+    assert.equal(typeof initial.body.estimatedCost, "number");
+
+    const completed = await waitFor(async () => {
+      const next = await getJSON("/api/tokens/summary/progressive?timeframe=all");
+      return next.body.progress.complete ? next : null;
+    });
+
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.progress.complete, true);
+    assert.ok(completed.body.sessionsAnalyzed >= testData.sessions.length);
+    assert.equal(typeof completed.body.estimatedCost, "number");
+  });
+});
+
+describe("Settings API", () => {
+  it("returns default settings with VS Code loading disabled", async () => {
+    const { status, body } = await getJSON("/api/settings");
+    assert.equal(status, 200);
+    assert.deepEqual(body, { vscodeSessionsEnabled: false });
+  });
+
+  it("updates and persists VS Code loading settings", async () => {
+    const { status, body } = await patchJSON("/api/settings", { vscodeSessionsEnabled: true });
+    assert.equal(status, 200);
+    assert.equal(body.vscodeSessionsEnabled, true);
+
+    const settingsFile = join(testHomeDir, ".copilot", "copilot-insights-settings.json");
+    assert.equal(existsSync(settingsFile), true);
+    const persisted = JSON.parse(readFileSync(settingsFile, "utf-8"));
+    assert.equal(persisted.vscodeSessionsEnabled, true);
+  });
+
+  it("rejects unknown setting keys", async () => {
+    const { status, body } = await patchJSON("/api/settings", { unknownSetting: true });
+    assert.equal(status, 400);
+    assert.match(body.error, /Unknown setting keys/);
+  });
+
+  it("rejects non-boolean VS Code loading values", async () => {
+    const { status, body } = await patchJSON("/api/settings", { vscodeSessionsEnabled: "yes" });
+    assert.equal(status, 400);
+    assert.equal(body.error, "vscodeSessionsEnabled must be a boolean");
+  });
+});
+
+describe("VS Code settings gating", () => {
+  it("returns disabled payloads when VS Code loading is off", async () => {
+    await patchJSON("/api/settings", { vscodeSessionsEnabled: false });
+
+    const { status: summaryStatus, body: summaryBody } = await getJSON("/api/vscode/summary");
+    const { status: sessionsStatus, body: sessionsBody } = await getJSON("/api/vscode/sessions");
+    const disabledSessionResponse = await fetch(`${BASE}/api/vscode/sessions/workspace-123`);
+
+    assert.equal(summaryStatus, 200);
+    assert.equal(summaryBody.enabled, false);
+    assert.equal(summaryBody.totalSessions, 0);
+
+    assert.equal(sessionsStatus, 200);
+    assert.deepEqual(sessionsBody, { enabled: false, sessions: [] });
+
+    assert.equal(disabledSessionResponse.status, 403);
+  });
+
+  it("returns enabled payloads after opting in", async () => {
+    await patchJSON("/api/settings", { vscodeSessionsEnabled: true });
+
+    const { status: summaryStatus, body: summaryBody } = await getJSON("/api/vscode/summary");
+    const { status: sessionsStatus, body: sessionsBody } = await getJSON("/api/vscode/sessions");
+
+    assert.equal(summaryStatus, 200);
+    assert.equal(summaryBody.enabled, true);
+    assert.ok(Array.isArray(summaryBody.models));
+
+    assert.equal(sessionsStatus, 200);
+    assert.equal(sessionsBody.enabled, true);
+    assert.ok(Array.isArray(sessionsBody.sessions));
   });
 });
 

@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { fetchVSCodeSessions, fetchVSCodeSummary } from "../api.js";
 import { PageBanner } from "../components/PageBanner.jsx";
 import { PILLARS, PILLAR_ORDER, getPillarStatus } from "../pillar-config.js";
+import { useSettings } from "../SettingsContext.jsx";
 
 export default function VSCodeSessions() {
+  const { settings } = useSettings();
   const [sessions, setSessions] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,6 +16,14 @@ export default function VSCodeSessions() {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    if (!settings.vscodeSessionsEnabled) {
+      setSessions([]);
+      setSummary(null);
+      setLoading(false);
+      setError(null);
+      return undefined;
+    }
+
     setLoading(true);
     setError(null);
     Promise.allSettled([
@@ -29,9 +40,21 @@ export default function VSCodeSessions() {
         setSummary(sum);
       })
       .finally(() => setLoading(false));
-  }, [retryCount]);
+  }, [retryCount, settings.vscodeSessionsEnabled]);
 
   if (loading) return <div className="loading">Loading VS Code sessions…</div>;
+  if (!settings.vscodeSessionsEnabled) return (
+    <div className="empty">
+      <div className="empty-icon">⚙️</div>
+      <h3>VS Code session loading is off</h3>
+      <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+        Copilot Insights is currently using Copilot CLI data only. Enable VS Code session loading in Settings if you want this page and the overview surfaces to read local VS Code workspace storage.
+      </p>
+      <Link to="/settings" style={{ color: "var(--accent)", fontSize: 13 }}>
+        Open Settings →
+      </Link>
+    </div>
+  );
   if (error) return (
     <div className="empty">
       <div className="empty-icon">⚠️</div>
@@ -63,7 +86,7 @@ export default function VSCodeSessions() {
         <h1>💻 VS Code Sessions</h1>
       </div>
       <PageBanner pageId="vscode-sessions">
-        Copilot Chat sessions from VS Code — view your conversation history across workspaces.
+        Copilot Chat sessions from VS Code — view your conversation history across workspaces when VS Code loading is enabled in Settings.
       </PageBanner>
 
       {summary && (

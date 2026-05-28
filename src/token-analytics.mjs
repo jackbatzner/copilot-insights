@@ -128,7 +128,7 @@ export function tokensByWorkStyle({ repo, since, excludeIds } = {}) {
     else if (firstFileTurn >= 2) style = "iterative";
     else style = "mixed";
 
-    const tokenResult = analyzeSessionTokens(s.id);
+    const tokenResult = analyzeSessionTokens(s.id, { includePerTurn: false });
     if (!tokenResult) continue;
 
     // Count redirections
@@ -257,7 +257,7 @@ export function tokenTrends({ repo, since, excludeIds } = {}) {
       });
     }
 
-    const tokenResult = analyzeSessionTokens(s.id);
+    const tokenResult = analyzeSessionTokens(s.id, { includePerTurn: false });
     if (!tokenResult) continue;
 
     const entry = weekMap.get(week.key);
