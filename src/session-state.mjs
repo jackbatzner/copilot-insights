@@ -35,19 +35,12 @@ export function listSessionJsonlFiles(sessionId) {
   }
 }
 
-function isPathInsideRoot(p) {
-  const resolved = resolve(p);
-  const sep = process.platform === "win32" ? "\\" : "/";
-  return resolved === SESSION_STATE_ROOT || resolved.startsWith(SESSION_STATE_ROOT + sep);
-}
-
 export function parseJsonlFile(filePath) {
-  if (typeof filePath !== "string" || !isPathInsideRoot(filePath)) return [];
-  const safePath = resolve(filePath);
+  if (typeof filePath !== "string") return [];
+  const safePath = resolve(SESSION_STATE_ROOT, filePath);
+  if (!safePath.startsWith(SESSION_STATE_ROOT)) return [];
   try {
-    // Path is validated against SESSION_STATE_ROOT above; sessionId is also
-    // regex-sanitized in getSessionStateDir at the public boundary.
-    const content = readFileSync(safePath, "utf-8"); // lgtm[js/path-injection]
+    const content = readFileSync(safePath, "utf-8");
     const results = [];
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
@@ -73,12 +66,11 @@ export function parseJsonlFile(filePath) {
  * @param {(obj: any) => void} onObject
  */
 export function scanJsonlFile(filePath, shouldParseLine, onObject) {
-  if (typeof filePath !== "string" || !isPathInsideRoot(filePath)) return;
-  const safePath = resolve(filePath);
+  if (typeof filePath !== "string") return;
+  const safePath = resolve(SESSION_STATE_ROOT, filePath);
+  if (!safePath.startsWith(SESSION_STATE_ROOT)) return;
   try {
-    // Path is validated against SESSION_STATE_ROOT above; sessionId is also
-    // regex-sanitized in getSessionStateDir at the public boundary.
-    const content = readFileSync(safePath, "utf-8"); // lgtm[js/path-injection]
+    const content = readFileSync(safePath, "utf-8");
     for (const line of content.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
