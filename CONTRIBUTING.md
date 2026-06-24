@@ -58,7 +58,7 @@ npm run lint    # runs eslint across the project
 
 Before submitting a PR:
 
-1. **Run the tests:** `npm test` (should pass with no failures — currently 316 tests across 80 suites)
+1. **Run the tests:** `npm test` (should pass with no failures)
 2. **Run the linter:** `npm run lint` (should complete with no errors)
 3. **Build the UI:** `cd ui && npm run build` (should complete with no errors)
 4. **Start the server:** `cd server && node index.mjs` → visit http://localhost:3002

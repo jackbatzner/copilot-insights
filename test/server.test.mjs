@@ -150,6 +150,11 @@ describe("GET /api/tokens/summary/progressive", () => {
     assert.equal(completed.body.progress.complete, true);
     assert.ok(completed.body.sessionsAnalyzed >= testData.sessions.length);
     assert.equal(typeof completed.body.estimatedCost, "number");
+    assert.equal(typeof completed.body.estimatedCredits, "number");
+    assert.equal(completed.body.localUsage.source, "local-session-db");
+    assert.equal(typeof completed.body.localUsage.prompts, "number");
+    assert.equal(typeof completed.body.localUsage.requests, "number");
+    assert.equal(typeof completed.body.localUsage.avgTokensPerRequest, "number");
   });
 });
 
