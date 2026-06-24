@@ -9,6 +9,14 @@ import { TabBar, TabPanel } from "../components/TabBar.jsx";
 import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
 import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
 
+function formatLocalCredits(cost) {
+  const credits = (cost || 0) / 0.01;
+  if (credits === 0) return "0";
+  if (credits < 1) return credits.toFixed(2);
+  if (credits >= 1000) return `${(credits / 1000).toFixed(1)}K`;
+  return credits.toFixed(1);
+}
+
 export default function SessionDetail() {
   const { id } = useParams();
   const [isHidden, setIsHidden] = useState(false);
@@ -765,29 +773,71 @@ export default function SessionDetail() {
       <TabPanel id="tokens" activeTab={tab}>
         {tokenInfo ? (
           <div>
+            {(() => {
+              const inputTokens = tokenInfo.tokens?.input || tokenInfo.totals?.input || 0;
+              const outputTokens = tokenInfo.tokens?.output || tokenInfo.totals?.output || 0;
+              const cachedTokens = tokenInfo.tokens?.cached || tokenInfo.totals?.cached || 0;
+              const totalTokens = tokenInfo.tokens?.total || tokenInfo.totals?.total || 0;
+              const cacheRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
+              const avgTokensPerRequest = tokenInfo.avgTokensPerRequest || (tokenInfo.requestCount ? Math.round(totalTokens / tokenInfo.requestCount) : 0);
+              const guidance = [];
+              if (avgTokensPerRequest > 12000) guidance.push("High average tokens per request. Consider splitting large goals into smaller prompts or attaching only the files needed for each step.");
+              if (inputTokens > 0 && outputTokens / inputTokens > 2) guidance.push("Output-heavy session. This usually means long generated explanations, diffs, or logs; ask for concise answers when exploring.");
+              if (inputTokens > 0 && cacheRate === 0) guidance.push("No cached input tokens were recorded locally. That may mean the source did not expose cache reads, or this session did not reuse much context.");
+              if (guidance.length === 0) guidance.push("Usage looks balanced for this session. Cached tokens and exact request counts depend on which local usage fields were captured.");
+
+              return (
+                <>
+                  <div style={{ marginBottom: 16, padding: "0.75rem 1rem", background: "rgba(88, 166, 255, 0.08)", border: "1px solid rgba(88, 166, 255, 0.3)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}>
+                    🗄️ Token data comes from local Copilot session DB/session-state files. It is useful for coaching and investigation, but is not an imported GitHub org usage or billing report.
+                  </div>
+
             <div className="stats-grid" style={{ marginBottom: 16 }}>
               <div className="card" style={{ textAlign: "center" }}>
-                <div className="card-header">Est. Input Tokens</div>
-                <div className="stat-value">{(tokenInfo.tokens?.input || tokenInfo.totals?.input || 0).toLocaleString()}</div>
+                      <div className="card-header">Input Tokens</div>
+                      <div className="stat-value">{inputTokens.toLocaleString()}</div>
                 <div className="stat-sub">your prompts</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
-                <div className="card-header">Est. Output Tokens</div>
-                <div className="stat-value">{(tokenInfo.tokens?.output || tokenInfo.totals?.output || 0).toLocaleString()}</div>
+                      <div className="card-header">Output Tokens</div>
+                      <div className="stat-value">{outputTokens.toLocaleString()}</div>
                 <div className="stat-sub">agent responses</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
-                <div className="card-header">Total Tokens</div>
-                <div className="stat-value">{(tokenInfo.tokens?.total || tokenInfo.totals?.total || 0).toLocaleString()}</div>
+                      <div className="card-header">Cached Input</div>
+                      <div className="stat-value">{cachedTokens.toLocaleString()}</div>
+                      <div className="stat-sub">{cacheRate}% cache hit</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
-                <div className="card-header">Est. Cost</div>
-                <div className="stat-value" style={{ color: "var(--accent)" }}>
-                  {(tokenInfo.estimatedCost || 0) < 0.01 ? "<$0.01" : `$${(tokenInfo.estimatedCost || 0).toFixed(4)}`}
-                </div>
-                <div className="stat-sub">{tokenInfo.model || "unknown model"}</div>
+                      <div className="card-header">Total Tokens</div>
+                      <div className="stat-value">{totalTokens.toLocaleString()}</div>
               </div>
-            </div>
+              <div className="card" style={{ textAlign: "center" }}>
+                      <div className="card-header">Est. Local Credits</div>
+                <div className="stat-value" style={{ color: "var(--accent)" }}>
+                        {formatLocalCredits(tokenInfo.estimatedCost)}
+                </div>
+                      <div className="stat-sub">{(tokenInfo.estimatedCost || 0) < 0.01 ? "<$0.01" : `$${(tokenInfo.estimatedCost || 0).toFixed(4)}`} equivalent</div>
+                    </div>
+                    <div className="card" style={{ textAlign: "center" }}>
+                      <div className="card-header">Prompts / Requests</div>
+                      <div className="stat-value">{tokenInfo.promptCount || tokenInfo.turnCount || 0} / {tokenInfo.requestCount || 0}</div>
+                      <div className="stat-sub">{avgTokensPerRequest.toLocaleString()} tokens / request</div>
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+                    <div className="card-header" style={{ marginBottom: 8 }}>Usage guidance</div>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text-muted)", fontSize: 13, lineHeight: 1.6 }}>
+                      {guidance.map((item, i) => <li key={i}>{item}</li>)}
+                    </ul>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
+                      Source: <strong>{tokenInfo.source || "estimated"}</strong> · Model: <strong>{tokenInfo.model || "unknown"}</strong>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
 
             {tokenInfo.turns && tokenInfo.turns.length > 0 && (
               <div className="card" style={{ marginBottom: 16 }}>

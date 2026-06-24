@@ -40,7 +40,7 @@ Every time you say "no, not that" or "go back to the previous approach," that's 
 - 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
 - 💻 **VS Code Sessions** — Optionally analyze Copilot sessions from VS Code / VS Code Insiders when enabled in Settings
 - 📡 **Live monitoring** — Real-time feed of corrections as they happen
-- 💰 **Token usage & cost** — Track spend by model, get optimization tips, budget projections
+- 💰 **Local token/session usage** — See input, output, cached tokens, local prompts/requests, estimated credits, and optimization tips
 - 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
 - ♿ **Accessible** — Full WAI-ARIA keyboard navigation, semantic HTML, focus-visible styles
 
@@ -245,15 +245,15 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 
 <img src="docs/screenshots/vscode.png" alt="VS Code Sessions" width="800" />
 
-**Token Usage** — progressive token and cost loading with spend by model, estimated costs, and usage trends
+**Token Usage** — local session DB/session-state usage with input/output/cached tokens, prompts, requests, estimated local credits, and usage trends
 
 <img src="docs/screenshots/token-usage.png" alt="Token Usage overview" width="800" />
 
-**Token Optimization** — personalized cost-saving tips, model recommendations, and savings plan
+**Token Optimization** — personalized token-saving tips, model recommendations, and savings plan
 
 <img src="docs/screenshots/token-optimization.png" alt="Token Optimization" width="800" />
 
-**Token Models** — per-model breakdown with costs and usage distribution
+**Token Models** — per-model breakdown with local token totals, cache hit rate, estimated local credits, and usage distribution
 
 <img src="docs/screenshots/token-models.png" alt="Token Models" width="800" />
 
@@ -272,7 +272,7 @@ The main dashboard uses **progressive disclosure** — new users see the key ins
 - **Settings** — Enable optional data sources like VS Code loading while keeping the default workflow focused on Copilot CLI sessions
 - **VS Code Sessions** — Opt-in analysis for Copilot sessions from VS Code and VS Code Insiders with turn-by-turn detail, retry on error, and expandable session cards
 - **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
-- **Token Usage** — 5-tab dashboard (Overview, Models, Cost Insights, Budget, Optimization) with progressive token/cost loading, model breakdowns, personalized cost-saving insights, budget projections, and live pricing from GitHub docs
+- **Token Usage** — 5-tab local usage dashboard (Overview, Models, Cost Insights, Budget, Optimization) with progressive token/session loading, input/output/cached token breakdowns, prompts, inferred requests, estimated local credits, model breakdowns, personalized token-saving insights, budget projections, and live pricing from GitHub docs
 
 All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
 
@@ -311,7 +311,7 @@ The Live Monitor polls your session database every 5 seconds for new turns and d
 
 ## How It Works
 
-The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads JSONL event files from `~/.copilot/session-state/` which contain real model and token count data. VS Code sessions are read from `state.vscdb` files in VS Code's workspace storage.
+The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads local JSONL event files from `~/.copilot/session-state/` and local usage events when available, then falls back to text estimates when exact counts are unavailable. It does **not** import GitHub organization usage metrics or billing reports; local estimated credits are coaching estimates based on current Copilot model pricing. VS Code sessions are read from `state.vscdb` files in VS Code's workspace storage.
 
 ```
 ~/.copilot/session-store.db (read-only)
@@ -321,9 +321,10 @@ The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite d
   → Chronicle builder: clean messages, classify intent
 
 ~/.copilot/session-state/*/events.jsonl (read-only)
-  → Read real token usage & model data
-  → Estimate costs using official GitHub Copilot pricing
-  → Generate personalized optimization tips
+  → Read local model and output token data
+  → Combine with local DB events for input/output/cached token breakdowns when available
+  → Estimate local credits using official GitHub Copilot pricing
+  → Generate personalized token/session optimization tips
 
 VS Code workspace storage (read-only)
   → Discover VS Code / VS Code Insiders sessions

@@ -45,6 +45,13 @@ function formatCost(n) {
   return `$${n.toFixed(2)}`;
 }
 
+function formatCredits(n) {
+  if (n == null || n === 0) return "0";
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n < 1) return n.toFixed(2);
+  return n.toFixed(1);
+}
+
 export default function TokenUsage() {
   const { key: refreshKey } = useRefresh();
   const { timeframe, setTimeframe } = useTimeframe();
@@ -125,9 +132,12 @@ export default function TokenUsage() {
         <TimeframeSelector value={timeframe} onChange={setTimeframe} />
       </div>
 
+      <div style={{ margin: "0.75rem 0", padding: "0.5rem 1rem", background: "rgba(88, 166, 255, 0.08)", border: "1px solid rgba(88, 166, 255, 0.3)", borderRadius: 8, fontSize: "0.85rem", color: "var(--text-muted)" }}>
+        🗄️ Based on your <strong>local Copilot session database and session-state files</strong>. No GitHub organization usage metrics or billing reports are imported.
+      </div>
       {summary.isEstimated ? (
         <div className="info-banner" style={{ margin: "0.75rem 0", padding: "0.5rem 1rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.85rem", color: "var(--text-muted)" }}>
-          ℹ️ Token counts are <strong>estimated</strong> from message text (~4 chars/token). Actual usage may vary.
+          ℹ️ Some token counts are <strong>estimated locally</strong> from message text (~4 chars/token). Actual GitHub usage metrics may vary.
         </div>
       ) : (
         <div className="info-banner" style={{ margin: "0.75rem 0", padding: "0.5rem 1rem", background: "rgba(63, 185, 80, 0.08)", border: "1px solid rgba(63, 185, 80, 0.3)", borderRadius: 8, fontSize: "0.85rem", color: "var(--text-muted)" }}>
@@ -135,7 +145,7 @@ export default function TokenUsage() {
         </div>
       )}
       <div style={{ margin: "0 0 0.75rem", padding: "0.5rem 1rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
-        💰 Cost estimates use <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot per-token pricing</a> (1 AI credit = $0.01). Your actual spend depends on your plan&apos;s included allowance.
+        💰 Local credit estimates use <a href="https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>GitHub Copilot per-token pricing</a> (1 AI credit = $0.01). These are coaching estimates, not official billing totals.
       </div>
       {summaryUpdating && (
         <ProgressBanner
@@ -146,9 +156,10 @@ export default function TokenUsage() {
 
       {/* Hero Stats */}
       <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <StatCard label="Total Tokens" value={formatTokens(summary.totals.total)} sub={`${formatTokens(summary.totals.input)} in / ${formatTokens(summary.totals.output)} out`} />
-        <StatCard label="Est. Cost" value={formatCost(summary.estimatedCost)} sub={summary.costBreakdown ? `${formatCost(summary.costBreakdown.input)} input / ${formatCost(summary.costBreakdown.output)} output` : `${formatCost(summary.avgCostPerSession)} / session avg`} />
-        <StatCard label="Sessions" value={summary.sessionsAnalyzed} sub={`${formatTokens(summary.avgTokensPerSession)} tokens / session`} />
+        <StatCard label="Total Local Tokens" value={formatTokens(summary.totals.total)} sub={`${formatTokens(summary.totals.input)} input / ${formatTokens(summary.totals.output)} output`} />
+        <StatCard label="Cached Input" value={formatTokens(summary.totals.cached)} sub={`${summary.localUsage?.cacheHitRate || 0}% of input tokens`} />
+        <StatCard label="Est. Local Credits" value={formatCredits(summary.estimatedCredits ?? summary.localUsage?.estimatedCredits)} sub={`${formatCost(summary.estimatedCost)} equivalent`} />
+        <StatCard label="Local Sessions" value={summary.sessionsAnalyzed} sub={`${summary.localUsage?.prompts || 0} prompts · ${summary.localUsage?.requests || 0} requests`} />
         <StatCard label="Models Used" value={summary.byModel.filter(m => m.model !== "unknown").length || summary.byModel.length} sub={summary.byModel.filter(m => m.model !== "unknown").map((m) => m.model === "auto" ? "auto" : m.model).join(", ") || "no model data"} />
       </div>
 
@@ -207,6 +218,13 @@ function StatCard({ label, value, sub }) {
 
 function OverviewTab({ trends, summary, loadingTrends }) {
   const hasTrends = Array.isArray(trends?.weeks) && trends.weeks.length > 0;
+  const cachedInput = summary.totals.cached || 0;
+  const freshInput = Math.max((summary.totals.input || 0) - cachedInput, 0);
+  const tokenMix = [
+    { name: "Fresh input", value: freshInput },
+    { name: "Cached input", value: cachedInput },
+    { name: "Output", value: summary.totals.output || 0 },
+  ].filter((item) => item.value > 0);
   const chartData = hasTrends
     ? trends.weeks.map((w) => ({
       week: w.week.replace(/^\d{4}-/, ""),
@@ -222,6 +240,47 @@ function OverviewTab({ trends, summary, loadingTrends }) {
 
   return (
     <>
+      <CollapsibleSection title="Local Usage Breakdown" defaultOpen>
+        <div className="stat-grid" style={{ marginBottom: 16 }}>
+          <StatCard
+            label={<MetricHelp
+              label="Prompts"
+              definition="Productive user prompts or commands found in your local Copilot CLI session turns. Auto-generated system traffic is excluded where detected."
+              target="Use this to understand how many deliberate interactions drove local token usage."
+            />}
+            value={summary.localUsage?.prompts || 0}
+            sub={`${formatTokens(summary.localUsage?.avgTokensPerPrompt || 0)} tokens / prompt`}
+          />
+          <StatCard
+            label={<MetricHelp
+              label="Requests"
+              definition="Local request count inferred from real usage events when available, otherwise from productive turns. Requests may include agentic follow-up calls when local event data exposes them."
+              target="Higher requests than prompts usually means the agent did more follow-up work per user instruction."
+            />}
+            value={summary.localUsage?.requests || 0}
+            sub={`${formatTokens(summary.localUsage?.avgTokensPerRequest || 0)} tokens / request`}
+          />
+          <StatCard label="Avg / Session" value={formatTokens(summary.avgTokensPerSession)} sub={`${formatCost(summary.avgCostPerSession)} local estimate`} />
+          <StatCard label="Source Mix" value={`${summary.localUsage?.sourceBreakdown?.jsonl || 0}/${summary.localUsage?.sourceBreakdown?.events || 0}/${summary.localUsage?.sourceBreakdown?.estimated || 0}`} sub="jsonl / events / estimated" />
+        </div>
+        <div className="card" style={{ padding: "1rem" }}>
+          <div className="card-header">Where local tokens went</div>
+          {tokenMix.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={tokenMix} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                  {tokenMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={TT_STYLE} formatter={(v) => formatTokens(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState message="No token mix data available yet." />
+          )}
+        </div>
+      </CollapsibleSection>
+
       <CollapsibleSection title={`Weekly Token Trends — ${trendLabel}`} defaultOpen>
         {hasTrends ? (
           <ResponsiveContainer width="100%" height={280}>
@@ -265,9 +324,12 @@ function OverviewTab({ trends, summary, loadingTrends }) {
               <thead>
                 <tr>
                   <th>Session</th>
-                  <th>Tokens</th>
-                  <th>Cost</th>
-                  <th>Turns</th>
+                  <th>Input</th>
+                  <th>Output</th>
+                  <th>Cached</th>
+                  <th>Total</th>
+                  <th>Est. Credits</th>
+                  <th>Prompts</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,9 +338,12 @@ function OverviewTab({ trends, summary, loadingTrends }) {
                     <td style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       <a href={`/sessions/${s.sessionId}`}>{s.summary || s.branch || s.sessionId.slice(0, 8)}</a>
                     </td>
+                    <td>{formatTokens(s.tokens.input)}</td>
+                    <td>{formatTokens(s.tokens.output)}</td>
+                    <td>{formatTokens(s.tokens.cached)}</td>
                     <td>{formatTokens(s.tokens.total)}</td>
-                    <td>{formatCost(s.estimatedCost)}</td>
-                    <td>{s.turnCount}</td>
+                    <td>{formatCredits((s.estimatedCost || 0) / 0.01)}</td>
+                    <td>{s.promptCount || s.turnCount}</td>
                   </tr>
                 ))}
               </tbody>
