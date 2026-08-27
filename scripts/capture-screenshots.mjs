@@ -265,6 +265,13 @@ try {
       await page.waitForURL(/\/sessions\/.+/);
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(2000);
+
+      const tokensTab = page.locator("button", { hasText: "Tokens" });
+      if (await tokensTab.count()) {
+        await tokensTab.click();
+        await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(2000);
+      }
     }
     const detailPath = resolve(SCREENSHOTS_DIR, "session-detail.png");
     await page.screenshot({ path: detailPath, fullPage: false });

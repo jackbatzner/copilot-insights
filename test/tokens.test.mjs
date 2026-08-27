@@ -101,7 +101,7 @@ describe("analyzeSessionTokens", () => {
       "utf-8"
     );
 
-    const { analyzeSessionTokens } = await importFresh("../src/tokens.mjs");
+    const { analyzeSessionTokens, analyzeTokensBatch } = await importFresh("../src/tokens.mjs");
     const result = analyzeSessionTokens("sess-jsonl-1");
 
     assert.ok(result);
@@ -109,8 +109,19 @@ describe("analyzeSessionTokens", () => {
     assert.equal(result.model, "claude-sonnet-4.6");
     assert.equal(result.tokens.output, 2000);
     assert.equal(result.turnCount, 2);
+    assert.equal(result.promptCount, 2);
+    assert.equal(result.requestCount, 2);
+    assert.equal(result.avgTokensPerRequest, Math.round(result.tokens.total / 2));
     assert.equal(result.perTurn.length, 2);
     assert.equal(result.perTurn[0].outputTokens, 1200);
     assert.equal(result.perTurn[1].outputTokens, 800);
+
+    const batch = analyzeTokensBatch();
+    assert.equal(batch.localUsage.source, "local-session-db");
+    assert.equal(batch.localUsage.sessions, 1);
+    assert.equal(batch.localUsage.prompts, 2);
+    assert.equal(batch.localUsage.requests, 2);
+    assert.equal(batch.localUsage.sourceBreakdown.jsonl, 1);
+    assert.equal(batch.estimatedCredits, batch.estimatedCost / 0.01);
   });
 });

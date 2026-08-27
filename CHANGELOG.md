@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1] - 2026-06-24
+
+_See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.3.1) for full release notes._
+
+### Added
+
+- **Local token/session usage metrics** — Token Usage now surfaces local prompts, inferred requests, input/output/cached token breakdowns, cache hit rate, estimated local credits, and source breakdowns from the local Copilot session DB/session-state files without importing GitHub org usage metrics
+
 ## [0.3.0] - 2026-06-02
 
 _See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.3.0) for full release notes._
