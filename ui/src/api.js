@@ -76,6 +76,13 @@ function normalizeVSCodeSummaryPayload(data) {
   };
 }
 
+function normalizeOptionalAnalysisPayload(data, key) {
+  if (data && typeof data === "object" && data[key] === null) {
+    return null;
+  }
+  return data;
+}
+
 const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
@@ -202,11 +209,13 @@ export async function fetchEfficiency(timeframe, repo) {
 }
 
 export async function fetchSessionSprawl(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/sprawl`);
+  const data = await safeFetch(`${API_BASE}/sessions/${id}/sprawl`);
+  return normalizeOptionalAnalysisPayload(data, "sprawl");
 }
 
 export async function fetchSessionEfficiency(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/efficiency`);
+  const data = await safeFetch(`${API_BASE}/sessions/${id}/efficiency`);
+  return normalizeOptionalAnalysisPayload(data, "efficiency");
 }
 
 export async function fetchPromptLength(timeframe, repo) {
