@@ -22,4 +22,4 @@ labels: bug
 
 ## Additional context
 
-<!-- Error messages, screenshots, or logs. Never share your session-store.db — it contains your session data. -->
+<!-- Share sanitized diagnostics or a synthetic reproduction only. Session Detail shows original text by default: enable Presentation mode before screen sharing. Never attach real-history screenshots, session databases, raw event files, transcripts, credentials or local paths. -->

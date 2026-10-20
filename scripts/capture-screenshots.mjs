@@ -1,500 +1,286 @@
 #!/usr/bin/env node
-// Captures screenshots and demo GIFs of each dashboard page using Playwright.
-// Usage: node scripts/capture-screenshots.mjs [--gif] [--pages practice,overview,live,...]
-//
-// Flags:
-//   --gif           Also record animated GIFs for pages that have interactions
-//   --pages <list>  Comma-separated page names to capture (default: all)
-
-import { chromium } from "@playwright/test";
-import { spawn, execFileSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { chromium, expect } from "@playwright/test";
+import { startServer } from "../server/index.mjs";
+import { createSyntheticFixture } from "./seed-mock-db.mjs";
+import { createGalleryFixture } from "./gallery-fixture.mjs";
+import { assertCaptureSafe, captureRequestPolicy, GALLERY_IMAGES, GALLERY_LABEL } from "./gallery-contract.mjs";
+import { PRESENTATION_KEY } from "../ui/src/presentation-preference.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "..");
-const MOCK_DB = resolve(ROOT, "mock-session-store.db");
-const MOCK_SESSION_STATE = resolve(ROOT, "mock-session-state");
-const MOCK_SETTINGS = resolve(ROOT, "mock-copilot-insights-settings.json");
-const SCREENSHOTS_DIR = resolve(ROOT, "docs", "screenshots");
-const PORT = 3099; // avoid clashing with a running dev server
-
-// ── Parse CLI flags ─────────────────────────────────────────────
-
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const docsDirectory = join(root, "docs", "screenshots");
 const args = process.argv.slice(2);
-const doGif = args.includes("--gif");
-const pagesFlag = args.find((_, i, a) => a[i - 1] === "--pages");
-const pageFilter = pagesFlag ? pagesFlag.split(",") : null;
-
-// Resolve ffmpeg from ffmpeg-static (dev dependency)
-let ffmpegPath;
-try {
-  const mod = await import("ffmpeg-static");
-  ffmpegPath = mod.default;
-} catch {
-  if (doGif) {
-    console.error("❌ ffmpeg-static not installed. Run: npm install --save-dev ffmpeg-static");
-    process.exit(1);
-  }
+if (args.length && (args.length !== 2 || args[0] !== "--output")) {
+  throw new Error("Usage: node scripts/capture-screenshots.mjs [--output <directory>]");
 }
-if (doGif && (!ffmpegPath || !existsSync(ffmpegPath))) {
-  ffmpegPath = "ffmpeg";
+const requestedOutput = args[1] ? resolve(args[1]) : null;
+const publish = requestedOutput === docsDirectory;
+if (requestedOutput && !publish) {
+  const path = relative(root, requestedOutput);
+  if (!path || (!path.startsWith("..") && !isAbsolute(path))) throw new Error("Capture output must be outside the repository or exactly docs/screenshots.");
 }
-
-// ── 1. Seed the mock database ───────────────────────────────────
-
-console.log("🌱 Seeding mock database…");
-const seedResult = await runNode(resolve(__dirname, "seed-mock-db.mjs"));
-if (seedResult !== 0) {
-  console.error("❌ Seeding failed"); process.exit(1);
-}
-
-if (!existsSync(MOCK_DB)) {
-  console.error("❌ Mock database not found at", MOCK_DB); process.exit(1);
-}
-
-writeFileSync(MOCK_SETTINGS, JSON.stringify({ vscodeSessionsEnabled: false }, null, 2));
-
-mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-
-// ── 2. Start the server with the mock database ──────────────────
-
-console.log("🚀 Starting server on port", PORT, "…");
-const server = spawn(process.execPath, ["index.mjs"], {
-  cwd: resolve(ROOT, "server"),
-  env: {
-    ...process.env,
-    COPILOT_SESSION_DB: MOCK_DB,
-    COPILOT_SESSION_STATE_PATH: MOCK_SESSION_STATE,
-    COPILOT_INSIGHTS_SETTINGS_FILE: MOCK_SETTINGS,
-    PORT: String(PORT),
-  },
-  stdio: ["ignore", "pipe", "pipe"],
+const output = await mkdtemp(join(tmpdir(), "copilot-insights-gallery-"));
+const fixture = createGalleryFixture();
+const empty = createSyntheticFixture({ empty: true });
+const forbidden = [...fixture.privateMarkers, empty.directory, ...empty.ids];
+const counts = { contentBlocked: 0, externalBlocked: 0, mutationBlocked: 0, unknownApiBlocked: 0, inspectedApiResponses: 0, screenshots: 0 };
+const errors = [];
+const checks = [];
+let scene = "initialization";
+let server, emptyServer, browser;
+let succeeded = false;
+const close = (value) => value && new Promise((done, reject) => {
+  value.close((error) => error ? reject(error) : done());
+  value.closeAllConnections();
 });
-
-let serverOutput = "";
-server.stdout.on("data", (d) => { serverOutput += d.toString(); });
-server.stderr.on("data", (d) => { serverOutput += d.toString(); });
-
-// Wait for the server to be ready
-await waitForServer(`http://127.0.0.1:${PORT}/api/sessions`, 20_000);
-console.log("✅ Server is ready");
-const baseUrl = `http://127.0.0.1:${PORT}`;
-await updateSettings(baseUrl, { vscodeSessionsEnabled: true });
-console.log("✅ Mock VS Code loading enabled");
-
-// ── 3. Capture screenshots ─────────────────────────────────────
-
+const sha = (buffer) => createHash("sha256").update(buffer).digest("hex");
 try {
-  const browser = await chromium.launch();
+  const uiDist = resolve(process.env.COPILOT_INSIGHTS_TEST_UI_DIST || join(root, "ui", "dist"));
+  const buildHash = sha(await readFile(join(uiDist, "index.html")));
+  // Explicit synthetic sources and state prevent fallback to any host session store.
+  server = await startServer({ ...fixture, port: 0, uiDist });
+  emptyServer = await startServer({ ...empty, port: 0, uiDist });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const emptyBase = `http://127.0.0.1:${emptyServer.address().port}`;
+  const origins = new Set([base, emptyBase]);
+  browser = await chromium.launch({ channel: "msedge", headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-    colorScheme: "dark",
+    viewport: { width: 1440, height: 1180 }, colorScheme: "dark", timezoneId: "UTC", locale: "en-US", serviceWorkers: "block",
   });
+  await context.addInitScript(({ key, allowed }) => {
+    if (allowed.includes(location.origin)) localStorage.setItem(key, "on");
+  }, { key: PRESENTATION_KEY, allowed: [...origins] });
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    const policy = captureRequestPolicy(request.url(), request.method(), origins);
+    if (policy !== "allow") {
+      counts[{ content: "contentBlocked", external: "externalBlocked", mutation: "mutationBlocked", "unknown-api": "unknownApiBlocked" }[policy]]++;
+      return route.abort();
+    }
+    return route.continue();
+  });
+  await context.routeWebSocket("**/*", (socket) => { counts.externalBlocked++; socket.close(); });
+  context.on("page", (page) => page.on("pageerror", (error) => {
+    const category = ["removeChild", "insertBefore", "ResizeObserver", "Failed to fetch", "Unexpected token"].find((value) => error.message.includes(value)) || "unclassified";
+    errors.push({ scene, category });
+  }));
   const page = await context.newPage();
-
-  const allPages = [
-    { path: "/welcome",   name: "welcome" },
-    { path: "/",          name: "overview" },
-    { path: "/skills",    name: "skill-building" },
-    { path: "/sessions",  name: "sessions" },
-    { path: "/analytics", name: "analytics" },
-    { path: "/practice",      name: "practice" },
-    { path: "/instructions",  name: "instructions" },
-    { path: "/settings",      name: "settings" },
-    { path: "/live",          name: "live" },
-    { path: "/vscode",        name: "vscode" },
-    { path: "/tokens",        name: "token-usage" },
-  ];
-
-  const filtered = pageFilter
-    ? allPages.filter((p) => pageFilter.includes(p.name))
-    : allPages;
-
-  for (const p of filtered) {
-    // Skill Building page: capture overview then click through pillar tabs
-    if (p.name === "skill-building") {
-      console.log("📸 Capturing skill-building (Overview + pillar tabs)…");
-      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(2000);
-      let outPath = resolve(SCREENSHOTS_DIR, "skill-building.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-
-      // Capture Intent tab
-      const intentTab = page.locator("button[role='tab']", { hasText: /intent|specification/i });
-      if (await intentTab.count()) {
-        await intentTab.click();
-        await page.waitForTimeout(1500);
-        outPath = resolve(SCREENSHOTS_DIR, "skill-building-intent.png");
-        await page.screenshot({ path: outPath, fullPage: false });
-        console.log(`   → ${outPath}`);
-      }
-
-      // Capture Dev Plan tab
-      const devPlanTab = page.locator("button[role='tab']", { hasText: /dev plan/i });
-      if (await devPlanTab.count()) {
-        await devPlanTab.click();
-        await page.waitForTimeout(1500);
-        outPath = resolve(SCREENSHOTS_DIR, "skill-building-devplan.png");
-        await page.screenshot({ path: outPath, fullPage: false });
-        console.log(`   → ${outPath}`);
-      }
-      continue;
-    }
-
-    // VS Code Sessions page
-    if (p.name === "vscode") {
-      console.log("📸 Capturing vscode sessions…");
-      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(2000);
-
-      // Try expanding the first session card
-      const expandBtn = page.locator("button[aria-expanded]").first();
-      if (await expandBtn.count()) {
-        await expandBtn.click();
-        await page.waitForTimeout(1000);
-      }
-
-      const outPath = resolve(SCREENSHOTS_DIR, "vscode.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-      continue;
-    }
-
-    if (p.name === "settings") {
-      console.log("📸 Capturing settings…");
-      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(1500);
-      const outPath = resolve(SCREENSHOTS_DIR, "settings.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-      continue;
-    }
-
-    // Practice page: navigate to Rewrite Challenge with a loaded challenge
-    if (p.name === "practice") {
-      console.log("📸 Capturing practice (Rewrite Challenge with coaching panel)…");
-      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await page.waitForTimeout(1000);
-
-      // Click "Rewrite Challenge" tab
-      const challengeTab = page.locator("button", { hasText: "Rewrite Challenge" });
-      if (await challengeTab.count()) {
-        await challengeTab.click();
-        await page.waitForTimeout(500);
-      }
-
-      // Click "Prompt Library" source button
-      const libraryBtn = page.locator("button", { hasText: "Prompt Library" });
-      if (await libraryBtn.count()) {
-        await libraryBtn.click();
-        await page.waitForTimeout(500);
-      }
-
-      // Click "Pick Random Challenge" or similar to load a challenge
-      const pickBtn = page.locator("button", { hasText: /random|pick|challenge/i });
-      if (await pickBtn.count()) {
-        await pickBtn.first().click();
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(2000);
-      }
-
-      const outPath = resolve(SCREENSHOTS_DIR, `${p.name}.png`);
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-      continue;
-    }
-
-    // Token Usage page: capture Overview tab + Optimization tab
-    if (p.name === "token-usage") {
-      console.log("📸 Capturing token-usage (Overview tab)…");
-      await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-      await waitForTokenFlow(page);
-      let outPath = resolve(SCREENSHOTS_DIR, "token-usage.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-
-      // Capture the Optimization tab
-      console.log("📸 Capturing token-optimization (Optimization tab)…");
-      const optimTab = page.locator("button", { hasText: "Optimization" });
-      if (await optimTab.count()) {
-        await optimTab.click();
-        await page.waitForTimeout(2000);
-      }
-      outPath = resolve(SCREENSHOTS_DIR, "token-optimization.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-
-      // Capture the Models tab
-      console.log("📸 Capturing token-models (Models tab)…");
-      const modelsTab = page.locator("button", { hasText: "Models" });
-      if (await modelsTab.count()) {
-        await modelsTab.click();
-        await page.waitForTimeout(2000);
-      }
-      outPath = resolve(SCREENSHOTS_DIR, "token-models.png");
-      await page.screenshot({ path: outPath, fullPage: false });
-      console.log(`   → ${outPath}`);
-      continue;
-    }
-
-    console.log(`📸 Capturing ${p.name}…`);
-    await page.goto(`${baseUrl}${p.path}`, { waitUntil: "networkidle" });
-    if (p.name === "overview") {
-      await waitForTokenFlow(page);
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname.startsWith("/api/")) checks.push((async () => {
+      if (!response.ok()) throw new Error("Gallery API returned an unsuccessful response.");
+      assertCaptureSafe(await response.text(), forbidden);
+      counts.inspectedApiResponses++;
+    })().catch(() => {
+      errors.push({ scene, category: "API response privacy check failed" });
+    }));
+  });
+  const goto = async (path, origin = base) => {
+    await Promise.all(checks);
+    assert.deepEqual(errors, [], "Gallery checks must finish successfully before navigation.");
+    scene = "navigation";
+    await page.goto(origin + path);
+    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator(".usage-loading")).toHaveCount(0);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await Promise.all(checks);
+    assert.deepEqual(errors, [], "Gallery response checks failed.");
+  };
+  const shot = async (name, locator, through) => {
+    scene = name;
+    const viewport = page.viewportSize();
+    assert.ok(GALLERY_IMAGES.includes(name), "Screenshot is not in the publication allowlist.");
+    await expect(page.locator(".local-content-preview, .local-content-text, pre")).toHaveCount(0);
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.mouse.move(0, 0);
+    await Promise.all(checks);
+    assert.deepEqual(errors, [], "Gallery checks must finish successfully before capture.");
+    assertCaptureSafe(await page.content(), forbidden);
+    assertCaptureSafe(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } })), forbidden);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Capture has page overflow.");
+    // The only capture decoration is a provenance label, never replacement product data.
+    if (locator) {
+      await locator.evaluate((node, label) => {
+        const banner = document.createElement("p");
+        banner.dataset.captureLabel = "true";
+        banner.textContent = label;
+        banner.style.cssText = "position:relative;z-index:10000;color:var(--text);background:var(--bg-card);border:1px solid var(--border);padding:8px 12px;margin-bottom:12px;font:600 13px 'Segoe UI',sans-serif;";
+        node.prepend(banner);
+      }, GALLERY_LABEL);
+      await locator.screenshot({ path: join(output, name), animations: "disabled" });
     } else {
-      await page.waitForTimeout(2000); // let charts animate
-    }
-    const outPath = resolve(SCREENSHOTS_DIR, `${p.name}.png`);
-    await page.screenshot({ path: outPath, fullPage: false });
-    console.log(`   → ${outPath}`);
-  }
-
-  // Session detail — click first session from the sessions list
-  if (!pageFilter || pageFilter.includes("session-detail")) {
-    console.log("📸 Capturing session-detail…");
-    await page.goto(`${baseUrl}/sessions`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(1000);
-
-
-    const sessionLink = page.locator("a[href^='/sessions/']").first();
-    if (await sessionLink.count()) {
-      await sessionLink.click();
-      await page.waitForURL(/\/sessions\/.+/);
-      await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(2000);
-
-      const tokensTab = page.locator("button", { hasText: "Tokens" });
-      if (await tokensTab.count()) {
-        await tokensTab.click();
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(2000);
+      if (through) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        const box = await through.boundingBox();
+        assert.ok(box, "Capture extent is unavailable.");
+        await page.setViewportSize({ width: viewport.width, height: Math.max(720, Math.ceil(box.y + box.height + 48)) });
       }
+      await page.evaluate((label) => {
+        window.scrollTo(0, 0);
+        const banner = document.createElement("div");
+        banner.dataset.captureLabel = "true";
+        banner.textContent = label;
+        banner.style.cssText = "position:fixed;bottom:12px;right:12px;z-index:10000;color:var(--text);background:var(--bg-card);border:1px solid var(--border);padding:8px 12px;font:600 13px 'Segoe UI',sans-serif;";
+        document.body.append(banner);
+      }, GALLERY_LABEL);
+      await page.screenshot({ path: join(output, name), animations: "disabled" });
     }
-    const detailPath = resolve(SCREENSHOTS_DIR, "session-detail.png");
-    await page.screenshot({ path: detailPath, fullPage: false });
-    console.log(`   → ${detailPath}`);
+    await page.locator("[data-capture-label]").evaluateAll((nodes) => nodes.forEach((node) => node.remove()));
+    await page.setViewportSize(viewport);
+    counts.screenshots++;
+  };
+
+  await goto("/?timeframe=30d");
+  await expect(page.locator(".primary-insight .button-link")).toBeInViewport();
+  await expect(page.locator(".share-chart-grid")).toBeVisible();
+  await shot("overview.png", null, page.locator(".share-chart-grid"));
+  await page.getByRole("button", { name: "Switch to light mode", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await shot("overview-light.png", null, page.locator(".share-chart-grid"));
+  await page.getByRole("button", { name: "Switch to dark mode", exact: true }).click();
+  await shot("overview-daily.png", page.locator(".trend-card"));
+  await page.locator(".primary-insight .button-link").click();
+  await expect(page.getByLabel("Model", { exact: true })).toHaveValue("claude-sonnet-4.6");
+  await page.getByLabel("Scope", { exact: true }).selectOption("subagent");
+  await page.getByLabel("UTC day", { exact: true }).fill(fixture.usageDays.child);
+  await expect(page.getByRole("status")).toContainText("2 matching sessions");
+  const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: "Session 1", exact: true }) });
+  await expect(row.locator('[data-exact="31,000"]').first()).toBeVisible();
+  await expect(row.locator('[data-exact="62,800"]').first()).toBeVisible();
+  await shot("sessions.png", null, page.locator(".pagination"));
+  await page.setViewportSize({ width: 390, height: 1180 });
+  await shot("sessions-mobile.png", page.locator("main"));
+  await page.setViewportSize({ width: 1440, height: 1180 });
+  await page.getByRole("link", { name: "Session 1", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Show text", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Matching usage totals" }).locator('[data-exact="31,000"]')).toHaveText("31K");
+  const turn = page.locator(".usage-turn");
+  await page.getByRole("button", { name: "Inspect Turn 2", exact: true }).click();
+  await expect(turn.locator(".call-summary")).toContainText("matching call");
+  await expect(turn.locator(".request-list-row").first()).toContainText("Ending:");
+  await shot("turn-summary-desktop.png", page.locator(".turn-explorer"));
+  await page.setViewportSize({ width: 390, height: 1180 });
+  await expect(turn.getByRole("button", { name: "Back to turns", exact: true })).toBeVisible();
+  await shot("turn-summary-mobile.png", page.locator(".turn-explorer"));
+  await page.setViewportSize({ width: 1440, height: 1180 });
+  await turn.locator(".request-list-row").first().click();
+  await expect(turn.locator(".usage-request")).toContainText("Exact child linkage");
+  await shot("turn-requests-desktop.png", page.locator(".turn-explorer"));
+  await turn.getByRole("link", { name: /Inspect .* attribution/ }).first().click();
+  const child = page.locator(".attribution-group[open]").filter({ hasText: "Exact child linkage" });
+  await expect(child).toContainText("File reads");
+  await expect(child).toContainText("Search");
+  await child.locator(".model-attribution > summary").click();
+  await shot("session-detail.png", page.locator('section[aria-labelledby="attribution-heading"]'));
+  await page.setViewportSize({ width: 390, height: 1180 });
+  await shot("tool-activity-mobile.png", child.getByRole("region", { name: "Subagent 1 tool activity", exact: true }));
+  await page.setViewportSize({ width: 1440, height: 1180 });
+  const primaryHandle = new URL(page.url()).pathname.split("/").at(-1);
+
+  await goto("/tokens?timeframe=30d");
+  await page.locator(".performance-group > summary").filter({ hasText: "Child invocations" }).click();
+  await shot("token-usage.png", null, page.locator("#performance"));
+  await shot("token-models.png", page.locator("#models"));
+  await page.getByRole("link", { name: "Compare models", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Models you actually used", exact: true })).toBeVisible();
+  await shot("comparison-observed.png", null, page.locator('section[aria-labelledby="observed-heading"]'));
+  await page.getByRole("button", { name: "What-if cost", exact: true }).click();
+  await page.getByLabel("Baseline model", { exact: true }).selectOption("gpt-5.4");
+  await page.getByLabel("Alternative 2", { exact: true }).selectOption("");
+  await page.getByLabel("Alternative 1", { exact: true }).selectOption("claude-haiku-4.5");
+  await page.getByLabel("Alternative 2", { exact: true }).selectOption("gpt-6-astra");
+  await expect(page.getByRole("region", { name: "What-if model comparison" })).toContainText("Baseline scenario, not recorded spend");
+  await shot("comparison-what-if.png", page.locator('section[aria-labelledby="what-if-heading"]'));
+
+  await goto(`/tokens/compare?timeframe=all&session=${primaryHandle}`);
+  await page.getByRole("button", { name: "What-if cost", exact: true }).click();
+  await page.getByLabel("Alternative 2", { exact: true }).selectOption("");
+  await page.getByLabel("Alternative 1", { exact: true }).selectOption("claude-haiku-4.5");
+  await page.getByRole("button", { name: "Choose for trial: Claude Haiku 4.5", exact: true }).click();
+  await page.getByRole("button", { name: "Save local baseline", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Saved snapshot", exact: true })).toBeVisible();
+  forbidden.push(fixture.addLaterSession());
+  await page.getByRole("button", { name: "Check for newer sessions", exact: true }).click();
+  await page.getByRole("link", { name: "Compare later session 1", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Recorded baseline comparison" })).toContainText("13.5K");
+  await expect(page.getByText(/Differences do not establish savings, quality/)).toBeVisible();
+  await shot("comparison-baseline.png", page.locator(".comparison-baseline"));
+  await goto("/settings");
+  await expect(page.getByRole("checkbox", { name: "Enable VS Code" })).not.toBeChecked();
+  await expect(page.locator("main").getByRole("button", { name: "Presentation mode: On", exact: true })).toBeVisible();
+  await shot("settings.png", null, page.locator("main > .card").last());
+  await goto("/?timeframe=30d", emptyBase);
+  await expect(page.getByRole("link", { name: "Check Data Sources", exact: true })).toBeInViewport();
+  await shot("empty-overview.png", null, page.locator(".source-coverage"));
+
+  await Promise.all(checks);
+  assert.deepEqual(errors, []);
+  assert.deepEqual({ ...counts, inspectedApiResponses: 0, screenshots: 0 }, {
+    contentBlocked: 0, externalBlocked: 0, mutationBlocked: 0, unknownApiBlocked: 0, inspectedApiResponses: 0, screenshots: 0,
+  }, "Unexpected blocked requests during normal gallery flow.");
+  assert.equal(counts.screenshots, GALLERY_IMAGES.length);
+  // Exercise the guards after capture; these synthetic probes must never reach a server.
+  const reached = [];
+  const record = (request) => reached.push({ url: request.url, method: request.method });
+  server.on("request", record);
+  await goto("/?timeframe=all");
+  await page.evaluate(async () => {
+    const requests = [
+      ["/api/sessions/" + "a".repeat(64) + "/content", { method: "POST", body: "{}" }],
+      ["https://example.invalid/capture-guard", {}],
+      ["/api/settings", { method: "PATCH", body: "{}" }],
+    ];
+    await Promise.all(requests.map(async ([url, options]) => {
+      try { await fetch(url, options); throw new Error("Capture guard allowed a forbidden request."); }
+      catch (error) { if (error.message === "Capture guard allowed a forbidden request.") throw error; }
+    }));
+  });
+  server.off("request", record);
+  assert.ok(!reached.some((request) => request.url?.includes("/content") || request.method !== "GET"));
+  assert.equal(counts.contentBlocked, 1);
+  assert.equal(counts.externalBlocked, 1);
+  assert.equal(counts.mutationBlocked, 1);
+  await Promise.all(checks);
+  assert.deepEqual(errors, []);
+  const images = await Promise.all(GALLERY_IMAGES.map(async (name) => {
+    const buffer = await readFile(join(output, name));
+    assert.equal(buffer.subarray(1, 4).toString(), "PNG");
+    return { name, sha256: sha(buffer), bytes: buffer.length, width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+  }));
+  const manifest = {
+    generatedAt: new Date().toISOString(), source: "Isolated synthetic SessionDB and session-state JSONL only",
+    label: GALLERY_LABEL, browser: "Microsoft Edge isolated context", uiIndexSha256: buildHash,
+    presentationMode: true, ...counts, blockedRequestsArePostCaptureGuardProbes: true,
+    realSourceReads: 0, contentOrRawIdentifiersRendered: false,
+    baseline: "Saved via UI; a new fabricated session is then inserted into the same synthetic database, selected via fresh metadata",
+    images,
+  };
+  const destination = requestedOutput || output;
+  if (destination !== output) {
+    await mkdir(destination, { recursive: true });
+    if (publish) {
+      const unexpected = (await readdir(destination)).filter((name) => !GALLERY_IMAGES.includes(name));
+      assert.deepEqual(unexpected, [], "Review obsolete gallery assets before publication; nothing is silently deleted.");
+    }
+    for (const name of GALLERY_IMAGES) await copyFile(join(output, name), join(destination, name));
   }
-
-  // ── 4. Record full-app demo GIF (optional) ─────────────────────
-
-  if (doGif) {
-    console.log("\n🎬 Recording full-app demo GIF…");
-    await recordFullDemoGif(browser, baseUrl);
+  await writeFile(join(output, "gallery-validation.json"), JSON.stringify(manifest, null, 2) + "\n");
+  if (!publish && destination !== output) {
+    await copyFile(join(output, "gallery-validation.json"), join(destination, "gallery-validation.json"));
+    await rm(output, { recursive: true, force: true });
   }
-
-  await browser.close();
-  console.log("\n✅ All captures complete");
+  console.log(JSON.stringify({ status: "passed", gallery: destination, manifest: join(publish ? output : destination, "gallery-validation.json"), ...counts }));
+  succeeded = true;
 } finally {
-  server.kill();
-  try { unlinkSync(MOCK_SETTINGS); } catch { /* ignore */ }
-}
-
-// ── GIF recorder ────────────────────────────────────────────────
-
-/**
- * Record a single full-app demo GIF that walks through the major pages:
- * Welcome → Overview → Sessions → Session Detail → Skill Building →
- * Analytics → Practice → Token Usage → VS Code → Live Monitor.
- * Outputs docs/screenshots/demo.gif.
- */
-async function recordFullDemoGif(browser, baseUrl) {
-  console.log("🎬 Recording demo.gif (full-app walkthrough)…");
-  const videoDir = resolve(SCREENSHOTS_DIR, ".video-tmp");
-  mkdirSync(videoDir, { recursive: true });
-
-  const gifContext = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-    colorScheme: "dark",
-    recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } },
-  });
-  const gifPage = await gifContext.newPage();
-
-  // ── Scene 0: Welcome — show onboarding flow ────────────────────
-  await gifPage.goto(`${baseUrl}/welcome`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2500);
-
-  // Click through the 3 steps
-  for (let i = 0; i < 2; i++) {
-    const nextBtn = gifPage.locator("button", { hasText: "Next" }).first();
-    if (await nextBtn.count()) {
-      await nextBtn.click();
-      await gifPage.waitForTimeout(1500);
-    }
-  }
-  await gifPage.waitForTimeout(1000);
-
-  // ── Scene 1: Overview — show the main dashboard ───────────────
-  await gifPage.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(3000);
-
-  // ── Scene 2: Sessions list ────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/sessions`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2000);
-
-  // ── Scene 3: Click into a session detail ──────────────────────
-  const sessionLink = gifPage.locator("a[href^='/sessions/']").first();
-  if (await sessionLink.count()) {
-    await sessionLink.click();
-    await gifPage.waitForURL(/\/sessions\/.+/);
-    await gifPage.waitForLoadState("networkidle");
-    await gifPage.waitForTimeout(2500);
-  }
-
-  // ── Scene 4: Skill Building ─────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/skills`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2500);
-
-  // Click through a couple of pillar tabs
-  const intentTab = gifPage.locator("button[role='tab']", { hasText: /intent|specification/i });
-  if (await intentTab.count()) {
-    await intentTab.click();
-    await gifPage.waitForTimeout(1500);
-  }
-
-  const devPlanTab = gifPage.locator("button[role='tab']", { hasText: /dev plan/i });
-  if (await devPlanTab.count()) {
-    await devPlanTab.click();
-    await gifPage.waitForTimeout(1500);
-  }
-
-  // ── Scene 5: Analytics ────────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2000);
-
-  // ── Scene 6: Practice Lab — type a prompt ─────────────────────
-  await gifPage.goto(`${baseUrl}/practice`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(1500);
-
-  const textarea = gifPage.locator(".practice-textarea").first();
-  try {
-    await textarea.waitFor({ state: "visible", timeout: 10_000 });
-    await textarea.click();
-    await textarea.type("fix the bug", { delay: 60 });
-    await gifPage.waitForTimeout(2000);
-
-    await textarea.fill("");
-    await gifPage.waitForTimeout(400);
-    await textarea.type(
-      "The login endpoint POST /api/auth/login returns 401 for valid credentials. " +
-      "Debug JWT verification in src/middleware/auth.ts — the token expiry check on " +
-      "line 42 compares seconds vs milliseconds. Add a unit test in tests/auth.test.ts.",
-      { delay: 20 },
-    );
-    await gifPage.waitForTimeout(2500);
-  } catch {
-    console.warn("⚠️  Practice textarea not found — skipping typing scene");
-  }
-
-  // ── Scene 7: Token Usage ───────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/tokens`, { waitUntil: "networkidle" });
-  await waitForTokenFlow(gifPage);
-
-  // Switch to Optimization tab
-  const optimTab = gifPage.locator("button", { hasText: "Optimization" });
-  if (await optimTab.count()) {
-    await optimTab.click();
-    await gifPage.waitForTimeout(2000);
-  }
-
-  // ── Scene 8: Settings opt-in for VS Code loading ──────────────
-  await updateSettings(baseUrl, { vscodeSessionsEnabled: false });
-  await gifPage.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(1500);
-  const vscodeToggleRow = gifPage.locator(".settings-toggle-row").first();
-  if (await vscodeToggleRow.count()) {
-    await vscodeToggleRow.click({ force: true });
-    await gifPage.waitForFunction(
-      () => {
-        const el = document.querySelector("input[type='checkbox']");
-        return Boolean(el && el.checked);
-      },
-      { timeout: 5_000 }
-    ).catch(() => {});
-    await gifPage.waitForTimeout(1500);
-  }
-
-  // ── Scene 9: VS Code Sessions ─────────────────────────────────
-  await gifPage.goto(`${baseUrl}/vscode`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(2000);
-
-  // Expand first session if possible
-  const expandBtn = gifPage.locator("button[aria-expanded]").first();
-  if (await expandBtn.count()) {
-    await expandBtn.click();
-    await gifPage.waitForTimeout(1500);
-  }
-
-  // ── Scene 10: Live Monitor ────────────────────────────────────
-  await gifPage.goto(`${baseUrl}/live`, { waitUntil: "networkidle" });
-  await gifPage.waitForTimeout(3000);
-
-  // ── Finalize ──────────────────────────────────────────────────
-  const videoPath = await gifPage.video().path();
-  await gifContext.close();
-
-  const gifPath = resolve(SCREENSHOTS_DIR, "demo.gif");
-  try {
-    execFileSync(ffmpegPath, [
-      "-y", "-i", videoPath,
-      "-vf", "fps=12,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-      "-loop", "0",
-      gifPath,
-    ], { stdio: "pipe" });
-    console.log(`   → ${gifPath}`);
-  } catch (err) {
-    console.error("⚠️  GIF conversion failed:", err.stderr?.toString().slice(-2000));
-  }
-
-  // Clean up temp video
-  try { unlinkSync(videoPath); } catch { /* ignore */ }
-  try {
-    const { rmSync } = await import("node:fs");
-    rmSync(videoDir, { recursive: true, force: true });
-  } catch { /* ignore */ }
-}
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-function runNode(script) {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], { stdio: "inherit" });
-    child.on("close", (code) => resolve(code));
-  });
-}
-
-async function waitForServer(url, timeoutMs) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const resp = await fetch(url);
-      if (resp.ok) return;
-    } catch { /* not ready yet */ }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  console.error("Server output:\n", serverOutput);
-  throw new Error(`Server did not start within ${timeoutMs}ms`);
-}
-
-async function updateSettings(baseUrl, patch) {
-  const resp = await fetch(`${baseUrl}/api/settings`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!resp.ok) {
-    throw new Error(`Failed to update mock settings: HTTP ${resp.status}`);
-  }
-  return resp.json();
-}
-
-async function waitForTokenFlow(page, timeoutMs = 8_000) {
-  await page.waitForTimeout(1200);
-  await page.waitForFunction(
-    () => !document.body.innerText.includes("Updating token totals"),
-    { timeout: timeoutMs }
-  ).catch(() => {});
-  await page.waitForTimeout(1500);
+  await browser?.close();
+  await close(server);
+  await close(emptyServer);
+  await rm(fixture.directory, { recursive: true, force: true });
+  await rm(empty.directory, { recursive: true, force: true });
+  if (!succeeded) await rm(output, { recursive: true, force: true });
 }

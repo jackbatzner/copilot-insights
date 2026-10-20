@@ -2,495 +2,220 @@
   <img src="logo.svg" alt="Copilot Insights" width="96" />
 </p>
 
-<h1 align="center">Copilot Insights</h1>
+# Copilot Insights
 
-<p align="center">
-  <strong>Understand how you work with AI. Build the skills to do it better.</strong><br/>
-  A local-first dashboard and Copilot CLI extension that analyzes your AI coding sessions,<br/>connects collaboration patterns to token usage, and helps you improve over time.
-</p>
+**Understand your Copilot usage. Find an optimization worth trying.**
 
-> **Note:** This is an independent, community-built project. It is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" is a trademark of GitHub, Inc.
+A local-first dashboard and optional CLI extension for investigating models,
+tokens, cache, turns, and primary/subagent usage. Find an expensive session,
+inspect the recorded evidence, then try one manual change.
 
-> **Scope:** Copilot Insights is built around [GitHub Copilot CLI](https://docs.github.com/en/copilot) session history. VS Code / VS Code Insiders Copilot session analysis is available as an optional data source that you can enable from **Settings** when you want the dashboard to read supported local workspace storage.
+> Independent community project. Not affiliated with, endorsed by, or sponsored
+> by GitHub or Microsoft.
+>
+> **Session Detail shows original local conversation text by default.** Enable
+> **Presentation mode** before screen sharing. Usage analytics exclude text;
+> the separate local viewer does not guarantee redaction.
 
-<p align="center">
-  <a href="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml"><img src="https://github.com/jackbatzner/copilot-insights/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/jackbatzner/copilot-insights/releases/latest"><img src="https://img.shields.io/github/v/release/jackbatzner/copilot-insights" alt="GitHub release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
-</p>
+## Quick start
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#dashboard">Dashboard</a> •
-  <a href="#cli-tools">CLI Tools</a> •
-  <a href="#how-it-works">How It Works</a>
-</p>
+Requires **Node.js 20+** and existing local **Copilot CLI** sessions.
+Windows, macOS, and Linux are supported.
 
----
+### Install or upgrade
 
-## Why?
-
-Every time you say "no, not that" or "go back to the previous approach," that's signal. It means there's a gap between what you asked for and what the agent did. **Copilot Insights** surfaces those moments so you can learn from them.
-
-- 📊 **See your patterns** — Which corrections do you make most often?
-- 🎯 **Skill Building** — 7-pillar WTI framework with dev plan, retros, and progress tracking
-- 💡 **Get coaching** — Personalized dev plans, daily check-ins, and retros
-- 📈 **Watch your trends** — Pillar scores over 7/30/90 days or all time
-- 🔍 **Replay sessions** — Annotated turn-by-turn session replay
-- 🧪 **Practice prompting** — Sandbox for instant feedback + rewrite challenges with coaching nudges
-- 💻 **VS Code Sessions** — Optionally analyze Copilot sessions from VS Code / VS Code Insiders when enabled in Settings
-- 📡 **Live monitoring** — Real-time feed of corrections as they happen
-- 💰 **Local token/session usage** — See input, output, cached tokens, local prompts/requests, estimated credits, and optimization tips
-- 🌗 **Dark & light mode** — System-aware theme with manual toggle and localStorage persistence
-- ♿ **Accessible** — Full WAI-ARIA keyboard navigation, semantic HTML, focus-visible styles
-
-Inspired by [this investigation](https://dfberry.github.io/#if-youre-building-an-agent-on-top-of-copilot) into using Copilot session data as telemetry for agent improvement.
-
-## What It Detects
-
-| Category | Examples |
-|----------|----------|
-| 🔄 **Iterative Refinement** | "no, that's wrong", "not what I asked", "this is wrong" |
-| ↩️ **Course Change** | "actually, do X instead", "scratch that", "I changed my mind" |
-| 💬 **Clarification Needed** | "still broken", "I already said", "why did you do that" |
-| 🔁 **Reinforced Instruction** | "like I said", "one more time", "again" |
-| 🔀 **Direction Change** | "undo that", "go back", "revert", "change it back" |
-
-It also detects **repeated file edits** — when the same file is edited 3+ times in a session, which often indicates unclear requirements.
-
-## Quick Start
-
-### Prerequisites
-
-- **Node.js 20+**
-- **[Copilot CLI](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line)** installed and used at least once (creates `~/.copilot/session-store.db`)
-- **OS:** macOS, Linux, or Windows
-
-### Fastest Path
-
-Install or upgrade to the latest release, then launch the dashboard and optionally link the Copilot CLI extension. If the dashboard is empty, run `copilot` once first so Copilot CLI creates `~/.copilot/session-store.db`.
-
-**Windows**
+Windows:
 
 ```powershell
 irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
 copilot-insights
-copilot-insights link
 ```
 
-**macOS / Linux**
+macOS / Linux:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash
 copilot-insights
-copilot-insights link
 ```
 
-Run the same installer command again any time you want to upgrade to the newest release. Then open [http://localhost:3002](http://localhost:3002), and reload Copilot CLI extensions with `/extensions reload` if you linked the extension.
+The installers verify the latest release's SHA-256 checksum and install with
+npm. Rerun to upgrade. Open **http://localhost:3002**, or choose another port
+with `copilot-insights --port 3003`.
 
-### 1. Install
-
-**Option A: Recommended installer scripts**
-
-**Windows**
-
-```powershell
-irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
-```
-
-**macOS / Linux**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash
-```
-
-Both scripts download the latest GitHub Release tarball, verify its SHA-256 checksum, and install it globally with npm. Rerun the same command later to upgrade.
-
-```powershell
-$env:COPILOT_INSIGHTS_VERSION = "v0.2.4"
-irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
-Remove-Item Env:\COPILOT_INSIGHTS_VERSION
-```
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.sh | bash -s -- v0.2.4
-```
-
-Use `-Force` or `--force` after downloading the script locally if you want to reinstall the currently installed version, and `-DryRun` or `--dry-run` to resolve the release without changing your machine.
-
-**Option B: GitHub shorthand fallback**
-
-```bash
-npm i -g jackbatzner/copilot-insights
-copilot-insights
-# → http://localhost:3002
-```
-
-This still works for many environments, but the installer scripts are more reliable on Windows because they install from the packaged GitHub Release tarball instead of npm's git dependency path.
-
-**Option C: From source**
+### From source
 
 ```bash
 git clone https://github.com/jackbatzner/copilot-insights.git
 cd copilot-insights
 npm install
+npm start
 ```
 
-`npm install` is the normal source-checkout path. It installs the nested `server/` and `ui/` dependencies and builds the UI via the root `postinstall` script. Use `npm run setup` if you want the same bootstrap flow without relying on root install scripts.
+Installation builds the UI. `npm run setup` is the explicit bootstrap alternative.
 
-### 2. Launch the Dashboard
+### Optional CLI extension
 
-```bash
-copilot-insights   # if installed from GitHub
-npm start          # if installed from source
-# → http://localhost:3002
-```
+Run `copilot-insights link`, then `/extensions reload` in Copilot CLI.
+Use `copilot-insights unlink` to remove the link.
 
-Open [http://localhost:3002](http://localhost:3002) to see your dashboard. Run `copilot-insights --help` any time to see the available commands and flags.
+The extension provides safe usage summaries, model comparisons, session
+drill-downs, and dashboard launch/stop. `insights_sessions` returns 25 sessions
+per page; retain filters and pass `page: 2` to continue. Use a returned opaque
+handle with `insights_session` for details. It does not expose conversation text.
 
-### 3. Use as a Copilot CLI Extension (optional)
+## A focused workflow
 
-This repo follows the official Copilot CLI extension layout: `.github/extensions/copilot-insights/extension.mjs`.
+| Destination | Use it to |
+| --- | --- |
+| **Overview** | Find usage patterns and open an investigation from a graph. |
+| **Sessions** | Filter by model, scope, or UTC request day and compare matching usage with whole-session totals. |
+| **Token Usage** | Explore models, observed Agent & Skill Performance, and model comparisons. |
+| **Settings** | Check Data Sources, optional-source preferences, and Presentation mode. |
 
-To get insights directly inside Copilot CLI chat from a global or source install, link the packaged extension directory into your Copilot user extensions folder:
+Start with a high-usage model in **Token Usage**, follow it to **Sessions**, and
+inspect a costly turn. Check child attribution, choose one manual change, and
+save a metric-only baseline to compare with a later session. The app never
+changes your Copilot configuration automatically.
 
-The Copilot SDK is supplied by Copilot CLI when the extension runs, so a normal `npm i -g jackbatzner/copilot-insights` install does not need a separate `@github/copilot-sdk` package.
+### Inspect turns and model calls
 
-```bash
-copilot-insights link    # if installed globally
-node bin/cli.mjs link    # if running from source
-```
+Session Detail has **Turns**, **Agents & models**, and **Tool activity** views.
+Select a turn, then a call to inspect its model, tokens/cache, latency, outcome,
+and source evidence. Desktop uses a list beside an inspector; mobile uses
+**Back to turns**. Source and lifecycle diagnostics sit below the explorer.
 
-To remove the extension later:
+Call ending labels describe how calls stopped, **not why the next call began**.
+Retries, tool continuations, and causal ordering are not inferred. Child
+ownership requires exact same-session linkage; missing ownership stays
+unattributed. Tool categories cover recorded executions, not tool-level token
+costs. Skills remain session-level counts, not proven causes of model usage.
 
-```bash
-copilot-insights unlink    # if installed globally
-node bin/cli.mjs unlink    # if running from source
-```
+### Compare models
 
-Then reload extensions (`/extensions reload`) or restart Copilot CLI. The extension registers 8 tools that the agent can invoke:
+**Observed usage** shows recorded metrics. **What-if cost** applies dated
+standard token rates to a fixed workload: **benchmarks, not your Copilot bill**.
+Incomplete observations are excluded with coverage shown; cache accounting
+remains an explicit assumption. Unknown prices and unverified monetary
+conversions stay unavailable.
 
-```
-> How am I doing with my prompting?          → insights_summary
-> Scan my recent sessions                    → insights_analyze
-> What are my most common correction patterns? → insights_patterns
-> Compare sessions abc123 and def456         → insights_compare
-> Coach this prompt before I send it         → insights_coach
-> Launch the insights dashboard              → insights_dashboard
-> Stop the dashboard                         → insights_stop
-```
+Trial choices use the public CLI support catalog checked **October 20, 2026**,
+not an account-entitlement check. Retired models remain in history and saved
+baselines, but not new trial choices. Refresh reloads usage, not the catalog.
+See the [compatibility review](docs/copilot-compatibility-2026-10-15.md) for
+sources, retirements, identifier limits, and deferrals.
 
-## Dashboard
+Save one local metric-only baseline, make a manual change, then **Check for newer
+sessions**. Comparisons use whole-session history, not incremental billed usage
+or a controlled experiment. Fewer tokens do not prove equal quality or savings.
+The baseline persists until replaced, cleared, or removed with browser site data.
 
-First-time users are greeted with a **Welcome walkthrough** that explains what the tool does before diving in:
+### Loading and navigation
 
-<p align="center">
-  <img src="docs/screenshots/welcome.png" alt="Welcome onboarding" width="800" />
-</p>
+Cold history and new filters can require a scan. Loading placeholders show
+pending sections; a longer-wait message appears after ten seconds, and failures
+offer Retry. Revisiting a view can reuse a bounded in-tab usage cache. Private
+text never enters that cache.
 
-The main dashboard uses **progressive disclosure** — new users see the key insight, quick stats, and clear next steps. Deeper data is available in collapsible sections. Navigation is organized into **Core** (Overview, Skill Building, Practice Lab, Sessions) and **Advanced** (Token Usage, Analytics, Live, Instructions, Settings, VS Code) groups:
+**Refresh** reloads usage. **Reload app** on an error screen reloads updated
+application files while retaining URL filters.
 
-<p align="center">
-  <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="800" />
-</p>
+## Data and attribution
 
-<p align="center">
-  <img src="docs/screenshots/demo.gif" alt="Copilot Insights full demo" width="800" />
-</p>
+The baseline is read-only local **SessionDB + session-state JSONL**. Optional
+sources live under **Settings -> Data Sources**; there is no OTel requirement
+or importer.
+
+- Recorded SessionDB usage takes precedence over JSONL fallback, without
+  double-counting. Aggregate-only history cannot reconstruct turns or calls.
+- Missing metrics are not zero. Cache is separate from input/output, and summed
+  request durations are not elapsed session time.
+- Timeframes select sessions by activity; totals cover their whole history.
+  Daily graphs use verified request timestamps instead.
+- Raw nano-AIU and request-cost fields have no verified currency or local-credit
+  conversion. Unsupported conversions display **Not recorded**.
+- There is no verified person/owner dimension, team ranking, or task-quality score.
+
+## Privacy
+
+Usage API/CLI output excludes prompts, replies, commands, arguments/results,
+paths, arbitrary source names/errors, and raw identifiers. Anonymous labels
+and opaque handles support navigation. No session data is uploaded to an
+external analytics service.
+
+**The local text viewer is a separate exception.** Session Detail displays
+bounded original turn text and exactly linked child prompts, which may contain
+sensitive information. Text stays out of usage responses, logs, shared caches,
+exports, and persistent app storage. **Hide all text** clears previews/panels,
+cancels reads, and saves Presentation mode across navigation and reload.
+Only the visibility preference is saved.
+
+The server is loopback-only, not a public or multi-user service. Presentation
+mode does not make real usage suitable for a public screenshot. See
+[Security and privacy](SECURITY.md) for the full boundary and reporting guidance.
+
+## Screenshot gallery
+
+All 17 gallery images use isolated **synthetic data with text hidden**,
+refreshed October 20, 2026. They are examples, not real usage or savings.
+Older local videos are historical and do not show the current UI.
+
+![Overview with synthetic data and text hidden](docs/screenshots/overview.png)
 
 <details>
-<summary>📸 More screenshots</summary>
+<summary>Sessions, turns, and attribution</summary>
 
-**Sessions list** — sortable, filterable by repo, hide noisy sessions from analysis
+![Filtered Sessions with synthetic data and text hidden](docs/screenshots/sessions.png)
 
-<img src="docs/screenshots/sessions.png" alt="Sessions list" width="800" />
+![Selected turn and call list with synthetic data and text hidden](docs/screenshots/turn-summary-desktop.png)
 
-**Skill Building overview** — 7-part WTI workspace with pillar cards, quick wins, retro, and dev plan entry points
+![Selected call evidence with synthetic data and text hidden](docs/screenshots/turn-requests-desktop.png)
 
-<img src="docs/screenshots/skill-building.png" alt="Skill Building" width="800" />
-
-**Skill Building: Intent** — drill into one scored pillar with evidence, guidance, and targeted improvements
-
-<img src="docs/screenshots/skill-building-intent.png" alt="Skill Building Intent tab" width="800" />
-
-**Analytics** — work style, prompt length, session depth
-
-<img src="docs/screenshots/analytics.png" alt="Analytics" width="800" />
-
-**Skill Building: Dev Plan** — track improvement goals, habits, and follow-up actions in one place
-
-<img src="docs/screenshots/skill-building-devplan.png" alt="Skill Building Dev Plan tab" width="800" />
-
-**Practice Lab** — sandbox for instant prompt feedback + rewrite challenges with coaching panel
-
-<img src="docs/screenshots/practice.png" alt="Practice Lab" width="800" />
-
-**Instructions** — convention gap analysis with copy-paste snippets
-
-<img src="docs/screenshots/instructions.png" alt="Instructions" width="800" />
-
-**Settings** — enable optional VS Code loading without changing the default CLI-first workflow
-
-<img src="docs/screenshots/settings.png" alt="Settings page" width="800" />
-
-**Session Detail** — turn-by-turn replay with annotations
-
-<img src="docs/screenshots/session-detail.png" alt="Session detail" width="800" />
-
-**Live Monitor** — real-time feed with pattern badges and coaching alerts
-
-<img src="docs/screenshots/live.png" alt="Live Monitor" width="800" />
-
-**VS Code Sessions** — opt in from Settings, then analyze Copilot sessions from VS Code with turn-by-turn detail
-
-<img src="docs/screenshots/vscode.png" alt="VS Code Sessions" width="800" />
-
-**Token Usage** — local session DB/session-state usage with input/output/cached tokens, prompts, requests, estimated local credits, and usage trends
-
-<img src="docs/screenshots/token-usage.png" alt="Token Usage overview" width="800" />
-
-**Token Optimization** — personalized token-saving tips, model recommendations, and savings plan
-
-<img src="docs/screenshots/token-optimization.png" alt="Token Optimization" width="800" />
-
-**Token Models** — per-model breakdown with local token totals, cache hit rate, estimated local credits, and usage distribution
-
-<img src="docs/screenshots/token-models.png" alt="Token Models" width="800" />
+![Primary and child attribution with synthetic data and text hidden](docs/screenshots/session-detail.png)
 
 </details>
 
-### Pages
+<details>
+<summary>Model comparisons and mobile</summary>
 
-- **Welcome** — 3-step onboarding for first-time users; always accessible via `/welcome`
-- **Overview** — Tier hero card, collapsible stats/trends/skill growth/work style sections, prompting insights; "Since last visit" summary for returning users
-- **Skill Building** — 7-pillar WTI framework (Intent, Work Design, Quality Control, Evaluation, plus Retro, Dev Plan, Overview) with pillar cards, tabbed deep-dives, trend detection with sample-size guard, Chronicle tips, and dev plan goal tracking
-- **Sessions** — Sortable table of all sessions with redirections, filterable by repo; hide noisy sessions from analysis
-- **Session Detail** — Turn-by-turn timeline showing exactly where corrections happened; hide/unhide from detail view
-- **Analytics** — Hourly productivity, prompt length, repo health, tool usage
-- **Practice Lab** — Sandbox for instant prompt feedback (score, pattern detection, coaching nudges) + rewrite challenges using your real sessions or curated examples
-- **Instructions** — Custom instruction effectiveness analysis with ready-to-paste markdown snippets
-- **Settings** — Enable optional data sources like VS Code loading while keeping the default workflow focused on Copilot CLI sessions
-- **VS Code Sessions** — Opt-in analysis for Copilot sessions from VS Code and VS Code Insiders with turn-by-turn detail, retry on error, and expandable session cards
-- **Live Monitor** — Real-time session feed with pattern badges, coaching alerts, pause/resume
-- **Token Usage** — 5-tab local usage dashboard (Overview, Models, Cost Insights, Budget, Optimization) with progressive token/session loading, input/output/cached token breakdowns, prompts, inferred requests, estimated local credits, model breakdowns, personalized token-saving insights, budget projections, and live pricing from GitHub docs
+![Standard-rate comparison with synthetic data and text hidden, not a Copilot bill](docs/screenshots/comparison-what-if.png)
 
-All pages include a **timeframe selector** (7d / 30d / 90d / All time) that syncs across pages — change it once and every page updates. Your selection is persisted to localStorage.
+![Mobile turn inspection with synthetic data and text hidden](docs/screenshots/turn-summary-mobile.png)
 
-The dashboard is **mobile responsive**: on small screens a hamburger menu replaces the sidebar, tables scroll horizontally, and the layout adapts to narrow viewports. **API caching** (60-second TTL on GET requests with LRU eviction at 200 entries) keeps navigation snappy, and the refresh button clears the cache for fresh data. **Hidden sessions** are persisted to disk (`~/.copilot/copilot-insights-hidden.json`) so they survive server restarts. **API resilience** includes `AbortController` with 30s timeout, `Promise.allSettled` for parallel requests, and retry buttons on error states.
+</details>
 
-### Practice Lab
+Browse [all gallery images](docs/screenshots).
 
-The Practice Lab is an interactive sandbox for improving your prompting skills:
+## Upgrading from the earlier dashboard
 
-**🧪 Sandbox Mode** — Type any prompt and click **Analyze** to get instant feedback: a 0-100 score, pattern detection (vague language, missing context, etc.), quality checks, and actionable rewrite suggestions. Coaching nudges help you improve — "try mentioning the specific file" or "what should the result look like?"
+Analytics is now part of **Overview** and **Sessions**; Skill Building's observed
+performance is under **Token Usage**. Live diagnostics are contextual in Session
+Detail, and VS Code setup is under **Settings -> Data Sources**.
 
-**🏆 Rewrite Challenge** — Choose between your own low-scoring prompts ("My Bad Prompts") or a curated library of 80+ bad prompts covering best practices from GitHub, Anthropic, Google, and OpenAI. Filter by topic (vague prompts, missing constraints, no examples, etc.), rewrite the prompt, and see your score improve. Before you rewrite, a **coaching panel** shows what's wrong: detected problems, missing quality signals, and before/after rewrite examples — so you know exactly what to fix. Personalized recommendations highlight which categories need the most work based on your real session patterns.
-
-Scoring is based on heuristics derived from published prompting guides — see [docs/prompting-resources.md](docs/prompting-resources.md) for the full list of sources.
-
-### Live Monitor
-
-The Live Monitor polls your session database every 5 seconds for new turns and displays them in a live feed. Each turn is annotated with detected redirection patterns shown as colored badges. When a high-severity pattern (weight ≥ 3) is detected, an inline coaching card appears with contextual tips.
-
-- **Pause/resume** — Stop and restart polling with one click
-- **Status indicator** — Green pulsing dot when active, yellow when paused
-- **Coaching alerts** — Actionable advice for iterative refinements, clarification needs, direction changes, etc.
-
-## CLI Tools
-
-| Tool | Description |
-|------|-------------|
-| `insights_analyze` | Scan recent sessions, ranked by correction severity |
-| `insights_session` | Deep-dive a specific session with turn-by-turn timeline |
-| `insights_patterns` | Most common correction patterns with real examples |
-| `insights_summary` | Quick snapshot: tier badge, pillar scores, coaching tip |
-| `insights_compare` | Compare two sessions side-by-side |
-| `insights_coach` | Prompt coaching: immediate feedback, periodic review, and progress tracking |
-| `insights_dashboard` | Launch the web dashboard from the CLI |
-| `insights_stop` | Stop the dashboard server |
-
-## How It Works
-
-The extension reads from `~/.copilot/session-store.db` (read-only), the SQLite database where Copilot CLI stores session history. It scans user messages against 30+ regex patterns, categorizes matches, and scores the results. For token usage analysis, it also reads local JSONL event files from `~/.copilot/session-state/` and local usage events when available, then falls back to text estimates when exact counts are unavailable. It does **not** import GitHub organization usage metrics or billing reports; local estimated credits are coaching estimates based on current Copilot model pricing. VS Code sessions are read from `state.vscdb` files in VS Code's workspace storage.
-
-```
-~/.copilot/session-store.db (read-only)
-  → Read user messages from turns table
-  → Match against 30+ correction patterns
-  → Categorize and aggregate
-  → Chronicle builder: clean messages, classify intent
-
-~/.copilot/session-state/*/events.jsonl (read-only)
-  → Read local model and output token data
-  → Combine with local DB events for input/output/cached token breakdowns when available
-  → Estimate local credits using official GitHub Copilot pricing
-  → Generate personalized token/session optimization tips
-
-VS Code workspace storage (read-only)
-  → Discover VS Code / VS Code Insiders sessions
-  → Analyze clarity, delegation, judgment, efficiency
-
-  → Serve via Express API → React dashboard
-```
-
-**Privacy:** All data stays local. The tool only reads your existing session database — it never writes to it, and nothing is sent to external services.
+Global Instructions/snippets, Practice Lab, Dev Plan/Journal, and Chronicle were
+removed, not hidden. Existing hidden-session and source preferences migrate from
+bounded app metadata. Removed features' files are neither read nor automatically
+deleted.
 
 ## Development
 
-```bash
-# UI dev mode (hot reload on :5174, proxies API to :3002)
-cd ui && npm run dev
+See [Contributing](CONTRIBUTING.md) for architecture, validation, synthetic
+browser checks, and [gallery capture](CONTRIBUTING.md#screenshot-gallery).
+Keep real session stores, logs, transcripts, and machine-local artifacts out of
+contributions.
 
-# Server dev mode (auto-restart on changes)
-cd server && npm run dev
-```
+## Releasing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+Use the **Manual release** GitHub Actions workflow from `main`, or
+`npm run release patch`. Both commit and publish; neither is a validation
+command. `npm run release patch --dry-run` previews the local release.
 
-### Releasing
+## Troubleshooting
 
-**Recommended:** merge what you want into `main`, then run the **Manual release** GitHub Actions workflow from the `main` branch. Pick `patch`, `minor`, `major`, or `explicit`, and the workflow will bump versions, update the changelog, commit, tag, and push. The existing tag-based release workflow then validates the tag, packages the tarball, and creates the GitHub Release.
-
-**Local fallback:**
-
-```bash
-npm run release patch         # 0.1.0 → 0.1.1
-npm run release minor         # 0.1.0 → 0.2.0
-npm run release major         # 0.1.0 → 1.0.0
-npm run release 0.2.0-beta.1  # explicit version
-npm run release patch --dry-run  # preview without changes
-```
-
-The local script follows the same flow: it bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then reruns install/build/lint/test validation, packages the tarball, and creates the GitHub Release automatically.
-
-## Architecture
-
-```mermaid
-graph LR
-    subgraph "Data Source"
-        DB[(~/.copilot/session-store.db)]
-        JSONL[(~/.copilot/session-state/*.jsonl)]
-        VSCDB[(VS Code state.vscdb)]
-    end
-
-    subgraph "Analysis Engine"
-        DB -->|read-only| Analyzer[analyzer.mjs]
-        JSONL -->|token data| Tokens[tokens.mjs]
-        VSCDB -->|read-only| VSCode[vscode-sessions.mjs]
-        Analyzer --> Patterns[30+ regex patterns]
-        Analyzer --> Pillars[Clarity · Efficiency · Delegation]
-        Analyzer --> Tiers[Tier scoring]
-        Tokens --> TokenAnalytics[token-analytics.mjs]
-        Patterns --> Practice[practice.mjs]
-        DB -->|polling| LiveFeed[/api/live/feed]
-        LiveFeed --> Patterns
-        DB --> Chronicle[chronicle.mjs]
-        Chronicle --> IntentClassifier[intent-classifier.mjs]
-        Chronicle --> DevPlan[dev-plan.mjs]
-    end
-
-    subgraph "Delivery"
-        Analyzer --> API[Express API :3002]
-        Practice --> API
-        LiveFeed --> API
-        TokenAnalytics --> API
-        VSCode --> API
-        Chronicle --> API
-        DevPlan --> API
-        API --> UI[React Dashboard]
-        Analyzer --> CLI[Copilot CLI Extension]
-        CLI --> Tools[8 insights_* tools]
-    end
-```
-
-```
-copilot-insights/
-├── .github/
-│   └── extensions/
-│       └── copilot-insights/
-│           └── extension.mjs  # Official discovered Copilot CLI entry point
-├── src/
-│   ├── db.mjs             # SQLite read-only access + batch query support
-│   ├── patterns.mjs       # 30+ regex patterns, 5 categories
-│   ├── analyzer.mjs       # Core analysis engine
-│   ├── chronicle.mjs      # Session chronicle builder with message cleaning
-│   ├── intent-classifier.mjs  # WTI-aligned intent classification
-│   ├── dev-plan.mjs       # Personalized coaching & scoring
-│   ├── vscode-sessions.mjs    # VS Code session discovery & analysis
-│   ├── practice.mjs       # Prompt analysis for Practice Lab (no DB dependency)
-│   ├── challenge-library.mjs  # 83 curated bad prompts with tags and hints
-│   ├── tiers.mjs          # Tier badge system (shared UI + CLI)
-│   ├── suggestions.mjs    # Prompt rewrite engine
-│   ├── delegation.mjs     # Delegation analysis
-│   ├── judgment.mjs       # Judgment analysis
-│   ├── efficiency.mjs     # Efficiency scoring
-│   ├── clarity.mjs        # Clarity scoring
-│   ├── sprawl.mjs         # Tool/file sprawl detection
-│   ├── instructions.mjs   # Convention gap analysis
-│   ├── instruction-failures.mjs  # Instruction failure detection
-│   ├── session-insights.mjs  # Per-session improvement suggestions
-│   ├── work-style.mjs     # Work style analysis
-│   ├── trends.mjs         # Time-series trend detection
-│   ├── tokens.mjs         # Token usage estimation, JSONL reader, model pricing
-│   ├── token-analytics.mjs # Cost insights, model recommendations, savings plan
-│   └── formatter.mjs      # Markdown formatting (CLI output)
-├── server/
-│   └── index.mjs          # Express API + static UI + atomic writes + write mutex
-├── ui/src/
-│   ├── pages/
-│   │   ├── SkillBuilding/     # Decomposed skill building module
-│   │   │   ├── index.jsx      # Orchestrator (data loading, tabs, retry)
-│   │   │   ├── DevPlanContext.jsx  # React context for dev plan state
-│   │   │   ├── shared.jsx     # Shared components (AddToDevPlanButton, MiniStat, etc.)
-│   │   │   ├── OverviewTab.jsx, IntentTab.jsx, WorkDesignTab.jsx
-│   │   │   ├── QualityControlTab.jsx, EvaluationTab.jsx
-│   │   │   ├── RetroTab.jsx, DevPlanTab.jsx
-│   │   │   └── (7 tab components total)
-│   │   ├── Overview.jsx, Welcome.jsx, Sessions.jsx, SessionDetail.jsx
-│   │   ├── Analytics.jsx, Practice.jsx, Instructions.jsx
-│   │   ├── VSCodeSessions.jsx, LiveMonitor.jsx, TokenUsage.jsx
-│   │   └── (12 pages total)
-│   ├── components/        # TabBar, CollapsibleSection, EmptyState, MetricHelp, etc.
-│   └── api.js             # API client with safeFetch, LRU cache, AbortController
-├── docs/
-│   ├── prompting-resources.md  # Official guides, academic papers, scoring reference
-│   └── screenshots/       # Auto-captured screenshots and demo GIF
-├── scripts/               # Mock data seeder + screenshot/GIF capture
-└── .github/workflows/     # CI + Release (GitHub Releases)
-```
+Check **Settings -> Data Sources** for missing history and capability limits.
+See [Support](SUPPORT.md) for loading, model, dependency, and port issues.
+Share only sanitized diagnostics or synthetic reproductions, never your source
+database or transcripts.
 
 ## License
 
 [MIT](LICENSE)
-
-## Disclaimer
-
-This project is not affiliated with, endorsed by, or sponsored by GitHub or Microsoft. "GitHub Copilot" and "Copilot" are trademarks of GitHub, Inc. This project uses the name "Copilot Insights" solely to describe its function as a tool that works with locally available GitHub Copilot session data.
-
-## Troubleshooting
-
-**"No sessions found" / empty dashboard**
-- You need at least one Copilot CLI session. Run `copilot` in any repo to create one.
-- Confirm that `~/.copilot/session-store.db` exists on your machine.
-
-**"Port 3002 already in use"**
-- Kill the existing process, or launch on a different port: `copilot-insights --port 3003`
-
-**"Cannot find module 'better-sqlite3'"**
-- From a source checkout, run `npm install` in the project root to install all dependencies.
-- If you need to bypass root install scripts, run `npm run setup` instead.
-
-**"Copilot session DB is missing required tables"**
-- Your `~/.copilot/session-store.db` may be from an incompatible Copilot CLI version.
-- Update Copilot CLI and try again, or [open an issue](https://github.com/jackbatzner/copilot-insights/issues).
-
-**Dashboard loads but shows errors**
-- Ensure the server is running (`npm start`) before opening the dashboard.
-- Check the terminal for server-side error messages.
-
-## Future Ideas
-
-- **Gamification** — Scoring, XP, levels, achievements, and goals to encourage improvement
-- **Team leaderboards** — Anonymous comparison across teams
-- **Custom instruction generation** — Auto-generate `.github/copilot-instructions.md` from common patterns
-- **OpenTelemetry tracing** — Opt-in distributed tracing via `@github/copilot-sdk` for debugging

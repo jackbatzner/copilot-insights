@@ -3,6 +3,6 @@ export const LEGACY_ONBOARDING_KEY = "copilot-insights-welcomed";
 export const ONBOARDING_COMPLETE_EVENT = "copilot-insights:onboarding-complete";
 
 export function markOnboardingComplete() {
-  localStorage.setItem(ONBOARDING_COMPLETE_KEY, "true");
+  try { localStorage.setItem(ONBOARDING_COMPLETE_KEY, "true"); } catch { /* Optional preference only. */ }
   window.dispatchEvent(new Event(ONBOARDING_COMPLETE_EVENT));
 }

@@ -1,183 +1,75 @@
-// Tests for src/formatter.mjs — markdown report formatting
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  formatSessionReport,
-  formatSummaryReport,
-  formatTopPatterns,
-} from "../src/formatter.mjs";
+import { formatUsageSummary, formatUsageSession, formatUsageSessions, formatUsageModels } from "../src/formatter.mjs";
+import { CANARY, RAW_ID, assertPrivate } from "./usage-fixture.mjs";
 
-describe("formatSessionReport", () => {
-  it("returns error message for null input", () => {
-    const result = formatSessionReport(null);
-    assert.ok(result.includes("not found"), `Expected error message, got: ${result}`);
+const capabilities = { sessionDb: "available", sessionState: "partial", diagnostics: [CANARY] };
+const metrics = { requests: 0, inputTokens: 100, outputTokens: null, totalTokens: null, totalNanoAiu: null, localCredits: null };
+const evidence = {
+  requests: { source: "sessiondb", status: "recorded", recorded: 1, total: 1 },
+  inputTokens: { source: "jsonl", status: "partial", recorded: 1, total: 2 },
+};
+const session = { handle: "a".repeat(64), label: "Session 1", hidden: false, models: ["gpt-5", CANARY], metrics, evidence, id: RAW_ID, summary: CANARY, repository: CANARY, branch: CANARY };
+
+describe("privacy-safe CLI formatting", () => {
+  it("preserves known zero, unavailable values, provenance, and partial coverage", () => {
+    const output = formatUsageSummary({ sessionCount: 1, metrics, evidence, capabilities });
+    assert.match(output, /\| Requests \| 0 \| recorded \(sessiondb\) \| 1 \/ 1 \|/);
+    assert.match(output, /\| Input tokens \| 100 \| partial \(jsonl\) \| 1 \/ 2 \|/);
+    assert.doesNotMatch(output, /\| Output tokens \|/);
+    assert.doesNotMatch(output, /\| Local credits \|/);
+    assert.match(output, /Local credits: Not recorded; no verified nano-AIU conversion/);
+    assert.match(output, /recorded activity or creation/);
+    assertPrivate(assert, output);
   });
 
-  it("includes session ID, repo, branch, and summary in output", () => {
-    const report = {
-      session: {
-        id: "abc12345-full-id",
-        repository: "owner/repo",
-        branch: "feature-branch",
-        summary: "Fix authentication bug",
-        turnCount: 10,
-        createdAt: "2024-01-15",
-      },
-      stats: {
-        totalRedirections: 2,
-        redirectionRate: 0.2,
-        totalWeight: 5,
-      },
-      categoryBreakdown: {},
-      redirections: [],
-      thrashedFiles: [],
+  it("shows anonymous sessions and handles without arbitrary metadata", () => {
+    const output = formatUsageSessions({ sessions: [session], capabilities });
+    assert.match(output, /Session 1/);
+    assert.ok(output.includes(session.handle));
+    assert.match(output, /Unknown model/);
+    assertPrivate(assert, output);
+  });
+
+  it("reports safe pagination, empty pages and unavailable metadata explicitly", () => {
+    const empty = formatUsageSessions({ sessions: [], capabilities, pagination: { page: 1, pages: 1, total: 0 } });
+    assert.match(empty, /\*\*Matching sessions:\*\* 0/);
+    assert.match(empty, /No more matching sessions/);
+    for (const pagination of [undefined, { page: CANARY, pages: 2, total: 26 }, { page: 0, pages: 1, total: 0 },
+      { page: 2, pages: 1, total: 26 }, { page: 1, pages: Infinity, total: 26 }]) {
+      const output = formatUsageSessions({ sessions: [], capabilities, pagination });
+      assert.match(output, /Pagination metadata is unavailable/);
+      assertPrivate(assert, output);
+    }
+  });
+
+  it("renders recorded modern metrics with coverage without deriving charges", () => {
+    const modern = {
+      requestMultiplier: 1.5, outputTtftMs: 0, interTokenLatencyMs: null, contentFilteredRequests: 0,
     };
-
-    const result = formatSessionReport(report);
-    assert.ok(result.includes("abc12345"), "Should include session ID prefix");
-    assert.ok(result.includes("owner/repo"), "Should include repo");
-    assert.ok(result.includes("feature-branch"), "Should include branch");
-    assert.ok(result.includes("Fix authentication bug"), "Should include summary");
+    const coverage = Object.fromEntries(Object.keys(modern).map((key) => [
+      key, { source: "sessiondb", status: "partial", recorded: 1, total: 2 },
+    ]));
+    const output = formatUsageSummary({
+      sessionCount: 1, metrics: { ...metrics, ...modern }, evidence: { ...evidence, ...coverage }, capabilities,
+    });
+    assert.match(output, /\| Mean recorded request multiplier \| 1.5 \| partial \(sessiondb\) \| 1 \/ 2 \|/);
+    assert.match(output, /\| Mean output time to first token \(ms\) \| 0 \|/);
+    assert.doesNotMatch(output, /\| Mean inter-token latency \(ms\) \|/);
+    assert.match(output, /\| Content-filtered requests \| 0 \|/);
+    assert.match(output, /Local credits: Not recorded/);
+    assertPrivate(assert, output);
   });
 
-  it("includes category breakdown table when redirections exist", () => {
-    const report = {
-      session: {
-        id: "abc12345-full-id",
-        repository: "owner/repo",
-        branch: "main",
-        summary: "Test",
-        turnCount: 5,
-        createdAt: "2024-01-15",
-      },
-      stats: { totalRedirections: 3, redirectionRate: 0.3, totalWeight: 7 },
-      categoryBreakdown: {
-        explicit_correction: { count: 2, weight: 6 },
-        course_change: { count: 1, weight: 2 },
-      },
-      redirections: [],
-      thrashedFiles: [],
-    };
-
-    const result = formatSessionReport(report);
-    assert.ok(result.includes("By Category"), "Should include category section");
-    assert.ok(result.includes("Iterative Refinement"), "Should include category label");
-    assert.ok(result.includes("Course Change"), "Should include course change label");
+  it("renders only whitelisted fields from session detail and models", () => {
+    const detail = { session, capabilities, skills: [{ category: CANARY }], attribution: [{ scope: "subagent", label: CANARY, key: CANARY, metrics, evidence }] };
+    assertPrivate(assert, formatUsageSession(detail));
+    assertPrivate(assert, formatUsageModels({ models: [{ model: `gpt-5-${CANARY}`, sessionCount: 1, metrics, evidence }], capabilities }));
+    assert.equal(formatUsageSession(null), "Session not found.");
   });
 
-  it("includes redirection timeline", () => {
-    const report = {
-      session: {
-        id: "abc12345-full-id",
-        repository: "owner/repo",
-        branch: "main",
-        summary: "Test",
-        turnCount: 5,
-        createdAt: "2024-01-15",
-      },
-      stats: { totalRedirections: 1, redirectionRate: 0.2, totalWeight: 3 },
-      categoryBreakdown: {},
-      redirections: [
-        {
-          turnIndex: 3,
-          message: "No, that's wrong",
-          matches: [
-            { category: "explicit_correction", label: "Direct rejection" },
-          ],
-        },
-      ],
-      thrashedFiles: [],
-    };
-
-    const result = formatSessionReport(report);
-    assert.ok(result.includes("Redirection Timeline"), "Should include timeline");
-    assert.ok(result.includes("Turn 3"), "Should include turn index");
-  });
-});
-
-describe("formatSummaryReport", () => {
-  it("includes aggregate stats", () => {
-    const data = {
-      aggregate: {
-        sessionsAnalyzed: 5,
-        sessionsWithRedirections: 3,
-        totalRedirections: 12,
-        avgRedirectionRate: 0.25,
-        categoryTotals: {},
-      },
-      sessions: [],
-    };
-
-    const result = formatSummaryReport(data);
-    assert.ok(result.includes("5"), "Should include sessions analyzed count");
-    assert.ok(result.includes("3"), "Should include sessions with redirections");
-    assert.ok(result.includes("12"), "Should include total redirections");
-    assert.ok(result.includes("25.0%"), "Should include avg redirection rate");
-  });
-
-  it("includes sessions table (up to 10)", () => {
-    // IDs are truncated to 8 chars by the formatter, so use distinguishable prefixes
-    const sessions = Array.from({ length: 12 }, (_, i) => ({
-      session: {
-        id: `s${String(i).padStart(7, "0")}-extra-long-id`,
-        repository: `repo-${i}`,
-      },
-      stats: {
-        totalRedirections: i + 1,
-        redirectionRate: 0.1 * (i + 1),
-        totalWeight: (i + 1) * 2,
-      },
-    }));
-
-    const data = {
-      aggregate: {
-        sessionsAnalyzed: 12,
-        sessionsWithRedirections: 12,
-        totalRedirections: 78,
-        avgRedirectionRate: 0.5,
-        categoryTotals: {},
-      },
-      sessions,
-    };
-
-    const result = formatSummaryReport(data);
-    assert.ok(result.includes("Sessions Ranked"), "Should include sessions table header");
-    // Formatter shows up to 10 sessions; ID is substring(0,8)
-    assert.ok(result.includes("s0000000"), "Should include first session");
-    assert.ok(result.includes("s0000009"), "Should include 10th session");
-    assert.ok(!result.includes("s0000010"), "Should not include 11th session");
-  });
-});
-
-describe("formatTopPatterns", () => {
-  it('returns "no patterns found" for empty array', () => {
-    const result = formatTopPatterns([]);
-    assert.ok(
-      result.toLowerCase().includes("no") && result.toLowerCase().includes("pattern"),
-      `Expected no-patterns message, got: ${result}`
-    );
-  });
-
-  it("includes pattern table with label, category, and occurrences", () => {
-    const patterns = [
-      {
-        label: "Direct rejection",
-        category: "explicit_correction",
-        count: 5,
-        examples: [{ message: "No, that's wrong" }],
-      },
-      {
-        label: "Mid-course pivot",
-        category: "course_change",
-        count: 3,
-        examples: [{ message: "Actually, let's try something else" }],
-      },
-    ];
-
-    const result = formatTopPatterns(patterns);
-    assert.ok(result.includes("Direct rejection"), "Should include pattern label");
-    assert.ok(result.includes("Iterative Refinement"), "Should include category name");
-    assert.ok(result.includes("5"), "Should include occurrence count");
-    assert.ok(result.includes("Mid-course pivot"), "Should include second pattern");
+  it("rejects poisoned numeric, handle, label, source and evidence values", () => {
+    const poisoned = { ...session, handle: RAW_ID, label: CANARY, metrics: { requests: CANARY }, evidence: { requests: { source: CANARY, status: CANARY, total: CANARY, recorded: CANARY } } };
+    assertPrivate(assert, formatUsageSession({ session: poisoned, capabilities: { sessionDb: CANARY }, attribution: [] }));
   });
 });

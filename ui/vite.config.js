@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
+const apiTarget = `http://127.0.0.1:${process.env.COPILOT_INSIGHTS_API_PORT || "3002"}`;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,8 +15,15 @@ export default defineConfig({
     port: 5174,
     proxy: {
       "/api": {
-        target: "http://localhost:3002",
+        target: apiTarget,
         changeOrigin: true,
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyRequest, request) => {
+            if (request.headers.origin === `http://${request.headers.host}`) {
+              proxyRequest.setHeader("Origin", apiTarget);
+            }
+          });
+        },
       },
     },
   },

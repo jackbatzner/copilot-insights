@@ -1,7 +1,7 @@
 {
   "name": "copilot-insights",
   "version": "0.3.1",
-  "description": "Copilot CLI extension that analyzes AI coding sessions for collaboration patterns, skill development, and actionable coaching.",
+  "description": "Local-first Copilot usage insights and optimization, with privacy-safe model, cache, and agent attribution.",
   "type": "module",
   "main": ".github/extensions/copilot-insights/extension.mjs",
   "bin": {
@@ -12,8 +12,7 @@
     ".github/extensions/",
     "src/",
     "scripts/postinstall.mjs",
-    "server/index.mjs",
-    "server/package.json",
+    "server/",
     "ui/",
     "logo.svg",
     "README.md",
@@ -35,8 +34,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
-    "eslint": "^10.6.0",
-    "ffmpeg-static": "^5.3.0"
+    "eslint": "^10.6.0"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0"
@@ -56,11 +54,11 @@
     "copilot",
     "copilot-cli",
     "extension",
-    "session-analysis",
-    "redirection",
-    "drift-detection",
-    "prompt-quality",
-    "ai-prompting"
+    "usage-analytics",
+    "token-usage",
+    "model-attribution",
+    "local-first",
+    "usage-optimization"
   ],
   "license": "MIT",
   "repository": {

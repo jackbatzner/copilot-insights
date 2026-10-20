@@ -1,390 +1,227 @@
-// Database access layer — reads from the Copilot session store SQLite DB.
-
 import Database from "better-sqlite3";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
+import { nonnegative, safeDate, safeModel, safeRequestTimestamp, UsageSourceError } from "./usage-metrics.mjs";
 
-const DB_PATH = process.env.COPILOT_SESSION_DB || join(homedir(), ".copilot", "session-store.db");
+export const USAGE_COLUMNS = [
+  "session_id", "model", "input_tokens", "output_tokens", "turn_index", "agent_id",
+  "parent_tool_call_id", "cache_read_tokens", "cache_write_tokens", "total_nano_aiu",
+  "request_multiplier", "duration_ms", "time_to_first_token_ms", "output_ttft_ms",
+  "inter_token_latency_ms", "finish_reason", "content_filter_triggered", "created_at",
+];
 
-const REQUIRED_TABLES = ["sessions", "turns", "session_files"];
-const OPTIONAL_TABLES = ["session_refs", "checkpoints", "events"];
-
-let _db = null;
-let _missingOptional = new Set();
-
-/**
- * Validate that the DB has the expected Copilot session-store schema.
- * Required tables cause an error; optional tables are tracked for graceful degradation.
- */
-function validateSchema(db) {
-  const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-  const tables = new Set(rows.map((r) => r.name));
-
-  const missingRequired = REQUIRED_TABLES.filter((t) => !tables.has(t));
-  if (missingRequired.length > 0) {
-    throw new Error(
-      `Copilot session DB is missing required tables: ${missingRequired.join(", ")}.\n` +
-      `The database at ${DB_PATH} may be from an incompatible Copilot CLI version.\n` +
-      `Expected tables: ${REQUIRED_TABLES.join(", ")}\n` +
-      `Please update Copilot CLI or report this issue:\n` +
-      `  https://github.com/jackbatzner/copilot-insights/issues`
-    );
-  }
-
-  const missingOpt = OPTIONAL_TABLES.filter((t) => !tables.has(t));
-  if (missingOpt.length > 0) {
-    _missingOptional = new Set(missingOpt);
-    console.warn(
-      `[copilot-insights] Optional tables missing: ${missingOpt.join(", ")}. Some features may be limited.`
-    );
-  }
+function columnInfo(db, table) {
+  return new Map(db.prepare(`PRAGMA table_info(${table})`).all().map((row) => [row.name, row]));
 }
 
-/**
- * Check whether an optional table is available.
- * @param {string} tableName
- * @returns {boolean}
- */
-export function hasTable(tableName) {
-  return !_missingOptional.has(tableName);
+function columns(db, table) {
+  return new Set(columnInfo(db, table).keys());
 }
 
-export function getDb() {
-  if (_db) return _db;
-  if (!existsSync(DB_PATH)) {
-    throw new Error(
-      `Couldn't find the Copilot session database at ${DB_PATH}. ` +
-      `Make sure Copilot CLI is installed and you've completed at least one session. ` +
-      `You can set the COPILOT_SESSION_DB environment variable to point to a custom location.`
-    );
-  }
+function sqliteUtcDefault(value) {
+  if (typeof value !== "string") return false;
+  let expression = value.trim();
+  while (expression.startsWith("(") && expression.endsWith(")")) expression = expression.slice(1, -1).trim();
+  return /^CURRENT_TIMESTAMP$/i.test(expression) ||
+    /^datetime\s*\(\s*'now'\s*\)$/.test(expression.replace(/^datetime/i, "datetime"));
+}
+
+function selectColumns(available, wanted) {
+  return wanted.map((name) => available.has(name) ? `"${name}"` : `NULL AS "${name}"`).join(", ");
+}
+
+function readDatabase(path, whenMissing, read) {
+  if (!existsSync(path)) return whenMissing();
+  let db;
   try {
-    _db = new Database(DB_PATH, { readonly: true });
-  } catch (err) {
-    throw new Error(
-      `Couldn't open the session database at ${DB_PATH}: ${err.message}. ` +
-      `The file may be corrupted or locked by another process.`,
-      { cause: err }
-    );
+    db = new Database(path, { readonly: true, fileMustExist: true });
+    return read(db);
+  } catch (error) {
+    if (error instanceof UsageSourceError) throw error;
+    throw new UsageSourceError("DB_READ", "Session database could not be read.");
+  } finally {
+    db?.close();
   }
-  validateSchema(_db);
-  return _db;
 }
 
-/**
- * List sessions, optionally filtered by repository and/or date range.
- * @param {object} opts
- * @param {string} [opts.repo] - Filter by repository name (partial match)
- * @param {number} [opts.limit] - Max sessions to return (default: 500)
- * @param {string} [opts.since] - ISO date string — only include sessions created on or after this date
- * @param {Set<string>} [opts.excludeIds] - Session IDs to exclude from results
- */
-export function listSessions({ repo, limit = 500, since, excludeIds } = {}) {
-  const db = getDb();
-  const conditions = [];
-  const params = [];
-
-  if (repo) {
-    conditions.push("s.repository LIKE ?");
-    params.push(`%${repo}%`);
-  }
-  if (since) {
-    conditions.push("s.created_at >= ?");
-    params.push(since);
-  }
-  if (excludeIds && excludeIds.size > 0) {
-    const placeholders = [...excludeIds].map(() => "?").join(", ");
-    conditions.push(`s.id NOT IN (${placeholders})`);
-    params.push(...excludeIds);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  params.push(limit);
-
-  return db
-    .prepare(
-      `SELECT s.id, s.repository, s.branch, s.summary, s.created_at, s.updated_at,
-              s.host_type, s.cwd,
-              (SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) as turn_count
-       FROM sessions s
-       ${where}
-       ORDER BY s.updated_at DESC LIMIT ?`
-    )
-    .all(...params);
-}
-
-/**
- * Get all turns for a session, ordered by turn_index.
- */
-export function getSessionTurns(sessionId) {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT turn_index, user_message, assistant_response, timestamp
-       FROM turns WHERE session_id = ? ORDER BY turn_index`
-    )
-    .all(sessionId);
-}
-
-/**
- * Batch-fetch turns for multiple sessions in fewer queries.
- * Returns a Map of sessionId → turns array.
- * Chunks IDs to stay within SQLite bind-parameter limits.
- */
-export function batchGetSessionTurns(sessionIds) {
-  const db = getDb();
-  const result = new Map();
-  if (!sessionIds || sessionIds.length === 0) return result;
-
-  const CHUNK_SIZE = 500;
-  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
-    const placeholders = chunk.map(() => "?").join(",");
-    const rows = db
-      .prepare(
-        `SELECT session_id, turn_index, user_message, assistant_response, timestamp
-         FROM turns WHERE session_id IN (${placeholders}) ORDER BY session_id, turn_index`
-      )
-      .all(...chunk);
-    for (const row of rows) {
-      if (!result.has(row.session_id)) result.set(row.session_id, []);
-      result.get(row.session_id).push({
-        turn_index: row.turn_index,
-        user_message: row.user_message,
-        assistant_response: row.assistant_response,
-        timestamp: row.timestamp,
-      });
+export function sessionCatalogVersion(path) {
+  function version(file) {
+    try {
+      const stat = statSync(file, { bigint: true });
+      return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+    } catch (error) {
+      if (error.code === "ENOENT") return "missing";
+      throw new UsageSourceError("DB_READ", "Session database could not be read.");
     }
   }
-  // Ensure all requested IDs have an entry
-  for (const id of sessionIds) {
-    if (!result.has(id)) result.set(id, []);
-  }
-  return result;
+  const database = version(path);
+  return database === "missing" ? database : `${database}|${version(`${path}-wal`)}`;
 }
 
-/**
- * Batch-fetch files touched for multiple sessions.
- * Returns a Map of sessionId → file rows array ordered by turn_index.
- */
-export function batchGetSessionFiles(sessionIds) {
-  const db = getDb();
-  const result = new Map();
-  if (!sessionIds || sessionIds.length === 0) return result;
-
-  const CHUNK_SIZE = 500;
-  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
-    const placeholders = chunk.map(() => "?").join(",");
-    const rows = db
-      .prepare(
-        `SELECT session_id, file_path, tool_name, turn_index
-         FROM session_files
-         WHERE session_id IN (${placeholders})
-         ORDER BY session_id, turn_index`
-      )
-      .all(...chunk);
-
-    for (const row of rows) {
-      if (!result.has(row.session_id)) result.set(row.session_id, []);
-      result.get(row.session_id).push({
-        file_path: row.file_path,
-        tool_name: row.tool_name,
-        turn_index: row.turn_index,
-      });
+export function readSessionIds(path) {
+  return readDatabase(path, () => [], (db) => {
+    if (!columns(db, "sessions").has("id")) {
+      throw new UsageSourceError("DB_SCHEMA", "Session database schema is incompatible.");
     }
-  }
-
-  for (const id of sessionIds) {
-    if (!result.has(id)) result.set(id, []);
-  }
-  return result;
+    return db.prepare("SELECT id FROM sessions").all().map((row) => row.id).filter((id) => typeof id === "string");
+  });
 }
 
-/**
- * Batch-count file edits for multiple sessions (detects file thrashing).
- * Returns a Map of sessionId → [{ file_path, edit_count }] sorted desc by edit_count.
- */
-export function batchGetFileEditCounts(sessionIds) {
-  const db = getDb();
-  const result = new Map();
-  if (!sessionIds || sessionIds.length === 0) return result;
-
-  const CHUNK_SIZE = 500;
-  for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-    const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
-    const placeholders = chunk.map(() => "?").join(",");
-    const rows = db
-      .prepare(
-        `SELECT session_id, file_path, COUNT(*) as edit_count
-         FROM session_files
-         WHERE session_id IN (${placeholders}) AND tool_name = 'edit'
-         GROUP BY session_id, file_path
-         ORDER BY session_id, edit_count DESC`
-      )
-      .all(...chunk);
-
-    for (const row of rows) {
-      if (!result.has(row.session_id)) result.set(row.session_id, []);
-      result.get(row.session_id).push({
-        file_path: row.file_path,
-        edit_count: row.edit_count,
-      });
+export function readUsageCapabilities(path) {
+  return readDatabase(path, () => ({
+    sessionDb: "unavailable", usageTable: false, diagnostics: ["Session database is unavailable."],
+  }), (db) => {
+    const sessionColumns = columns(db, "sessions");
+    if (!sessionColumns.has("id")) {
+      throw new UsageSourceError("DB_SCHEMA", "Session database schema is incompatible.");
     }
+    const diagnostics = [];
+    if (!sessionColumns.has("created_at") || !sessionColumns.has("updated_at")) {
+      diagnostics.push("Session activity timestamps are partially recorded.");
+    }
+    const usageTable = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'assistant_usage_events'").get());
+    if (!usageTable) {
+      return { sessionDb: "partial", usageTable, diagnostics: [...diagnostics, "Recorded request usage table is unavailable."] };
+    }
+    const usageInfo = columnInfo(db, "assistant_usage_events");
+    const usageColumns = new Set(usageInfo.keys());
+    if (!usageColumns.has("session_id")) {
+      return { sessionDb: "partial", usageTable, diagnostics: [...diagnostics, "Recorded request usage cannot be linked to sessions."] };
+    }
+    if (USAGE_COLUMNS.some((column) => !usageColumns.has(column))) {
+      diagnostics.push("Some recorded request usage columns are unavailable.");
+    }
+    return { sessionDb: diagnostics.length ? "partial" : "available", usageTable, diagnostics };
+  });
+}
+
+export function readUsageDb(path, { sessionId = null } = {}) {
+  return readDatabase(path, () => ({
+    sessions: [], records: [], sessionDb: "unavailable", usageTable: false, diagnostics: ["Session database is unavailable."],
+  }), (db) => {
+    const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name));
+    if (!tables.has("sessions") || !columns(db, "sessions").has("id")) {
+      throw new UsageSourceError("DB_SCHEMA", "Session database schema is incompatible.");
+    }
+    const sessionColumns = columns(db, "sessions");
+    const sessions = db.prepare(`SELECT ${selectColumns(sessionColumns, ["id", "created_at", "updated_at"])} FROM sessions`).all()
+      .filter((row) => typeof row.id === "string").map((row) => ({
+        id: row.id,
+        createdAt: safeDate(row.created_at),
+        updatedAt: safeDate(row.updated_at),
+      }));
+    const diagnostics = [];
+    if (!sessionColumns.has("created_at") || !sessionColumns.has("updated_at")) {
+      diagnostics.push("Session activity timestamps are partially recorded.");
+    }
+    const usageTable = tables.has("assistant_usage_events");
+    if (!usageTable) {
+      return { sessions, records: [], sessionDb: "partial", usageTable, diagnostics: [...diagnostics, "Recorded request usage table is unavailable."] };
+    }
+    const usageInfo = columnInfo(db, "assistant_usage_events");
+    const usageColumns = new Set(usageInfo.keys());
+    if (!usageColumns.has("session_id")) {
+      return { sessions, records: [], sessionDb: "partial", usageTable, diagnostics: [...diagnostics, "Recorded request usage cannot be linked to sessions."] };
+    }
+    if (USAGE_COLUMNS.some((name) => !usageColumns.has(name))) {
+      diagnostics.push("Some recorded request usage columns are unavailable.");
+    }
+    const sqliteUtc = sqliteUtcDefault(usageInfo.get("created_at")?.dflt_value);
+    let undatedValues = false;
+    const where = sessionId === null ? "" : " WHERE session_id = ?";
+    const records = db.prepare(`SELECT ${selectColumns(usageColumns, USAGE_COLUMNS)} FROM assistant_usage_events${where}`)
+      .all(...(sessionId === null ? [] : [sessionId])).map((row) => {
+      const inputTokens = nonnegative(row.input_tokens);
+      const outputTokens = nonnegative(row.output_tokens);
+      const createdAt = safeRequestTimestamp(row.created_at, { sqliteUtc });
+      if (row.created_at !== null && createdAt === null) undatedValues = true;
+      return {
+        sessionId: row.session_id,
+        model: safeModel(row.model),
+        source: "sessiondb",
+        requests: 1,
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null,
+        cacheReadTokens: nonnegative(row.cache_read_tokens),
+        cacheWriteTokens: nonnegative(row.cache_write_tokens),
+        totalNanoAiu: nonnegative(row.total_nano_aiu),
+        localCredits: null,
+        durationMs: nonnegative(row.duration_ms),
+        ttftMs: nonnegative(row.time_to_first_token_ms) ?? nonnegative(row.output_ttft_ms),
+        turnIndex: Number.isSafeInteger(row.turn_index) && row.turn_index >= 0 ? row.turn_index : null,
+        agentId: typeof row.agent_id === "string" ? row.agent_id : null,
+        parentToolCallId: typeof row.parent_tool_call_id === "string" ? row.parent_tool_call_id : null,
+        primaryRecorded: usageColumns.has("agent_id") && usageColumns.has("parent_tool_call_id") && row.agent_id === null && row.parent_tool_call_id === null,
+        requestMultiplier: nonnegative(row.request_multiplier),
+        outputTtftMs: nonnegative(row.output_ttft_ms),
+        interTokenLatencyMs: nonnegative(row.inter_token_latency_ms),
+        finishReason: ["stop", "length", "tool_calls", "content_filter", "cancelled", "error"].includes(row.finish_reason) ? row.finish_reason : "not-recorded",
+        contentFiltered: row.content_filter_triggered === 1 ? true : row.content_filter_triggered === 0 ? false : null,
+        contentFilteredRequests: row.content_filter_triggered === 1 ? 1 : row.content_filter_triggered === 0 ? 0 : null,
+        createdAt,
+      };
+    });
+    if (records.some((record) => record.totalNanoAiu !== null)) {
+      diagnostics.push("Local credits are unavailable: no verified recorded nano-AIU conversion is defined.");
+    }
+    if (undatedValues) {
+      diagnostics.push("Some request timestamps are invalid or have unverified timezone semantics; those requests are undated.");
+    }
+    return { sessions, records, sessionDb: diagnostics.some((message) => message.includes("columns") || message.includes("timestamps")) ? "partial" : "available", usageTable, diagnostics };
+  });
+}
+
+export function normalizedUsageBytes(rows) {
+  return rows.reduce((total, row) => total + 1024 +
+    Object.values(row).reduce((bytes, value) => bytes + (typeof value === "string" ? value.length * 2 : 0), 0), 0);
+}
+
+export function createUsageDbReader(path, { maxCacheBytes = 128 * 1024 * 1024, maxCacheEntries = 64 } = {}) {
+  const cache = new Map();
+  let version = null;
+  let bytes = 0;
+  function clear() {
+    cache.clear();
+    bytes = 0;
+    version = null;
   }
-
-  for (const id of sessionIds) {
-    if (!result.has(id)) result.set(id, []);
-  }
-  return result;
-}
-
-/**
- * Get session metadata by ID.
- */
-export function getSession(sessionId) {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT s.*, (SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) as turn_count
-       FROM sessions s WHERE s.id = ?`
-    )
-    .get(sessionId);
-}
-
-/**
- * Get files touched in a session.
- */
-export function getSessionFiles(sessionId) {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT file_path, tool_name, turn_index FROM session_files
-       WHERE session_id = ? ORDER BY turn_index`
-    )
-    .all(sessionId);
-}
-/**
- * Count edits per file within a session (detects file thrashing).
- */
-export function getFileEditCounts(sessionId) {
-  const db = getDb();
-  return db
-    .prepare(
-      `SELECT file_path, COUNT(*) as edit_count
-       FROM session_files
-       WHERE session_id = ? AND tool_name = 'edit'
-       GROUP BY file_path
-       ORDER BY edit_count DESC`
-    )
-    .all(sessionId);
-}
-
-/**
- * Get session refs (commits, PRs, issues) for a session.
- */
-export function getSessionRefs(sessionId) {
-  const db = getDb();
-  if (!hasTable("session_refs")) return [];
-  try {
-    return db
-      .prepare(
-        `SELECT ref_type, ref_value, turn_index, created_at
-         FROM session_refs WHERE session_id = ?`
-      )
-      .all(sessionId);
-  } catch {
-    return []; // table may not exist in older DBs
-  }
-}
-
-/**
- * Batch-fetch session refs for multiple sessions.
- * Returns a Map of sessionId → refs array.
- */
-export function batchGetSessionRefs(sessionIds) {
-  const result = new Map();
-  if (!sessionIds || sessionIds.length === 0) return result;
-  if (!hasTable("session_refs")) {
-    for (const id of sessionIds) result.set(id, []);
-    return result;
-  }
-
-  const db = getDb();
-  const CHUNK_SIZE = 500;
-  try {
-    for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-      const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "?").join(",");
-      const rows = db
-        .prepare(
-          `SELECT session_id, ref_type, ref_value, turn_index, created_at
-           FROM session_refs
-           WHERE session_id IN (${placeholders})
-           ORDER BY session_id, turn_index`
-        )
-        .all(...chunk);
-
-      for (const row of rows) {
-        if (!result.has(row.session_id)) result.set(row.session_id, []);
-        result.get(row.session_id).push({
-          ref_type: row.ref_type,
-          ref_value: row.ref_value,
-          turn_index: row.turn_index,
-          created_at: row.created_at,
-        });
+  return {
+    read(sessionId = null) {
+      const current = sessionCatalogVersion(path);
+      if (version !== current) {
+        clear();
+        version = current;
       }
-    }
-  } catch {
-    for (const id of sessionIds) result.set(id, []);
-    return result;
-  }
-
-  for (const id of sessionIds) {
-    if (!result.has(id)) result.set(id, []);
-  }
-  return result;
-}
-
-/**
- * Batch-count checkpoints for multiple sessions.
- * Returns a Map of sessionId → checkpoint count.
- */
-export function batchGetCheckpointCounts(sessionIds) {
-  const result = new Map();
-  if (!sessionIds || sessionIds.length === 0) return result;
-  if (!hasTable("checkpoints")) {
-    for (const id of sessionIds) result.set(id, 0);
-    return result;
-  }
-
-  const db = getDb();
-  const CHUNK_SIZE = 500;
-  try {
-    for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-      const chunk = sessionIds.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "?").join(",");
-      const rows = db
-        .prepare(
-          `SELECT session_id, COUNT(*) as checkpoint_count
-           FROM checkpoints
-           WHERE session_id IN (${placeholders})
-           GROUP BY session_id`
-        )
-        .all(...chunk);
-
-      for (const row of rows) {
-        result.set(row.session_id, row.checkpoint_count);
+      const cached = cache.get(sessionId);
+      if (cached) {
+        cache.delete(sessionId);
+        cache.set(sessionId, cached);
+        return cached.value;
       }
-    }
-  } catch {
-    for (const id of sessionIds) result.set(id, 0);
-    return result;
-  }
-
-  for (const id of sessionIds) {
-    if (!result.has(id)) result.set(id, 0);
-  }
-  return result;
+      const source = readUsageDb(path, { sessionId });
+      if (sessionCatalogVersion(path) !== current) {
+        clear();
+        return {
+          version: null,
+          source: {
+            ...source, sessionDb: "partial",
+            diagnostics: [...source.diagnostics, "Session database changed while being read; coverage is partial."],
+          },
+        };
+      }
+      const value = { source, version: current };
+      const size = 2048 + normalizedUsageBytes(source.sessions) + normalizedUsageBytes(source.records);
+      if (size <= maxCacheBytes && maxCacheEntries > 0) {
+        while (cache.size && (bytes + size > maxCacheBytes || cache.size >= maxCacheEntries)) {
+          const key = cache.keys().next().value;
+          bytes -= cache.get(key).bytes;
+          cache.delete(key);
+        }
+        cache.set(sessionId, { value, bytes: size });
+        bytes += size;
+      }
+      return value;
+    },
+    clear,
+  };
 }
