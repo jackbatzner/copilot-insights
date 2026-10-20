@@ -1,111 +1,194 @@
-# Security Policy
+# Security and privacy
 
-## Supported Versions
+## Reporting a vulnerability
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.2.x   | :white_check_mark: |
-| 0.1.x   | :white_check_mark: |
+Do not open a public issue containing a vulnerability or private telemetry.
+Use GitHub's [private security reporting](https://github.com/jackbatzner/copilot-insights/security/advisories/new).
+If unavailable, contact the maintainer privately before sharing details.
 
-## Reporting a Vulnerability
+Provide a minimal synthetic reproduction, affected version, and expected versus
+observed behavior. Do not send credentials, your session database, event files,
+or transcripts.
 
-If you discover a security vulnerability, please report it responsibly:
+## Supported versions
 
-1. **Do NOT open a public GitHub issue.**
-2. Prefer GitHub's private reporting flow from the **Security** tab or the repository's advisory form: <https://github.com/jackbatzner/copilot-insights/security/advisories/new>.
-3. If the advisory form is unavailable, contact the maintainer privately before sharing any details.
-4. Include a description of the vulnerability, steps to reproduce, and potential impact.
+Security changes target the latest published release. Upgrade before reproducing
+an issue; historical releases may still contain removed content-based features.
 
-We will acknowledge receipt within 48 hours and aim to release a patch within 7 days for critical issues.
+## Local boundary
 
-## Security Model
+Copilot Insights is a single-user, loopback-only usage dashboard. It is not a
+multi-user service and must not be exposed through a public bind address or
+reverse proxy.
 
-Copilot Insights is a **local-only** development tool:
+- Source SessionDB and session-state files are read-only.
+- Usage APIs serve sanitized metadata, not raw source records. A separate
+  request-consented local text endpoint is the explicit exception described below.
+  Session Detail displays text by default; this is not a first-use opt-in viewer.
+- Local app settings, hidden-session state, and opaque-handle bookkeeping are
+  application data, distinct from the source database.
+- No source telemetry is uploaded to an external analytics service.
+- Optional sources require explicit opt-in. Content-only sources do not become
+  usage sources through transcript parsing.
+- Removed instruction/practice/goal/journal/retrospective files are not consumed
+  or automatically deleted.
 
-- The server binds to `127.0.0.1` (localhost only) — it is not accessible from the network.
-- CORS is restricted to `localhost` origins.
-- The app reads your local Copilot session database (`~/.copilot/session-store.db`) in **read-only** mode.
-- Goal data is stored locally at `~/.copilot/insights-goals.json`.
-- No data is transmitted to external services.
-- No authentication is required because the server is only accessible to the local user.
+Upgrade migration reads only bounded legacy app-owned hidden-session IDs and
+source preference booleans. It converts IDs to opaque handles without reading
+session content, preserves existing new-format choices, and leaves old files
+unchanged. Invalid legacy state produces a safe error instead of silently
+unhiding sessions.
 
-### Input Validation
+Loopback is not an authentication boundary against other processes running as
+the same user. OS account and filesystem protections remain necessary.
 
-- The `POST /api/practice/analyze` endpoint enforces a **10,000 character** input limit and validates that the body contains a string.
-- The `GET /api/practice/library` endpoint validates tag query parameters against a **whitelist** of known tags — unrecognized tags are silently dropped.
-- The `GET /api/practice/challenge` and `GET /api/practice/weaknesses` endpoints validate timeframe parameters with a strict pattern (`\d{1,4}[dwmy]` or `all`).
-- The Express JSON body parser is limited to **50 KB**.
-- All regex patterns used for prompt analysis are designed to avoid catastrophic backtracking (ReDoS). Greedy quantifiers like `.*` are bounded (e.g., `.{0,200}?`) and nested quantifiers use explicit upper bounds.
+## Safe output contract
 
-### Input Validation Details
+Usage API responses, CLI results and analytics UI labels must not contain:
 
-- JSON body parser limit: **50 KB** (`express.json({ limit: "50kb" })`)
+- Prompt or reply content, commands, tool arguments/results.
+- Local paths, CWDs, endpoint URLs or credentials.
+- Raw session, agent, tool-call, interaction or request identifiers.
+- Arbitrary names, descriptions, or error text from source telemetry.
 
-### Query parameters
+Identifiers needed for correlation stay inside the normalizer. Application
+handles and anonymous labels support session navigation. Metadata uses strict
+allowlists or generic categories; escaping HTML alone is insufficient.
 
-| Parameter | Used by | Validation |
-|-----------|---------|------------|
-| `timeframe` | Most endpoints | Validated with strict pattern (`/^\d{1,4}[dwmy]$/` or `all`). Returns 400 for invalid values. |
-| `repo` | Most endpoints | Validated as a non-empty string. Passed as a SQL `LIKE` parameter with `%` wrapping in parameterized queries only. Returns 400 for non-string values. |
-| `since` | `/api/live/feed` | Validated as a parseable date via `new Date()`. Returns 400 if invalid. Normalized to ISO 8601 before SQL use. |
-| `text` | `POST /api/practice/analyze` | Must be a string, max 10,000 characters. Returns 400 if missing or invalid. |
-| `tag` | `GET /api/practice/library` | Validated against a whitelist of known tags. Invalid tags silently dropped. |
-| `:id` | `/api/sessions/:id/*` | Path parameter used as a session ID lookup key. Passed to parameterized SQL queries. Returns 404 if not found. |
-| `:id` | `POST/DELETE /api/sessions/:id/hide` | Validated as a UUID v4 format (`/^[0-9a-f]{8}-…$/i`). Returns 400 if invalid. Returns 429 if hidden set cap (5,000) reached. Hidden IDs stored in-memory only — reset on server restart. |
+Numeric metrics retain source and coverage. Missing values are not silently
+converted to zero, and JSONL fallback is not added to the same recorded usage.
+Request-duration sums must not be presented as wall-clock time. Local credits
+are not organization billing statements.
 
-### Database schema validation
+## API surface
 
-On startup, `src/db.mjs` validates the session-store schema before executing queries. Required tables (`sessions`, `turns`, `session_files`) must be present or the server exits with a descriptive error. Optional tables (`session_refs`, `checkpoints`) degrade gracefully — features that depend on them return empty results and a console warning is logged. This prevents confusing SQLite errors when the database is from an incompatible Copilot CLI version.
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/summary` | Safe usage snapshot and source capabilities |
+| `GET /api/sessions` | Anonymous catalog and model filters |
+| `GET /api/sessions/:handle` | Unified attribution, independent skill counts and diagnostic status |
+| `GET /api/sessions/:handle/turns` | Paginated turn summaries and selected-turn model-call evidence, without text |
+| `GET /api/sessions/:handle/tools` | Safe execution categories and proven child-invocation links, without arguments/results |
+| `POST /api/sessions/:handle/content` | Explicitly consented, bounded local turn text or proven delegation prompt; never cached |
+| `GET /api/tokens/summary` | Usage/model/performance snapshot |
+| `POST /api/sessions/:handle/hide` | Hide a session using its application handle |
+| `DELETE /api/sessions/:handle/hide` | Unhide a session |
+| `GET /api/settings` | Safe source availability and opt-in status |
+| `PATCH /api/settings` | Update explicitly supported settings |
+| `POST /api/refresh` | Refresh local reader/cache state |
+| `GET /api/comparison` | Sanitized model usage and eligible token-price bases; no content or source IDs |
 
-### SQL safety
+Retired content/coaching endpoints return JSON not-found/gone responses. They do
+not remain callable behind hidden navigation, and are not handled as SPA pages.
 
-All database queries use **parameterized statements** via `better-sqlite3`'s `.prepare().all()` / `.get()` API. No user input is interpolated into SQL strings.
+Validate query/body types and handles. Use parameterized SQL and check optional
+tables/columns before access. Errors must be explicit but sanitized; never return
+raw exception messages, SQL, or source paths. Mutating endpoints must retain
+origin protections and bounded request bodies.
 
-### Regex safety
+### Explicit local text exception
 
-All 130+ regex patterns (in `src/patterns.mjs` and other analysis modules) have been audited for ReDoS. None use nested quantifiers, unbounded `.+`/`.*` in dangerous positions, or overlapping alternations.
+Session Detail defaults to displaying original text. Mounted turns on the
+current paginated page automatically request bounded text for a first-line
+preview and expansion; agent prompts load only inside expanded exact-child
+attribution. Each read separately POSTs consent and either a safe recorded
+turn index or an existing anonymous attribution key. The endpoint requires
+an exact same-origin Origin header, JSON content type and strictly validated
+body. It is not available through GET, CLI tools, usage summaries or exports.
 
-## API Endpoints
+Turn text comes only from capability-checked columns in the same session's
+`turns` table. A child prompt needs exact same-session parent-call evidence and
+the corresponding verified task invocation's `arguments.prompt`; no arbitrary
+argument objects, tool results, commands or assembled system prompts are read
+out. Missing or ambiguous linkage is unavailable, not timestamp-guessed.
+Reads and response text are bounded, with explicit partial/truncation states.
 
-All endpoints are read-only (GET) except where noted. The server exposes:
+Original revealed text is **not guaranteed to be redacted** and can itself
+contain sensitive values. Render it as plain text, never HTML or interpreted
+Markdown. First-line previews are verbatim, length-bounded text, not generated
+summaries, and belong only to mounted turn state—not usage DTOs or labels.
+Do not log text or put it in app settings, browser persistence, usage
+DTOs or shared response caches. Browser HTTP caching is disabled. Clear panel
+state and abort pending requests on individual/global hide, pagination,
+navigation and manual refresh; stale responses must not repaint cleared text.
+Collapsing a turn removes its full text from the DOM but keeps its preview and
+bounded response in that mounted turn's state; collapsing an agent unmounts its
+prompt entirely. Hide all text removes both previews and full text, stops
+automatic reads, and enables presentation mode across navigation and reload.
+The browser stores only an `on`/`off` preference. Missing preference defaults to
+shown; unreadable or invalid stored values hide text and surface an explicit
+error. A failed write changes this tab's mode but visibly warns it was not saved.
+Other tabs follow preference storage events. Metadata polling does not refetch unchanged
+turn text; newly mounted turns follow the current text-display choice.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/summary` | Aggregate redirection stats |
-| `GET /api/sessions` | List sessions with scores |
-| `GET /api/sessions/:id` | Single session detail |
-| `GET /api/sessions/:id/sprawl` | Session scope-creep analysis |
-| `GET /api/sessions/:id/efficiency` | Session efficiency metrics |
-| `GET /api/sessions/:id/replay` | Annotated turn-by-turn replay |
-| `GET /api/sessions/:id/complexity` | Session complexity scoring |
-| `GET /api/patterns` | Top correction patterns |
-| `GET /api/trends` | Trend data for charts |
-| `GET /api/pillar-trends` | Pillar score trends |
-| `GET /api/insights` | Combined insights |
-| `GET /api/suggestions` | Prompt rewrite suggestions |
-| `GET /api/clarity` | First-turn clarity analysis |
-| `GET /api/efficiency` | Efficiency batch analysis |
-| `GET /api/delegation` | Delegation analysis |
-| `GET /api/judgment` | Judgment quality analysis |
-| `GET /api/instruction-gaps` | Missing instruction detection |
-| `GET /api/instruction-failures` | Rule failure analysis |
-| `GET /api/dev-plan` | Personalized dev plan |
-| `GET /api/progress-check` | Daily check-in |
-| `GET /api/retro` | Session retrospective |
-| `GET /api/work-style` | Work style analysis |
-| `GET /api/live/feed` | Real-time turn feed with pattern annotations |
-| `POST /api/practice/analyze` | Instant prompt scoring (10,000 char limit) |
-| `GET /api/practice/challenge` | Random low-scoring prompt from user sessions |
-| `GET /api/practice/library` | Curated challenge library with tag filtering |
-| `GET /api/practice/weaknesses` | Personalized category recommendations |
-| `GET /api/analytics/hourly` | Hourly productivity |
-| `GET /api/analytics/prompt-length` | Prompt length analysis |
-| `GET /api/analytics/repos` | Repository health |
-| `GET /api/analytics/hot-files` | Most-edited files |
-| `GET /api/analytics/depth` | Session depth metrics |
-| `GET /api/analytics/tools` | Tool usage statistics |
-| `GET /api/analytics/create-edit-ratio` | Create vs. edit ratio |
-| `GET /api/analytics/file-types` | File type diversity |
-| `GET /api/hidden-sessions` | List hidden session IDs (in-memory) |
-| `POST /api/sessions/:id/hide` | Hide a session from analysis |
-| `DELETE /api/sessions/:id/hide` | Unhide a session |
+This remains a single-user local viewer, not a secret-management boundary
+against other processes with access to the account.
+
+### Shutdown aggregate fallback
+
+Only verified numeric model-usage fields are normalized from shutdown events.
+Arbitrary nested values, model names outside the safe catalog, and raw event IDs
+are not exposed. Any recorded SessionDB usage rows suppress this fallback for
+that session. Repeated shutdown snapshots are not summed; partial aggregates
+remain partial and cannot establish individual request or child-agent identity.
+Recorded request-cost values have no inferred monetary unit, and session-wide API
+duration is not replicated into each model's usage.
+
+### Visual exploration
+
+Comparison browser persistence is bounded and validated: up to eight exact-selection
+scenarios in tab storage and one explicit metric-only baseline in browser-local
+storage, never original text, arbitrary notes, source
+paths or raw identifiers. Corrupt or unavailable storage is surfaced rather
+than silently replacing a baseline. The baseline has no automatic expiry and
+remains until replaced, cleared or removed with site data. It stores recorded
+metrics, source coverage and scenario assumptions, not a price estimate.
+Later-session comparisons use whole selected history, not an incremental delta
+or evidence of task quality, savings or causation. Standard-rate price scenarios
+are benchmarks, never a Copilot bill; cache assumptions must stay explicit.
+Browser-generated navigation allowlists
+filter values and uses fixed invalid-selection markers instead of reflecting
+arbitrary query text into links or controls.
+
+Daily usage graphs use verified timestamps on exact SessionDB usage only.
+Shutdown snapshots and undated records cannot establish a request timeline.
+UTC-day and execution-scope filters are validated and intersect on the same
+usage observation as a model filter. Drill-through links carry only safe filter
+values and opaque application handles, never raw identifiers or source content.
+Session performance and insights describe recorded usage, not personal skill,
+task quality, or an inferred causal connection between a skill and a model.
+
+The detail-only turn/request projection reuses normalized exact SessionDB usage.
+It does not read conversation-content tables. Turn indices must be safe
+nonnegative integers; other values remain Unassigned without dropping usage.
+Request labels are generated ordinals, never raw request/tool/agent IDs.
+Existing anonymous attribution keys connect requests to their proven group;
+timestamps do not infer skill/tool ownership. Shutdown counts never become
+fabricated request rows.
+
+## Telemetry evolution
+
+SessionDB and JSONL fields vary across producers and releases. Capability checks
+and synthetic fixtures are required. A missing relationship is unavailable
+evidence, not permission to infer it from adjacent timestamps.
+
+OTel consumption is not implemented. A future adapter must apply the same output
+contract even if its producer claims content capture is disabled. Trace
+attributes can be content-bearing, and a second source must not double-count
+usage already recorded in SessionDB.
+
+## Regression coverage
+
+Use synthetic canaries in prompts, arguments, results, paths, raw IDs, and
+arbitrary model/tool/skill names. Assert that none appear in usage payloads,
+CLI output, URLs, errors, or analytics screenshots. Synthetic text may appear only
+in dedicated local text responses/previews/panels; verify clearing and absence
+from subsequent analytics, caches and app state. Test absent/corrupt sources, partial
+metrics, stale handles, source filtering and retired routes as well as the happy
+path.
+
+Published gallery captures are stricter: isolated synthetic sources only,
+Presentation mode enabled, and content endpoints and external requests blocked.
+Require the **SYNTHETIC DATA / TEXT HIDDEN** label and no previews or text panels.
+Only allowlisted PNGs belong in the gallery; keep the validation manifest and
+environment-specific paths outside checked-in documentation.

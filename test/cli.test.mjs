@@ -29,4 +29,13 @@ describe("copilot-insights CLI help", () => {
     assert.match(result.stderr, /Unknown command/);
     assert.match(result.stdout, /Usage:/);
   });
+
+  it("rejects malformed dashboard ports without echoing arbitrary input", () => {
+    for (const port of ["PRIVATE_PORT_CANARY", "0", "65536", "1.5"]) {
+      const result = runCli([`--port=${port}`]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Invalid port/);
+      assert.doesNotMatch(result.stderr, /PRIVATE_PORT_CANARY/);
+    }
+  });
 });

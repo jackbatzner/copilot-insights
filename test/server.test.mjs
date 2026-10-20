@@ -1,454 +1,200 @@
-// Integration tests for the Express API server routes.
-// Sets up an in-memory test DB, starts the server on a test port,
-// and validates every major API endpoint.
-
 import { before, after, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { setupTestDb, teardownTestDb, FIXTURES } from "./test-helpers.mjs";
+import { request as httpRequest } from "node:http";
+import { startServer } from "../server/index.mjs";
+import { createUsageFixture, assertPrivate, CANARY, RAW_ID } from "./usage-fixture.mjs";
 
-const TEST_PORT = 3099;
-const BASE = `http://127.0.0.1:${TEST_PORT}`;
-let testHomeDir = null;
-const originalHome = process.env.HOME;
-const originalUserProfile = process.env.USERPROFILE;
-
-// Merge all fixtures for comprehensive API testing
-const testData = {
-  sessions: [
-    ...FIXTURES.redirectionSession.sessions,
-    ...FIXTURES.cleanSession.sessions,
-    ...FIXTURES.mixedAutoSession.sessions,
-    ...FIXTURES.dripFeedSession.sessions,
-  ],
-  turns: [
-    ...FIXTURES.redirectionSession.turns,
-    ...FIXTURES.cleanSession.turns,
-    ...FIXTURES.mixedAutoSession.turns,
-    ...FIXTURES.dripFeedSession.turns,
-  ],
-  files: [
-    ...(FIXTURES.redirectionSession.files || []),
-    ...(FIXTURES.cleanSession.files || []),
-  ],
-  refs: [
-    ...(FIXTURES.cleanSession.refs || []),
-  ],
-};
-
-/** Poll until the server accepts connections. */
-async function waitForServer(maxAttempts = 30) {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      await fetch(`${BASE}/api/summary`);
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 200));
-    }
+describe("safe usage HTTP contract", () => {
+  let fixture, server, base;
+  async function request(path, options) {
+    const response = await fetch(`${base}${path}`, options);
+    assert.match(response.headers.get("content-type"), /application\/json/);
+    const body = await response.json();
+    assertPrivate(assert, body);
+    return { status: response.status, body };
   }
-  throw new Error(`Server did not start on port ${TEST_PORT}`);
-}
+  before(async () => {
+    fixture = createUsageFixture();
+    const uiDist = join(fixture.root, "ui");
+    mkdirSync(uiDist);
+    writeFileSync(join(uiDist, "index.html"), "<!doctype html><title>Synthetic usage UI</title>");
+    server = await startServer({ ...fixture.options, uiDist, port: 0 });
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+  after(async () => {
+    await new Promise((done) => { server.close(done); server.closeAllConnections(); });
+    fixture.cleanup();
+  });
 
-// ── Setup / Teardown ────────────────────────────────────────────
-
-before(async () => {
-  testHomeDir = mkdtempSync(join(tmpdir(), "copilot-insights-home-"));
-  process.env.HOME = testHomeDir;
-  process.env.USERPROFILE = testHomeDir;
-  setupTestDb(testData);
-  process.env.PORT = String(TEST_PORT);
-  await import("../server/index.mjs");
-  await waitForServer();
-});
-
-after(() => {
-  // Close the Express server so the process can exit cleanly
-  for (const h of process._getActiveHandles()) {
-    if (typeof h.close === "function" && typeof h.address === "function") {
-      try {
-        const addr = h.address();
-        if (addr && addr.port === TEST_PORT) h.close();
-      } catch { /* ignore */ }
+  it("serves the exact safe summary and sessions shapes from a real SQLite fixture", async () => {
+    const { status, body } = await request("/api/summary?timeframe=all");
+    assert.equal(status, 200);
+    assert.equal(body.sessionCount, 2);
+    assert.ok(body.metrics && body.evidence && body.performance && body.recommendation);
+    assert.equal(body.capabilities.sessionDb, "available");
+    assert.equal(body.capabilities.usageTable, true);
+    assert.equal(body.metrics.requests, 3);
+    assert.equal(body.metrics.inputTokens, 190);
+    assert.equal(body.metrics.outputTokens, 35);
+    assert.equal(body.metrics.totalTokens, 225);
+    assert.equal(body.metrics.cacheReadTokens, 0);
+    assert.equal(body.metrics.durationMs, 1700);
+    assert.equal(body.sessions.length, 2);
+    for (const session of body.sessions) {
+      assert.match(session.handle, /^[a-f0-9]{64}$/);
+      assert.match(session.label, /^Session \d+$/);
+      assert.equal(session.source, "cli");
+      assert.ok("selectedUsage" in session);
+      assert.ok("selectedEvidence" in session);
+      assert.ok(!("id" in session));
     }
-  }
-  teardownTestDb();
-  if (originalHome === undefined) delete process.env.HOME;
-  else process.env.HOME = originalHome;
-  if (originalUserProfile === undefined) delete process.env.USERPROFILE;
-  else process.env.USERPROFILE = originalUserProfile;
-  if (testHomeDir) {
-    rmSync(testHomeDir, { recursive: true, force: true });
-  }
-});
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-async function getJSON(path) {
-  const res = await fetch(`${BASE}${path}`);
-  const body = await res.json();
-  return { status: res.status, body };
-}
-
-async function postJSON(path, data) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    const list = await request("/api/sessions?timeframe=all");
+    assert.equal(list.status, 200);
+    assert.deepEqual(Object.keys(list.body).sort(), ["capabilities", "models", "pagination", "sessions"]);
+    assert.deepEqual(list.body.pagination, { page: 1, pageSize: 25, pages: 1, total: 2, sort: "tokens" });
+    const tokens = await request("/api/tokens/summary?timeframe=all");
+    assert.deepEqual(tokens.body.metrics, body.metrics);
   });
-  const json = await res.json();
-  return { status: res.status, body: json };
-}
 
-async function patchJSON(path, data) {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  const body = await res.json();
-  return { status: res.status, body };
-}
-
-async function waitFor(checkFn, { attempts = 20, delayMs = 50 } = {}) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const value = await checkFn();
-    if (value) return value;
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-  throw new Error("Condition was not met in time");
-}
-
-// ── Tests ───────────────────────────────────────────────────────
-
-describe("GET /api/summary", () => {
-  it("returns 200 with aggregate stats", async () => {
-    const { status, body } = await getJSON("/api/summary");
+  it("filters child-model sessions while preserving whole-session metrics and unfiltered model choices", async () => {
+    const { status, body } = await request("/api/sessions?timeframe=all&model=claude-sonnet-4.5");
     assert.equal(status, 200);
-    assert.ok("sessionsAnalyzed" in body, "missing sessionsAnalyzed");
-    assert.ok("sessionsWithRedirections" in body, "missing sessionsWithRedirections");
-    assert.ok("totalRedirections" in body, "missing totalRedirections");
-    assert.equal(typeof body.sessionsAnalyzed, "number");
+    assert.equal(body.sessions.length, 1);
+    assert.equal(body.models.length, 3);
+    assert.equal(body.sessions[0].metrics.inputTokens, 160);
+    assert.equal(body.sessions[0].selectedUsage.inputTokens, 60);
+    assert.equal(body.sessions[0].selectedUsage.requests, 1);
+    const detail = await request(`/api/sessions/${body.sessions[0].handle}`);
+    const child = detail.body.attribution.find((group) => group.scope === "subagent");
+    assert.equal(child.correlation, "exact-child");
+    assert.equal(child.metrics.inputTokens, 60);
+    assert.equal(child.skill, null);
+    assert.equal(detail.body.skills[0].category, "skill");
   });
-});
 
-describe("GET /api/tokens/summary/progressive", () => {
-  it("returns partial progress first and completes after chunk processing", async () => {
-    const initial = await getJSON("/api/tokens/summary/progressive?timeframe=all");
-    assert.equal(initial.status, 200);
-    assert.equal(initial.body.progress.complete, false);
-    assert.equal(initial.body.progress.processedSessions, 0);
-    assert.equal(typeof initial.body.estimatedCost, "number");
+  it("retrieves only opaque-handle session detail and safe unknown errors", async () => {
+    const catalog = await request("/api/sessions?timeframe=all");
+    const { handle } = catalog.body.sessions[0];
+    const detail = await request(`/api/sessions/${handle}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.session.handle, handle);
+    assert.equal(detail.body.skillLinkage, "session-only");
+    assert.ok(Array.isArray(detail.body.attribution));
+    assert.equal((await request(`/api/sessions/${"0".repeat(64)}`)).status, 404);
+    assert.equal((await request(`/api/sessions/${RAW_ID}`)).status, 404);
+  });
 
-    const completed = await waitFor(async () => {
-      const next = await getJSON("/api/tokens/summary/progressive?timeframe=all");
-      return next.body.progress.complete ? next : null;
+  it("returns empty sessions for a recognized model without matching usage", async () => {
+    const catalog = await request("/api/sessions?timeframe=7d");
+    const filtered = await request("/api/sessions?timeframe=7d&model=gpt-4.1");
+    assert.equal(filtered.status, 200);
+    assert.deepEqual(filtered.body.sessions, []);
+    assert.deepEqual(filtered.body.models, catalog.body.models);
+    const unknown = await request("/api/sessions?timeframe=7d&model=Unknown%20model");
+    assert.equal(unknown.status, 200);
+    assert.equal(unknown.body.sessions.length, 1);
+  });
+
+  it("hides and restores sessions through opaque HTTP routes and excludes hidden totals", async () => {
+    const catalog = await request("/api/sessions?timeframe=all");
+    const session = catalog.body.sessions[0];
+    assert.deepEqual((await request(`/api/sessions/${session.handle}/hide`, { method: "POST" })).body, { hidden: true });
+    const summary = await request("/api/summary?timeframe=all");
+    assert.equal(summary.body.sessionCount, 1);
+    assert.equal(summary.body.metrics.requests, 3 - session.metrics.requests);
+    const hidden = await request("/api/sessions?timeframe=all&includeHidden=true");
+    assert.equal(hidden.body.sessions.length, 2);
+    assert.equal(hidden.body.sessions.find((entry) => entry.handle === session.handle).hidden, true);
+    assert.deepEqual((await request(`/api/sessions/${session.handle}/hide`, { method: "DELETE" })).body, { hidden: false });
+    assert.equal((await request("/api/summary?timeframe=all")).body.metrics.requests, 3);
+    assert.equal((await request(`/api/sessions/${RAW_ID}/hide`, { method: "POST" })).status, 404);
+    const persisted = readFileSync(join(fixture.options.stateDir, "usage-state.json"), "utf8");
+    assertPrivate(assert, persisted);
+  });
+
+  it("requires explicit boolean VS Code opt-in and reports unsupported metadata honestly", async () => {
+    const initial = await request("/api/settings");
+    assert.equal(initial.body.enableVSCode, false);
+    assert.equal(initial.body.vscode.status, "disabled");
+    const enabled = await request("/api/settings", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enableVSCode: true }),
     });
-
-    assert.equal(completed.status, 200);
-    assert.equal(completed.body.progress.complete, true);
-    assert.ok(completed.body.sessionsAnalyzed >= testData.sessions.length);
-    assert.equal(typeof completed.body.estimatedCost, "number");
-    assert.equal(typeof completed.body.estimatedCredits, "number");
-    assert.equal(completed.body.localUsage.source, "local-session-db");
-    assert.equal(typeof completed.body.localUsage.prompts, "number");
-    assert.equal(typeof completed.body.localUsage.requests, "number");
-    assert.equal(typeof completed.body.localUsage.avgTokensPerRequest, "number");
-  });
-});
-
-describe("Settings API", () => {
-  it("returns default settings with VS Code loading disabled", async () => {
-    const { status, body } = await getJSON("/api/settings");
-    assert.equal(status, 200);
-    assert.deepEqual(body, { vscodeSessionsEnabled: false });
-  });
-
-  it("updates and persists VS Code loading settings", async () => {
-    const { status, body } = await patchJSON("/api/settings", { vscodeSessionsEnabled: true });
-    assert.equal(status, 200);
-    assert.equal(body.vscodeSessionsEnabled, true);
-
-    const settingsFile = join(testHomeDir, ".copilot", "copilot-insights-settings.json");
-    assert.equal(existsSync(settingsFile), true);
-    const persisted = JSON.parse(readFileSync(settingsFile, "utf-8"));
-    assert.equal(persisted.vscodeSessionsEnabled, true);
-  });
-
-  it("rejects unknown setting keys", async () => {
-    const { status, body } = await patchJSON("/api/settings", { unknownSetting: true });
-    assert.equal(status, 400);
-    assert.match(body.error, /Unknown setting keys/);
-  });
-
-  it("rejects non-boolean VS Code loading values", async () => {
-    const { status, body } = await patchJSON("/api/settings", { vscodeSessionsEnabled: "yes" });
-    assert.equal(status, 400);
-    assert.equal(body.error, "vscodeSessionsEnabled must be a boolean");
-  });
-});
-
-describe("VS Code settings gating", () => {
-  it("returns disabled payloads when VS Code loading is off", async () => {
-    await patchJSON("/api/settings", { vscodeSessionsEnabled: false });
-
-    const { status: summaryStatus, body: summaryBody } = await getJSON("/api/vscode/summary");
-    const { status: sessionsStatus, body: sessionsBody } = await getJSON("/api/vscode/sessions");
-    const disabledSessionResponse = await fetch(`${BASE}/api/vscode/sessions/workspace-123`);
-
-    assert.equal(summaryStatus, 200);
-    assert.equal(summaryBody.enabled, false);
-    assert.equal(summaryBody.totalSessions, 0);
-
-    assert.equal(sessionsStatus, 200);
-    assert.deepEqual(sessionsBody, { enabled: false, sessions: [] });
-
-    assert.equal(disabledSessionResponse.status, 403);
-  });
-
-  it("returns enabled payloads after opting in", async () => {
-    await patchJSON("/api/settings", { vscodeSessionsEnabled: true });
-
-    const { status: summaryStatus, body: summaryBody } = await getJSON("/api/vscode/summary");
-    const { status: sessionsStatus, body: sessionsBody } = await getJSON("/api/vscode/sessions");
-
-    assert.equal(summaryStatus, 200);
-    assert.equal(summaryBody.enabled, true);
-    assert.ok(Array.isArray(summaryBody.models));
-
-    assert.equal(sessionsStatus, 200);
-    assert.equal(sessionsBody.enabled, true);
-    assert.ok(Array.isArray(sessionsBody.sessions));
-  });
-});
-
-describe("GET /api/sessions", () => {
-  it("returns 200 with session list and aggregate", async () => {
-    const { status, body } = await getJSON("/api/sessions");
-    assert.equal(status, 200);
-    assert.ok(Array.isArray(body.sessions), "sessions should be an array");
-    assert.ok("aggregate" in body, "missing aggregate");
-  });
-
-  it("each session has expected fields", async () => {
-    const { body } = await getJSON("/api/sessions");
-    for (const s of body.sessions) {
-      assert.ok("id" in s, "missing id");
-      assert.ok("redirectionCount" in s, "missing redirectionCount");
-      assert.ok("redirectionRate" in s, "missing redirectionRate");
+    assert.equal(enabled.status, 200);
+    assert.equal(enabled.body.enableVSCode, true);
+    assert.equal(enabled.body.vscode.status, "unavailable");
+    assert.match(enabled.body.vscode.message, /usage metadata is unavailable/);
+    assert.match(enabled.body.vscode.message, /not read or analyzed/);
+    const persisted = JSON.parse(readFileSync(join(fixture.options.stateDir, "usage-state.json"), "utf8"));
+    assert.equal(persisted.enableVSCode, true);
+    for (const value of [{ enableVSCode: CANARY }, { vscodeSessionsEnabled: true }, { enableVSCode: false, unknown: CANARY }, null]) {
+      assert.equal((await request("/api/settings", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value),
+      })).status, 400);
     }
-  });
-});
-
-describe("GET /api/sessions/catalog", () => {
-  it("returns 200 with a metadata-only session list", async () => {
-    const { status, body } = await getJSON("/api/sessions/catalog");
-    assert.equal(status, 200);
-    assert.ok(Array.isArray(body.sessions), "sessions should be an array");
-    assert.ok(body.sessions.length >= testData.sessions.length, "should include all test sessions");
-    assert.ok("id" in body.sessions[0], "missing id");
-    assert.ok("createdAt" in body.sessions[0], "missing createdAt");
-  });
-});
-
-describe("GET /api/sessions/:id", () => {
-  it("returns 200 with session detail for a known session", async () => {
-    const { status, body } = await getJSON("/api/sessions/sess-redirect-1");
-    assert.equal(status, 200);
-    assert.ok("session" in body, "missing session");
-    assert.ok("stats" in body, "missing stats");
-    assert.ok("redirections" in body, "missing redirections");
-    assert.ok("telemetry" in body, "missing telemetry field");
-    assert.equal(body.session.id, "sess-redirect-1");
+    assert.equal((await request("/api/settings", { method: "POST" })).status, 404);
+    assert.equal(readFileSync(fixture.coachingFile, "utf8"), CANARY);
   });
 
-  it("returns 404 for an unknown session", async () => {
-    const { status, body } = await getJSON("/api/sessions/nonexistent-id");
-    assert.equal(status, 404);
-    assert.ok("error" in body);
-  });
-});
-
-describe("GET /api/sessions/:id/replay", () => {
-  it("returns 200 with annotated turns and summary", async () => {
-    const { status, body } = await getJSON("/api/sessions/sess-redirect-1/replay");
-    assert.equal(status, 200);
-    assert.ok("sessionId" in body, "missing sessionId");
-    assert.ok(Array.isArray(body.turns), "turns should be an array");
-    assert.ok("summary" in body, "missing summary");
-    assert.equal(body.sessionId, "sess-redirect-1");
-    assert.ok(body.summary.totalTurns > 0, "should have turns");
-  });
-});
-
-describe("GET /api/sessions/:id/efficiency", () => {
-  it("returns 200 for a session with enough turns", async () => {
-    const { status, body } = await getJSON("/api/sessions/sess-redirect-1/efficiency");
-    assert.equal(status, 200);
-    // May return efficiency data or a null-message envelope
-    if (body.efficiency === null) {
-      assert.ok("message" in body, "null result should include message");
-    } else {
-      assert.ok("turnEfficiency" in body || "efficiency" in body || "grade" in body || "score" in body,
-        "should contain efficiency data");
+  it("rejects malformed and legacy filters without reflecting values", async () => {
+    for (const query of ["timeframe=bad", "timeframe=7d&timeframe=all", `repo=${CANARY}`, `excludeIds=${RAW_ID}`, "includeHidden=yes", `model=${CANARY}`]) {
+      assert.equal((await request(`/api/sessions?${query}`)).status, 400);
     }
-  });
-
-  it("returns 200 for session with few turns (may be null)", async () => {
-    const { status } = await getJSON("/api/sessions/sess-clean-1/efficiency");
-    assert.equal(status, 200);
-  });
-});
-
-describe("GET /api/patterns", () => {
-  it("returns 200 with patterns array", async () => {
-    const { status, body } = await getJSON("/api/patterns");
-    assert.equal(status, 200);
-    assert.ok("patterns" in body, "missing patterns");
-    assert.ok(Array.isArray(body.patterns), "patterns should be an array");
-  });
-});
-
-describe("POST /api/practice/analyze", () => {
-  it("returns 200 with analysis for a valid prompt", async () => {
-    const { status, body } = await postJSON("/api/practice/analyze", {
-      text: "Create a React component for user login with email and password fields",
+    const response = await request("/api/settings", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: `{"${CANARY}":`,
     });
-    assert.equal(status, 200);
-    assert.ok("score" in body, "missing score");
-    assert.ok("grade" in body, "missing grade");
+    assert.equal(response.status, 400);
+    assert.equal((await request("/api/settings", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enableVSCode: CANARY.repeat(200) }),
+    })).status, 413);
   });
 
-  it("includes heuristics in response", async () => {
-    const { status, body } = await postJSON("/api/practice/analyze", {
-      text: "Create a React component for user login with email and password fields",
-    });
-    assert.equal(status, 200);
-    assert.ok("heuristics" in body, "missing heuristics");
-    assert.ok(Array.isArray(body.heuristics?.details), "heuristics.details should be an array");
-  });
-
-  it("returns 400 when text is missing", async () => {
-    const { status, body } = await postJSON("/api/practice/analyze", {});
-    assert.equal(status, 400);
-    assert.ok("error" in body);
-  });
-
-  it("returns 400 when text is too long", async () => {
-    const { status, body } = await postJSON("/api/practice/analyze", {
-      text: "x".repeat(10001),
-    });
-    assert.equal(status, 400);
-    assert.ok("error" in body);
-  });
-});
-
-describe("GET /api/practice/library", () => {
-  it("returns 200 with challenges array", async () => {
-    const { status, body } = await getJSON("/api/practice/library");
-    assert.equal(status, 200);
-    assert.ok("challenges" in body, "missing challenges");
-    assert.ok(Array.isArray(body.challenges), "challenges should be an array");
-    assert.ok("total" in body, "missing total");
-  });
-
-  it("supports tag filtering", async () => {
-    const { status, body } = await getJSON("/api/practice/library?tag=vague");
-    assert.equal(status, 200);
-    assert.ok(Array.isArray(body.challenges), "should return array");
-  });
-
-  it("supports random mode", async () => {
-    const { status, body } = await getJSON("/api/practice/library?random=1");
-    assert.equal(status, 200);
-    // Returns either a challenge object or null
-    assert.ok("total" in body, "missing total");
-  });
-
-  it("includes heuristics in random challenge response", async () => {
-    const { status, body } = await getJSON("/api/practice/library?random=1");
-    assert.equal(status, 200);
-    if (body.challenge) {
-      assert.ok("heuristics" in body.challenge, "challenge should include heuristics");
-      assert.ok(Array.isArray(body.challenge.heuristics?.details), "heuristics.details should be an array");
+  it("denies cross-origin and malformed origins before reading or mutating state", async () => {
+    for (const origin of ["https://evil.example", "null", CANARY, "http://localhost:9999", `${base}.evil.example`]) {
+      for (const [path, method] of [["/api/summary", "GET"], ["/api/refresh", "POST"], ["/api/settings", "PATCH"]]) {
+        assert.equal((await request(path, { method, headers: { Origin: origin } })).status, 403);
+      }
     }
-  });
-});
-
-describe("GET /api/chronicle/tips", () => {
-  it("returns 200 with a tips array", async () => {
-    const { status, body } = await getJSON("/api/chronicle/tips");
-    assert.equal(status, 200);
-    assert.ok(Array.isArray(body), "tips response should be an array");
-  });
-});
-
-describe("GET /api/chronicle/improve/:sessionId", () => {
-  it("returns 200 with improve suggestions for a known session", async () => {
-    const { status, body } = await getJSON("/api/chronicle/improve/sess-redirect-1");
-    assert.equal(status, 200);
-    assert.equal(body.sessionId, "sess-redirect-1");
-    assert.ok(Array.isArray(body.suggestions), "suggestions should be an array");
-    assert.equal(typeof body.overallAdvice, "string");
-  });
-
-  it("returns 404 for an unknown session", async () => {
-    const { status, body } = await getJSON("/api/chronicle/improve/does-not-exist");
-    assert.equal(status, 404);
-    assert.ok("error" in body);
-  });
-});
-
-describe("POST /api/devplan/goals — concurrent writes", () => {
-  it("handles concurrent goal additions without data loss", async () => {
-    // Use unique suffix to avoid conflicts with prior runs
-    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    // Fire 5 concurrent goal additions
-    const promises = Array.from({ length: 5 }, (_, i) =>
-      postJSON("/api/devplan/goals", {
-        pillar: "intent",
-        title: `Concurrent Goal ${i}-${suffix}`,
-        description: `Test goal ${i}`,
-        source: "test",
-      })
-    );
-    const results = await Promise.allSettled(promises);
-    const successes = results.filter((r) => r.status === "fulfilled" && r.value.status === 201);
-    // Some may be 409 (duplicate) but none should fail with 500
-    const serverErrors = results.filter((r) => r.status === "fulfilled" && r.value.status >= 500);
-    assert.equal(serverErrors.length, 0, "No server errors during concurrent writes");
-    assert.ok(successes.length >= 1, "At least one goal should be created");
-  });
-
-  it("handles concurrent goal status updates", async () => {
-    // First create a goal
-    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const { body: created } = await postJSON("/api/devplan/goals", {
-      pillar: "workDesign",
-      title: `Status Update Test-${suffix}`,
-      description: "Testing concurrent updates",
-      source: "test",
+    assert.equal((await request("/api/summary", { headers: { Origin: base } })).status, 200);
+    const hostResponse = await new Promise((done, reject) => {
+      const req = httpRequest(`${base}/api/summary`, { headers: { Host: "evil.example" } }, (res) => {
+        let text = "";
+        res.on("data", (chunk) => { text += chunk; });
+        res.on("end", () => done({ status: res.statusCode, text }));
+      });
+      req.on("error", reject);
+      req.end();
     });
-    if (!created?.id) return; // skip if creation failed
-    const goalId = created.id;
-    // Fire concurrent status updates
-    const promises = [
-      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "sufficient" }),
-      }),
-      fetch(`${BASE}/api/devplan/goals/${goalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "active" }),
-      }),
-    ];
-    const results = await Promise.allSettled(promises);
-    const serverErrors = results.filter(
-      (r) => r.status === "fulfilled" && r.value.status >= 500
-    );
-    assert.equal(serverErrors.length, 0, "No server errors during concurrent updates");
+    assert.equal(hostResponse.status, 403);
+    assertPrivate(assert, hostResponse.text);
+    assert.equal((await request("/api/summary", { headers: { "Sec-Fetch-Site": "cross-site" } })).status, 403);
+  });
+
+  it("retires content APIs with JSON errors rather than serving the SPA", async () => {
+    for (const path of [
+      "/api", "/api/patterns", "/api/suggestions", "/api/coach", "/api/coaching", "/api/sessions/hidden",
+      "/api%2Fcoach", "/%61pi/coach",
+      "/api/instructions", "/api/instruction-failures", "/api/practice", "/api/practice/analyze",
+      "/api/challenges", "/api/chronicle", "/api/chronicle/tips", "/api/devplan", "/api/dev-plan",
+      "/api/journal", "/api/live", "/api/analytics", "/api/work-style", "/api/replay",
+      "/api/vscode/summary", "/api/vscode/sessions", "/api/tokens/summary/progressive",
+      `/api/sessions/${RAW_ID}/replay`, `/api/sessions/${RAW_ID}/turns`,
+    ]) {
+      for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+        assert.equal((await request(path, { method })).status, 404, `${method} ${path}`);
+      }
+    }
+    const page = await fetch(`${base}/sessions`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /Synthetic usage UI/);
+  });
+
+  it("refresh reloads sources without changing handles", async () => {
+    const before = await request("/api/sessions?timeframe=all");
+    assert.deepEqual((await request("/api/refresh", { method: "POST" })).body, { ok: true });
+    const after = await request("/api/sessions?timeframe=all");
+    assert.deepEqual(after.body.sessions.map((s) => s.handle), before.body.sessions.map((s) => s.handle));
   });
 });

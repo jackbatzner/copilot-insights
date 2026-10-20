@@ -1,202 +1,115 @@
-// Output formatting — turns analysis results into readable markdown.
+import { safeModel } from "./usage-metrics.mjs";
 
-import { REDIRECTION_CATEGORIES } from "./patterns.mjs";
+const METRICS = [
+  ["requests", "Requests"], ["inputTokens", "Input tokens"], ["outputTokens", "Output tokens"],
+  ["totalTokens", "Total tokens"], ["cacheReadTokens", "Cache read tokens"],
+  ["cacheWriteTokens", "Cache write tokens"], ["totalNanoAiu", "Nano AIU"],
+  ["requestCost", "Recorded request cost (opaque unit)"],
+  ["apiDurationMs", "Session API duration (ms)"], ["durationMs", "Recorded request duration (ms)"],
+  ["ttftMs", "Mean time to first token (ms)"],
+  ["requestMultiplier", "Mean recorded request multiplier"],
+  ["outputTtftMs", "Mean output time to first token (ms)"],
+  ["interTokenLatencyMs", "Mean inter-token latency (ms)"],
+  ["contentFilteredRequests", "Content-filtered requests"],
+];
+const STATUSES = new Set(["recorded", "partial", "not-recorded", "derived"]);
+const SOURCES = new Set(["sessiondb", "jsonl", "jsonl-shutdown", "mixed", "not-recorded"]);
 
-/**
- * Format a single session analysis as markdown.
- */
-export function formatSessionReport(report) {
-  if (!report) return "❌ Session not found.";
+function recorded(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+function numeric(value) {
+  return recorded(value) ? String(value) : "Not recorded";
+}
+function modelName(value) {
+  return safeModel(value);
+}
+function metricsTable(metrics = {}, evidence = {}) {
+  const available = METRICS.filter(([key]) => recorded(metrics[key]));
+  if (!available.length) return "No recorded usage metrics.";
+  return [
+    "| Metric | Value | Evidence | Coverage |",
+    "| --- | ---: | --- | ---: |",
+    ...available.map(([key, label]) => {
+      const item = evidence[key] || {};
+      const status = STATUSES.has(item.status) ? item.status : "not-recorded";
+      const source = item.source === "jsonl-shutdown" ? "Shutdown aggregate" : SOURCES.has(item.source) ? item.source : "not-recorded";
+      return `| ${label} | ${numeric(metrics[key])} | ${status} (${source}) | ${numeric(item.recorded)} / ${numeric(item.total)} |`;
+    }),
+  ].join("\n");
+}
+function sourceNote(containers) {
+  const shutdown = containers.some((item) => item?.usageGranularity === "session-model-aggregate" ||
+    Object.values(item?.evidence ?? {}).some((entry) => entry?.source === "jsonl-shutdown"));
+  const notes = ["Local credits: Not recorded; no verified nano-AIU conversion is available."];
+  if (shutdown) notes.push("Shutdown aggregate uses one selected session-model snapshot, not exact request or child attribution; repeated snapshots are not added and coverage counts aggregate rows.");
+  if (containers.some((item) => recorded(item?.metrics?.requestCost))) notes.push("Request cost is an opaque recorded unit, not currency or local credits.");
+  if (containers.some((item) => item?.evidence?.apiDurationMs?.scope === "session" && recorded(item?.metrics?.apiDurationMs) ||
+    item?.evidence?.totalNanoAiu?.scope === "session")) notes.push("Session API duration and root nano-AIU totals are not allocated to models.");
+  return notes.join(" ");
+}
+function capabilityText(capabilities = {}) {
+  const status = (value) => ["available", "unavailable", "partial"].includes(value) ? value : "unavailable";
+  return `**Sources:** session DB ${status(capabilities.sessionDb)}; session state ${status(capabilities.sessionState)}.`;
+}
+function sessionLabel(session) {
+  return /^Session \d+$/.test(session?.label) ? session.label : "Session";
+}
+function sessionHandle(session) {
+  return /^[a-f0-9]{64}$/.test(session?.handle) ? session.handle : "Unavailable";
+}
 
-  const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
-    report;
+export function formatUsageSummary(snapshot) {
+  return [
+    "## Copilot usage", `**Sessions:** ${numeric(snapshot.sessionCount)}`,
+    "Session-scoped recorded usage for sessions with recorded activity or creation in the selected timeframe; source coverage may be partial.",
+    capabilityText(snapshot.capabilities), "", metricsTable(snapshot.metrics, snapshot.evidence),
+    "", sourceNote([snapshot, ...(snapshot.sessions ?? [])]),
+  ].join("\n");
+}
 
-  const lines = [
-    `## 🔄 Redirection Analysis`,
+export function formatUsageSessions({ sessions, capabilities, pagination }) {
+  const paged = pagination && [pagination.page, pagination.pages, pagination.total].every(Number.isSafeInteger)
+    && pagination.page >= 1 && pagination.pages >= pagination.page && pagination.total >= 0;
+  return [
+    "## Usage sessions", capabilityText(capabilities), "",
+    paged ? `**Page:** ${pagination.page} of ${pagination.pages}; **Matching sessions:** ${pagination.total}.`
+      : "Pagination metadata is unavailable.",
+    paged && pagination.page < pagination.pages
+      ? `Call insights_sessions with page: ${pagination.page + 1} and the same filters for the next page.`
+      : paged ? "No more matching sessions." : "",
     "",
-    `**Session:** \`${session.id.substring(0, 8)}…\``,
-  ];
-
-  if (session.repository) lines.push(`**Repo:** ${session.repository}`);
-  if (session.branch) lines.push(`**Branch:** \`${session.branch}\``);
-  if (session.summary) lines.push(`**Summary:** ${session.summary}`);
-  lines.push(`**Turns:** ${session.turnCount} · **Created:** ${session.createdAt}`);
-
-  lines.push("");
-  lines.push(scoreBar(stats));
-  lines.push("");
-
-  // Category breakdown
-  if (Object.keys(categoryBreakdown).length > 0) {
-    lines.push("### By Category");
-    lines.push("");
-    lines.push("| Category | Count | Severity |");
-    lines.push("|----------|------:|:--------:|");
-    for (const [cat, data] of Object.entries(categoryBreakdown)) {
-      const info = REDIRECTION_CATEGORIES[cat] || { emoji: "❓", label: cat };
-      lines.push(
-        `| ${info.emoji} ${info.label} | ${data.count} | ${weightBar(data.weight)} |`
-      );
-    }
-  }
-
-  // Individual redirections
-  if (redirections.length > 0) {
-    lines.push("");
-    lines.push("### Redirection Timeline");
-    lines.push("");
-    for (const r of redirections) {
-      const labels = r.matches.map((m) => {
-        const info = REDIRECTION_CATEGORIES[m.category] || { emoji: "❓" };
-        return `${info.emoji} ${m.label}`;
-      });
-      const msgPreview = cleanMessage(r.message);
-      lines.push(
-        `**Turn ${r.turnIndex}** ${labels.join(" · ")}`
-      );
-      lines.push(`> ${msgPreview}`);
-      lines.push("");
-    }
-  }
-
-  // File thrashing
-  if (thrashedFiles.length > 0) {
-    lines.push("### ⚠️ File Thrashing");
-    lines.push(
-      "*Files edited 3+ times — may indicate unclear requirements or repeated corrections:*"
-    );
-    lines.push("");
-    for (const f of thrashedFiles) {
-      lines.push(`- \`${f.file_path}\` — ${f.edit_count} edits`);
-    }
-  }
-
-  return lines.join("\n");
+    "| Session | Opaque handle | Models | Requests | Hidden |",
+    "| --- | --- | --- | ---: | --- |",
+    ...sessions.map((session) => `| ${sessionLabel(session)} | \`${sessionHandle(session)}\` | ${session.models.map(modelName).join(", ")} | ${numeric(session.metrics?.requests)} | ${session.hidden === true ? "Yes" : "No"} |`),
+    "", sourceNote(sessions),
+    "", "Use insights_session with an opaque handle for all-model session usage.",
+  ].join("\n");
 }
 
-/**
- * Format the multi-session summary report.
- */
-export function formatSummaryReport({ aggregate, sessions }) {
-  const lines = [
-    `## 📊 Redirection Summary`,
-    "",
-    `**Sessions analyzed:** ${aggregate.sessionsAnalyzed}`,
-    `**With redirections:** ${aggregate.sessionsWithRedirections}`,
-    `**Total redirections:** ${aggregate.totalRedirections}`,
-    `**Avg redirection rate:** ${(aggregate.avgRedirectionRate * 100).toFixed(1)}% of user turns`,
-    "",
-  ];
-
-  // Category totals
-  if (Object.keys(aggregate.categoryTotals).length > 0) {
-    lines.push("### Category Breakdown");
-    lines.push("");
-    lines.push("| Category | Total | Weight |");
-    lines.push("|----------|------:|-------:|");
-    for (const [cat, data] of Object.entries(aggregate.categoryTotals)) {
-      const info = REDIRECTION_CATEGORIES[cat] || { emoji: "❓", label: cat };
-      lines.push(`| ${info.emoji} ${info.label} | ${data.count} | ${data.weight} |`);
-    }
-    lines.push("");
-  }
-
-  // Top sessions by redirection weight
-  if (sessions.length > 0) {
-    lines.push("### Sessions Ranked by Redirection Severity");
-    lines.push("");
-    lines.push("| Session | Repo | Redirections | Rate | Score |");
-    lines.push("|---------|------|:------------:|:----:|:-----:|");
-    for (const r of sessions.slice(0, 10)) {
-      const id = r.session.id.substring(0, 8);
-      const repo = r.session.repository || "—";
-      const rate = `${(r.stats.redirectionRate * 100).toFixed(0)}%`;
-      lines.push(
-        `| \`${id}…\` | ${repo} | ${r.stats.totalRedirections} | ${rate} | ${weightBar(r.stats.totalWeight)} |`
-      );
-    }
-    lines.push("");
-    lines.push(
-      "💡 Use `insights_session` with a session ID for a detailed breakdown."
-    );
-  }
-
-  return lines.join("\n");
+export function formatUsageSession(detail) {
+  if (!detail) return "Session not found.";
+  const { session } = detail;
+  return [
+    `## ${sessionLabel(session)} usage`, `**Handle:** \`${sessionHandle(session)}\``,
+    capabilityText(detail.capabilities), "", metricsTable(session.metrics, session.evidence),
+    "", "### Attribution",
+    ...detail.attribution.map((group) => [
+      `#### ${group.scope === "primary" ? "Primary agent" : group.scope === "subagent" ? "Subagent" : "Unattributed"}`,
+      metricsTable(group.metrics, group.evidence),
+    ].join("\n")),
+    "", "Skills are session-level observations, not per-request attribution.",
+    "", sourceNote([session, ...detail.attribution]),
+  ].join("\n");
 }
 
-/**
- * Format top-patterns report.
- */
-export function formatTopPatterns(patterns) {
-  if (patterns.length === 0) {
-    return "✅ No redirection patterns found in recent sessions.";
-  }
-
-  const lines = [
-    `## 🏆 Top Redirection Patterns`,
-    "",
-    "| Pattern | Category | Occurrences | Example |",
-    "|---------|----------|:-----------:|---------|",
-  ];
-
-  for (const p of patterns.slice(0, 15)) {
-    const info = REDIRECTION_CATEGORIES[p.category] || {
-      emoji: "❓",
-      label: p.category,
-    };
-    const example =
-      p.examples.length > 0
-        ? cleanMessage(p.examples[0].message).substring(0, 60)
-        : "—";
-    lines.push(
-      `| ${p.label} | ${info.emoji} ${info.label} | ${p.count} | ${example} |`
-    );
-  }
-
-  lines.push("");
-  lines.push(
-    "💡 These are the patterns where the agent most often needed correction."
-  );
-
-  return lines.join("\n");
-}
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-function scoreBar(stats) {
-  const { totalRedirections, redirectionRate, totalWeight } = stats;
-  const ratePercent = (redirectionRate * 100).toFixed(1);
-
-  let emoji, verdict;
-  if (redirectionRate < 0.1) {
-    emoji = "🟢";
-    verdict = "Smooth sailing";
-  } else if (redirectionRate < 0.25) {
-    emoji = "🟡";
-    verdict = "Some course corrections";
-  } else if (redirectionRate < 0.4) {
-    emoji = "🟠";
-    verdict = "Frequent redirections";
-  } else {
-    emoji = "🔴";
-    verdict = "Heavy redirection — consider refining approach";
-  }
-
-  return `${emoji} **${verdict}** — ${totalRedirections} redirection(s) in ${ratePercent}% of turns (severity: ${totalWeight})`;
-}
-
-function weightBar(weight) {
-  if (weight <= 2) return "🟢";
-  if (weight <= 5) return "🟡";
-  if (weight <= 10) return "🟠";
-  return "🔴";
-}
-
-function cleanMessage(msg) {
-  return msg
-    .replace(/<[^>]+>/g, "") // strip XML tags
-    .replace(/\n+/g, " ") // collapse newlines
-    .replace(/\s+/g, " ") // collapse whitespace
-    .trim()
-    .substring(0, 200);
+export function formatUsageModels({ models, capabilities }) {
+  return [
+    "## Model usage", capabilityText(capabilities),
+    ...models.map((model) => [
+      `### ${modelName(model.model)}`, `**Sessions:** ${numeric(model.sessionCount)}`,
+      metricsTable(model.metrics, model.evidence),
+    ].join("\n")),
+    sourceNote(models),
+  ].join("\n\n");
 }

@@ -1,448 +1,138 @@
 #!/usr/bin/env node
-// Generates a mock session-store.db with realistic Copilot CLI session data
-// and mock JSONL session-state files for token usage screenshots.
-
 import Database from "better-sqlite3";
-import { randomUUID } from "node:crypto";
-import { resolve, dirname } from "node:path";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, unlinkSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = resolve(__dirname, "..", "mock-session-store.db");
-const MOCK_SESSION_STATE = resolve(__dirname, "..", "mock-session-state");
+export const PRIVACY_CANARY = "SYNTHETIC_PRIVATE_CONTENT_DO_NOT_DISPLAY";
 
-if (existsSync(DB_PATH)) unlinkSync(DB_PATH);
-if (existsSync(MOCK_SESSION_STATE)) rmSync(MOCK_SESSION_STATE, { recursive: true, force: true });
-const db = new Database(DB_PATH);
-
-// ── Schema ──────────────────────────────────────────────────────
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    repository TEXT,
-    branch TEXT,
-    summary TEXT,
-    created_at TEXT,
-    updated_at TEXT,
-    host_type TEXT DEFAULT 'cli',
-    cwd TEXT
-  );
-  CREATE TABLE IF NOT EXISTS turns (
-    session_id TEXT,
-    turn_index INTEGER,
-    user_message TEXT,
-    assistant_response TEXT,
-    timestamp TEXT,
-    PRIMARY KEY (session_id, turn_index)
-  );
-  CREATE TABLE IF NOT EXISTS session_files (
-    session_id TEXT,
-    file_path TEXT,
-    tool_name TEXT,
-    turn_index INTEGER,
-    first_seen_at TEXT
-  );
-  CREATE TABLE IF NOT EXISTS session_refs (
-    session_id TEXT,
-    ref_type TEXT,
-    ref_value TEXT,
-    turn_index INTEGER,
-    created_at TEXT
-  );
-  CREATE TABLE IF NOT EXISTS checkpoints (
-    session_id TEXT,
-    checkpoint_number INTEGER,
-    title TEXT,
-    overview TEXT,
-    history TEXT,
-    work_done TEXT,
-    technical_details TEXT,
-    important_files TEXT,
-    next_steps TEXT,
-    PRIMARY KEY (session_id, checkpoint_number)
-  );
-`);
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-function daysAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d;
-}
-
-function isoDate(date) {
-  return date.toISOString();
-}
-
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function randInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// ── Data pools ──────────────────────────────────────────────────
-
-const repos = [
-  "user/web-app",
-  "user/api-service",
-  "user/mobile-app",
-  "user/shared-utils",
-];
-
-const branches = [
-  "feature/auth",
-  "feature/dashboard",
-  "feature/notifications",
-  "feature/search",
-  "feature/payments",
-  "fix/login-bug",
-  "fix/memory-leak",
-  "fix/race-condition",
-  "fix/null-pointer",
-  "refactor/cleanup",
-  "refactor/extract-service",
-  "chore/update-deps",
-];
-
-const summaries = [
-  "Implemented JWT authentication flow with refresh tokens",
-  "Fixed login form validation and error handling",
-  "Added user search with debounced input",
-  "Refactored database queries for pagination support",
-  "Created notification service with WebSocket updates",
-  "Fixed memory leak in event listener cleanup",
-  "Added unit tests for payment processing module",
-  "Migrated REST endpoints to new router structure",
-  "Built dashboard analytics charts with Recharts",
-  "Fixed race condition in concurrent API calls",
-  "Updated TypeScript types for API response models",
-  "Added caching layer for frequently accessed data",
-  "Implemented dark mode toggle with CSS variables",
-  "Fixed null pointer in user profile component",
-  "Refactored auth middleware into separate module",
-  "Created shared utility functions for date formatting",
-  "Added integration tests for checkout flow",
-  "Fixed mobile responsiveness issues on settings page",
-  "Implemented file upload with progress tracking",
-  "Added rate limiting middleware to API endpoints",
-  "Built user onboarding wizard component",
-  "Fixed timezone handling in scheduled tasks",
-  "Added error boundary components for React pages",
-  "Implemented pagination for session list view",
-  "Refactored CSS to use design tokens",
-];
-
-// Good messages — clear, focused prompts
-const goodUserMessages = [
-  "Add a login form component with email and password fields",
-  "Create a REST endpoint for GET /api/users/:id",
-  "Write unit tests for the calculateTotal function",
-  "Add TypeScript types for the API response",
-  "Refactor the auth middleware to use async/await",
-  "Add error handling to the database connection",
-  "Create a reusable Button component with variants",
-  "Add pagination to the sessions list API endpoint",
-  "Write a migration script for the new schema",
-  "Add input validation for the signup form",
-  "Create a custom hook for fetching data with loading state",
-  "Implement the search bar with debounced queries",
-  "Add CORS configuration for the Express server",
-  "Write integration tests for the checkout flow",
-  "Add a loading spinner component",
-  "Create the user profile page layout",
-  "Implement file upload with drag and drop",
-  "Add rate limiting to the API endpoints",
-  "Write a helper function for formatting dates",
-  "Set up the WebSocket connection for notifications",
-];
-
-// Convention messages — user teaching the agent project rules
-// These trigger instruction-gap detection ("always use", "don't use", "we use", "put files in")
-const conventionMessages = [
-  "Always use TypeScript in this project, not plain JavaScript",
-  "Don't use class-based components — we only use functional components with hooks",
-  "We always use vitest for testing, never jest",
-  "Put test files in __tests__/ next to the source file",
-  "Always use named exports, never default exports",
-  "We use pnpm, not npm or yarn",
-  "Don't use any inline styles — always use CSS modules",
-  "Always add JSDoc comments to exported functions",
-  "We always use Tailwind CSS for styling in this repo",
-  "Put all API route handlers in src/routes/ directory",
-  "Don't use console.log — use the project logger instead",
-  "We prefer zod for validation over manual checks",
-  "Always use async/await, never .then() chains",
-  "Put shared types in src/types/ and import from there",
-  "We use ESM imports, not CommonJS require",
-  "Don't use any as a TypeScript type — be explicit",
-];
-
-// Redirection messages — user correcting the agent
-const redirectionMessages = [
-  "No, that's wrong. I said to use async/await, not callbacks",
-  "Go back and undo that change, it broke the tests",
-  "I already told you to use TypeScript, not plain JavaScript",
-  "Actually, do it with a class component instead of hooks",
-  "Undo that — the previous version was better",
-  "Still broken. The error is on line 42, not line 30",
-  "That's not what I asked for. Read my first message again",
-  "No no no. Use PostgreSQL, not MySQL. I said this already",
-  "Go back to the previous approach, this one doesn't work",
-  "Wrong file! I said to edit src/auth.ts, not src/utils.ts",
-  "Actually, scratch that. Let me rethink the approach",
-  "This is still failing the same way. Try a different approach",
-  "I keep telling you — the API returns an array, not an object",
-  "Why did you change that file? I didn't ask for that",
-  "That's completely wrong. The endpoint should be POST not GET",
-  "No, revert those changes. You're modifying the wrong module",
-  "You're repeating the same mistake. The type is string not number",
-  "Still not working. Can you actually read the error message?",
-  "I said add validation, not remove the existing checks",
-  "Go back to step 1, everything since then has been wrong",
-];
-
-// Realistic assistant responses
-const assistantResponses = [
-  "I've created the component with the requested fields. Here's what I added:\n\n```tsx\nexport function LoginForm() {\n  const [email, setEmail] = useState('');\n  ...\n}\n```",
-  "Done! I've added the REST endpoint at `src/routes/users.ts`. It handles GET requests and returns user data from the database.",
-  "I've written 5 unit tests covering the main scenarios including edge cases for empty arrays and negative numbers.",
-  "Updated the TypeScript types in `src/types/api.ts`. The new interface covers all response fields including optional metadata.",
-  "Refactored the middleware to use async/await. I also added proper error handling with try/catch blocks.",
-  "Added error handling with retry logic and connection pooling. The database will now gracefully handle connection failures.",
-  "Created the Button component with 'primary', 'secondary', and 'danger' variants. It supports disabled state and loading indicator.",
-  "I've added the pagination with `limit` and `offset` query parameters. The response now includes `total` count for the frontend.",
-  "I see the issue — I was using the wrong import. Let me fix that and use the correct module path.",
-  "You're right, I apologize for the confusion. Let me revert that change and implement it correctly with async/await.",
-  "I've corrected the approach. Now using the proper API endpoint and handling the array response correctly.",
-  "Fixed! The issue was a missing null check. I've added proper validation before accessing the property.",
-  "I've reverted my changes and started fresh with the approach you specified. Here's the updated implementation.",
-  "Good catch — I've updated the file path and made the edit in the correct location now.",
-  "Applied the fix to the correct file. The tests should pass now with the updated type annotations.",
-  "I've implemented the search functionality with a 300ms debounce to avoid excessive API calls.",
-  "Set up the WebSocket connection with automatic reconnection logic and message queuing.",
-  "Created the migration script with up/down functions. It adds the new columns and backfills existing data.",
-  "Added comprehensive input validation using zod schema. Invalid inputs return descriptive error messages.",
-  "Here's the custom hook:\n\n```ts\nexport function useFetch<T>(url: string) {\n  const [data, setData] = useState<T | null>(null);\n  ...\n}\n```",
-];
-
-const filePaths = [
-  "src/components/LoginForm.tsx",
-  "src/components/Button.tsx",
-  "src/components/SearchBar.tsx",
-  "src/components/UserProfile.tsx",
-  "src/components/Dashboard.tsx",
-  "src/components/Sidebar.tsx",
-  "src/routes/users.ts",
-  "src/routes/auth.ts",
-  "src/routes/sessions.ts",
-  "src/routes/payments.ts",
-  "src/middleware/auth.ts",
-  "src/middleware/rateLimit.ts",
-  "src/services/database.ts",
-  "src/services/notifications.ts",
-  "src/services/cache.ts",
-  "src/utils/dates.ts",
-  "src/utils/validation.ts",
-  "src/types/api.ts",
-  "src/types/user.ts",
-  "tests/auth.test.ts",
-  "tests/users.test.ts",
-  "tests/payments.test.ts",
-  "package.json",
-  "tsconfig.json",
-  ".env",
-];
-
-// ── Generate sessions ───────────────────────────────────────────
-
-const insertSession = db.prepare(
-  `INSERT INTO sessions (id, repository, branch, summary, created_at, updated_at, host_type, cwd)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-);
-const insertTurn = db.prepare(
-  `INSERT INTO turns (session_id, turn_index, user_message, assistant_response, timestamp)
-   VALUES (?, ?, ?, ?, ?)`
-);
-const insertFile = db.prepare(
-  `INSERT INTO session_files (session_id, file_path, tool_name, turn_index, first_seen_at)
-   VALUES (?, ?, ?, ?, ?)`
-);
-const insertRef = db.prepare(
-  `INSERT INTO session_refs (session_id, ref_type, ref_value, turn_index, created_at)
-   VALUES (?, ?, ?, ?, ?)`
-);
-
-const sessionCount = 25;
-const sessionIds = [];
-
-const seedAll = db.transaction(() => {
-  for (let i = 0; i < sessionCount; i++) {
-    const sid = randomUUID();
-    sessionIds.push(sid);
-
-    const repo = pick(repos);
-    const branch = pick(branches);
-    const summary = pick(summaries);
-    const startDay = randInt(1, 30);
-    const created = daysAgo(startDay);
-    const updated = new Date(created.getTime() + randInt(10, 120) * 60000);
-    const cwd = `/home/dev/projects/${repo.split("/")[1]}`;
-
-    insertSession.run(
-      sid, repo, branch, summary,
-      isoDate(created), isoDate(updated),
-      "cli", cwd
-    );
-
-    // Determine session quality: ~40% will be "bad" (lots of redirections)
-    const isBadSession = Math.random() < 0.4;
-    const turnCount = randInt(5, 15);
-    const redirectionRate = isBadSession ? 0.5 : 0.1;
-
-    const sessionFiles = [];
-
-    for (let t = 0; t < turnCount; t++) {
-      const roll = Math.random();
-      const isRedirection = roll < redirectionRate;
-      const isConvention = !isRedirection && roll < redirectionRate + 0.15;
-      const userMsg = isRedirection
-        ? pick(redirectionMessages)
-        : isConvention
-          ? pick(conventionMessages)
-          : pick(goodUserMessages);
-      const assistantMsg = pick(assistantResponses);
-      const turnTime = new Date(created.getTime() + t * randInt(30, 300) * 1000);
-
-      insertTurn.run(sid, t, userMsg, assistantMsg, isoDate(turnTime));
-
-      // Generate file edits for some turns
-      if (Math.random() < 0.7) {
-        const filePath = pick(filePaths);
-        const toolName = Math.random() < 0.3 ? "create" : "edit";
-        insertFile.run(sid, filePath, toolName, t, isoDate(turnTime));
-        sessionFiles.push(filePath);
-      }
-    }
-
-    // For bad sessions, add extra edits on the same file (thrashing)
-    if (isBadSession) {
-      const thrashFile = pick(filePaths);
-      const thrashCount = randInt(3, 6);
-      for (let f = 0; f < thrashCount; f++) {
-        const turnIdx = randInt(0, turnCount - 1);
-        const turnTime = new Date(created.getTime() + turnIdx * randInt(30, 300) * 1000);
-        insertFile.run(sid, thrashFile, "edit", turnIdx, isoDate(turnTime));
-      }
-    }
-
-    // Add refs for some sessions
-    if (Math.random() < 0.6) {
-      const commitSha = randomUUID().replace(/-/g, "").slice(0, 12);
-      insertRef.run(sid, "commit", commitSha, turnCount - 1, isoDate(updated));
-    }
-    if (Math.random() < 0.3) {
-      const prNum = String(randInt(100, 500));
-      insertRef.run(sid, "pr", prNum, turnCount - 1, isoDate(updated));
-    }
-
-    // Add checkpoints for ~40% of sessions (longer ones)
-    if (turnCount >= 8 && Math.random() < 0.4) {
-      const cpCount = randInt(1, 3);
-      const insertCheckpoint = db.prepare(
-        `INSERT INTO checkpoints (session_id, checkpoint_number, title, overview, work_done, next_steps)
-         VALUES (?, ?, ?, ?, ?, ?)`
+// Every invocation creates new synthetic sources outside the checkout and user stores.
+export function createSyntheticFixture({ empty = false, extraSessions = 0, withoutExactUsage = false } = {}) {
+  if (!Number.isInteger(extraSessions) || extraSessions < 0 || extraSessions > 100) {
+    throw new Error("Synthetic extra-session count must be an integer from 0 to 100.");
+  }
+  const directory = mkdtempSync(join(tmpdir(), "copilot-insights-fixture-"));
+  const dbPath = join(directory, "session-store.db");
+  const sessionStatePath = join(directory, "session-state");
+  const stateDir = join(directory, "app-state");
+  mkdirSync(sessionStatePath);
+  mkdirSync(stateDir);
+  const db = new Database(dbPath);
+  const ids = Array.from({ length: 8 + extraSessions }, (_, index) => `synthetic-private-session-${String(index + 1).padStart(2, "0")}`);
+  const now = Date.now();
+  const time = (days, offset = 0) => new Date(now - days * 86_400_000 + offset).toISOString();
+  try {
+    db.exec(`
+      CREATE TABLE sessions (
+        id TEXT PRIMARY KEY, created_at TEXT, updated_at TEXT, repository TEXT,
+        branch TEXT, summary TEXT, cwd TEXT, host_type TEXT
       );
-      const cpTitles = ["Initial setup and scaffolding", "Core feature implementation", "Testing and polish"];
-      const cpOverviews = [
-        "Set up project structure and installed dependencies.",
-        "Implemented the main feature with tests.",
-        "Added error handling, documentation, and final polish.",
-      ];
-      const cpWorkDone = [
-        "Created package.json, configured build tools, set up directory structure.",
-        "Built core logic, added API endpoints, wrote unit tests.",
-        "Fixed edge cases, added JSDoc comments, updated README.",
-      ];
-      const cpNextSteps = [
-        "Implement core business logic and write tests.",
-        "Add error handling and edge case coverage.",
-        "Final review, merge PR, deploy.",
-      ];
-      for (let c = 0; c < cpCount; c++) {
-        insertCheckpoint.run(sid, c + 1, cpTitles[c], cpOverviews[c], cpWorkDone[c], cpNextSteps[c]);
-      }
+      CREATE TABLE turns (session_id TEXT, turn_index INTEGER, user_message TEXT, assistant_response TEXT, timestamp TEXT);
+      CREATE TABLE assistant_usage_events (
+        session_id TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER,
+        turn_index INTEGER, agent_id TEXT, parent_tool_call_id TEXT,
+        cache_read_tokens INTEGER, cache_write_tokens INTEGER, total_nano_aiu INTEGER,
+        request_multiplier REAL, duration_ms REAL, time_to_first_token_ms REAL,
+        output_ttft_ms REAL, inter_token_latency_ms REAL, finish_reason TEXT,
+        content_filter_triggered INTEGER, created_at TEXT
+      );
+    `);
+    if (!empty) {
+      const insertSession = db.prepare("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, 'cli')");
+      const insertTurn = db.prepare("INSERT INTO turns VALUES (?, 0, ?, ?, ?)");
+      ids.forEach((id, index) => {
+        const days = index === 5 ? 60 : index % 28 + 1;
+        insertSession.run(id, time(days), time(days, 120_000), `${PRIVACY_CANARY}/repository`,
+          `${PRIVACY_CANARY}/branch`, PRIVACY_CANARY, `C:\\${PRIVACY_CANARY}`);
+        insertTurn.run(id, PRIVACY_CANARY, PRIVACY_CANARY, time(days));
+      });
+      const insertUsage = db.prepare(`INSERT INTO assistant_usage_events VALUES (
+        @session, @model, @input, @output, @turn, @agent, @parent, @cacheRead, @cacheWrite,
+        @nano, @multiplier, @duration, @ttft, @outputTtft, @interLatency, @finish, @contentFiltered, @created
+      )`);
+      const usage = (session, model, input, output, overrides = {}) => insertUsage.run({
+        session, model, input, output, turn: 0, agent: null, parent: null, cacheRead: 0, cacheWrite: 0,
+        nano: null, multiplier: 1, duration: 1200, ttft: 120, outputTtft: null, interLatency: null,
+        finish: "stop", contentFiltered: 0, created: time(1), ...overrides,
+      });
+      usage(ids[0], "gpt-5.4", 10_000, 1_000, { cacheRead: 4000, nano: 123_456_789 });
+      usage(ids[0], "claude-sonnet-4.6", 30_000, 1_000, {
+        parent: "synthetic-child-a", cacheRead: 20_000, duration: 4000, multiplier: 2,
+        outputTtft: 500, interLatency: 25, contentFiltered: 1, finish: "content_filter",
+        created: time(2), turn: 2,
+      });
+      usage(ids[0], "claude-sonnet-4.6", 19_000, 1_000, {
+        parent: "synthetic-child-a", cacheRead: 15_000, ttft: null, interLatency: 15, turn: 2, finish: "tool_calls",
+      });
+      usage(ids[0], "claude-sonnet-4.6", 700, 100, { agent: "synthetic-unmatched-agent", cacheRead: null, turn: null });
+      usage(ids[1], "claude-sonnet-4.6", 8000, 500, { parent: "synthetic-child-b", cacheRead: 7000, finish: "error", created: time(2) });
+      usage(ids[2], "claude-sonnet-4.6", 3000, 500, { agent: "synthetic-unmatched-agent", cacheRead: null, duration: null, ttft: null, created: time(3) });
+      usage(ids[2], PRIVACY_CANARY, 0, 0, { agent: "synthetic-unmatched-agent", duration: 0, ttft: 0, created: null });
+      usage(ids[5], "gpt-4.1", 2000, 200, { created: time(60) });
+      if (withoutExactUsage) db.exec("DELETE FROM assistant_usage_events");
+
+      const writeEvents = (index, events) => {
+        const path = join(sessionStatePath, ids[index]);
+        mkdirSync(path);
+        writeFileSync(join(path, "events.jsonl"), events.map((event, i) => JSON.stringify({
+          id: `synthetic-event-${index}-${i}`, timestamp: time(index === 5 ? 60 : index + 1, i * 1000),
+          ...event,
+        })).join("\n") + "\n");
+      };
+      const start = { type: "session.start", data: { selectedModel: "gpt-5.4", context: { cwd: PRIVACY_CANARY } } };
+      const tool = (toolCallId) => ({ type: "tool.execution_start", data: { toolCallId, toolName: "task", arguments: { prompt: PRIVACY_CANARY, command: PRIVACY_CANARY } } });
+      const child = (toolCallId) => ({ type: "subagent.started", data: {
+        toolCallId, agentType: "explore", agentName: PRIVACY_CANARY, model: "claude-sonnet-4.6", prompt: PRIVACY_CANARY,
+      } });
+      const skill = { type: "skill.invoked", data: { name: PRIVACY_CANARY } };
+      writeEvents(0, [start, tool("synthetic-child-a"), child("synthetic-child-a"), skill, skill,
+        { type: "subagent.completed", data: { toolCallId: "synthetic-child-a", durationMs: 4200, result: PRIVACY_CANARY } },
+        { type: "assistant.message", data: { content: PRIVACY_CANARY, outputTokens: 999_999 } }]);
+      writeEvents(1, [start, tool("synthetic-child-b"), child("synthetic-child-b"),
+        { type: "subagent.failed", data: { toolCallId: "synthetic-child-b", durationMs: 2000, error: PRIVACY_CANARY } },
+        { type: "session.shutdown", data: {} }]);
+      writeEvents(2, [start, { type: "session.shutdown", data: {} }]);
+      writeEvents(3, [{ type: "session.start", data: { selectedModel: "gpt-5-mini" } },
+        { type: "assistant.message", data: { outputTokens: 420, content: PRIVACY_CANARY } },
+        { type: "session.shutdown", data: {} }]);
+      writeEvents(5, [{ type: "session.start", data: { selectedModel: "gpt-4.1" } }, { type: "session.shutdown", data: {} }]);
+      const shutdown = {
+        type: "session.shutdown",
+        data: {
+          totalApiDurationMs: 2200,
+          totalNanoAiu: 16_000_000,
+          modelMetrics: {
+            "gpt-5-mini": {
+              requests: { count: 2, cost: 0.5 },
+              usage: { inputTokens: 5000, outputTokens: 420, cacheReadTokens: 3000, cacheWriteTokens: 0 },
+              totalNanoAiu: 12_000_000,
+              description: PRIVACY_CANARY,
+            },
+          },
+        },
+      };
+      writeEvents(6, [{ type: "session.start", data: { selectedModel: "gpt-5-mini" } },
+        { type: "assistant.message", data: { outputTokens: 420, content: PRIVACY_CANARY } }, shutdown, shutdown]);
+      writeEvents(7, [{ type: "session.start", data: { selectedModel: "gpt-5.4-mini" } }, {
+        type: "session.shutdown",
+        data: {
+          totalApiDurationMs: 0,
+          modelMetrics: {
+            "gpt-5.4-mini": { requests: { count: 2, cost: 0 }, usage: { outputTokens: 345 } },
+          },
+        },
+      }]);
     }
+  } finally {
+    db.close();
   }
-});
-
-seedAll();
-db.close();
-
-// ── Generate mock JSONL session-state files ─────────────────
-// Creates events.jsonl files with realistic token data and model assignments
-// so the Token Usage dashboard shows populated charts and costs.
-
-const models = [
-  "claude-sonnet-4.6",
-  "claude-sonnet-4.5",
-  "claude-haiku-4.5",
-  "claude-opus-4.7",
-  "gpt-5.4",
-  "gpt-5.2",
-  "gpt-5-mini",
-  "gpt-4.1",
-];
-
-// Weight distribution: most sessions use sonnet/gpt-5 class models
-const modelWeights = [0.25, 0.15, 0.10, 0.05, 0.20, 0.10, 0.10, 0.05];
-function pickWeighted(arr, weights) {
-  const r = Math.random();
-  let sum = 0;
-  for (let i = 0; i < weights.length; i++) {
-    sum += weights[i];
-    if (r < sum) return arr[i];
-  }
-  return arr[arr.length - 1];
+  return {
+    directory, dbPath, sessionStatePath, stateDir, ids,
+    usageDays: { recent: time(1).slice(0, 10), child: time(2).slice(0, 10), unattributed: time(3).slice(0, 10) },
+  };
 }
 
-mkdirSync(MOCK_SESSION_STATE, { recursive: true });
-
-for (const sid of sessionIds) {
-  const sessionDir = resolve(MOCK_SESSION_STATE, sid);
-  mkdirSync(sessionDir, { recursive: true });
-
-  const model = pickWeighted(models, modelWeights);
-  const lines = [];
-
-  // Model change event
-  lines.push(JSON.stringify({
-    type: "session.model_change",
-    data: { newModel: model },
-    timestamp: new Date().toISOString(),
-  }));
-
-  // Generate assistant message events with realistic token counts
-  // Token ranges vary by model tier
-  const isLarge = model.includes("opus") || model.includes("gpt-5.4");
-  const isMini = model.includes("mini") || model.includes("haiku") || model.includes("gpt-4.1");
-  const turnCount = randInt(3, 12);
-
-  for (let t = 0; t < turnCount; t++) {
-    const baseOutput = isMini ? randInt(200, 800) : isLarge ? randInt(800, 3500) : randInt(400, 2000);
-    lines.push(JSON.stringify({
-      type: "assistant.message",
-      data: { outputTokens: baseOutput },
-      timestamp: new Date(Date.now() - (turnCount - t) * 60000).toISOString(),
-    }));
-  }
-
-  writeFileSync(resolve(sessionDir, "events.jsonl"), lines.join("\n") + "\n");
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.log(JSON.stringify(createSyntheticFixture(), null, 2));
 }
-
-console.log(`✅ Seeded ${sessionCount} sessions → ${DB_PATH}`);
-console.log(`✅ Generated ${sessionIds.length} mock JSONL files → ${MOCK_SESSION_STATE}`);

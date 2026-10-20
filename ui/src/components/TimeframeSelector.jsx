@@ -21,11 +21,11 @@ export function TimeframeSelector({ value, onChange }) {
     }
     e.preventDefault();
     onChange(OPTIONS[next].value);
-    e.currentTarget.parentElement.querySelectorAll("[role='tab']")[next]?.focus();
+    e.currentTarget.parentElement.querySelectorAll("[role='radio']")[next]?.focus();
   };
 
   return (
-    <div className="timeframe-selector" role="tablist" aria-label="Time range">
+    <div className="timeframe-selector" role="radiogroup" aria-label="Time range">
       {OPTIONS.map((opt, idx) => {
         const isActive = value === opt.value;
         return (
@@ -33,8 +33,8 @@ export function TimeframeSelector({ value, onChange }) {
             key={opt.value}
             className={`tf-btn${isActive ? " active" : ""}`}
             onClick={() => onChange(opt.value)}
-            role="tab"
-            aria-selected={isActive}
+            role="radio"
+            aria-checked={isActive}
             tabIndex={isActive ? 0 : -1}
             onKeyDown={(e) => handleKeyDown(e, idx)}
           >

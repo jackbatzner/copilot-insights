@@ -1,892 +1,186 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import { fetchSessionDetail, fetchSessionSprawl, fetchSessionEfficiency, fetchSessionReplay, fetchSessionComplexity, fetchHiddenSessions, hideSession, unhideSession, fetchSessionTokens, fetchChronicleImprove, fetchSessionIntent, fetchIntentSuggestion, setSessionIntent } from "../api.js";
-import { ScoreBadge, rateColor, CATEGORY_META } from "../components/ScoreBadge.jsx";
-import { CategoryBreakdown } from "../components/CategoryBreakdown.jsx";
-import { RedirectionTimeline } from "../components/RedirectionTimeline.jsx";
-import { MetricHelp } from "../components/MetricHelp";
-import { TabBar, TabPanel } from "../components/TabBar.jsx";
-import { SkeletonGrid, SkeletonCard } from "../components/SkeletonCard.jsx";
-import { useProgressivePageData } from "../hooks/useProgressivePageData.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { fetchSessionDetail, fetchSessions, fetchSessionTools, setSessionHidden } from "../api.js";
+import { useUsageData } from "../hooks/useUsageData.js";
+import { scopeLabels, useUsageQuery, validUtcDay } from "../hooks/useUsageQuery.js";
+import { AllMetrics, Capabilities, Evidence, formatDate, formatMetric, knownNumber, LoadState, MetricGrid, MetricValue, PageHeading, Recommendation, Skills, UsageTotal } from "../components/Usage.jsx";
+import TurnUsage from "../components/TurnUsage.jsx";
+import ToolActivity, { AgentToolActivity } from "../components/ToolActivity.jsx";
+import { LocalContentConsent, LocalContentPanel, LocalContentProvider } from "../components/LocalContent.jsx";
+import { useRefresh } from "../App.jsx";
 
-function formatLocalCredits(cost) {
-  const credits = (cost || 0) / 0.01;
-  if (credits === 0) return "0";
-  if (credits < 1) return credits.toFixed(2);
-  if (credits >= 1000) return `${(credits / 1000).toFixed(1)}K`;
-  return credits.toFixed(1);
+const correlations = { "exact-child": "Exact child linkage", "recorded-primary": "Recorded primary", unattributed: "No exact linkage recorded" };
+const outcomes = { completed: "Completed", failed: "Failed", cancelled: "Cancelled", mixed: "Mixed", "not-recorded": "Not recorded" };
+const scopeOrder = { primary: 0, subagent: 1, unattributed: 2 };
+
+function InvocationMetadata({ group }) {
+  const values = [
+    knownNumber(group.durationMs) && `Invocation duration: ${formatMetric(group.durationMs, "durationMs")}`,
+    group.requestedModel && `Requested model: ${group.requestedModel}`,
+    group.invocationCategory && `Category: ${group.invocationCategory}`,
+  ].filter(Boolean);
+  return values.length ? <p className="scope-note">{values.join(" · ")}</p> : null;
+}
+
+function SelectedSessionUsage({ session, query }) {
+  const { timeframe, model, day, scope, includeHidden } = query;
+  const state = useUsageData(useCallback(async (options) => {
+    const value = await fetchSessions(timeframe, { model, day, scope, session: session.handle, includeHidden: includeHidden || session.hidden }, options);
+    return value.sessions.find((entry) => entry.handle === session.handle) || null;
+  }, [timeframe, model, day, scope, includeHidden, session]));
+  return <section className="selected-usage" aria-label="Matching usage totals"><h2>Matching usage only</h2>
+    <LoadState {...state} skeleton="metrics" loadingLabel="Loading matching usage totals...">{state.data ? <MetricGrid metrics={state.data.selectedUsage} evidence={state.data.selectedEvidence}
+      names={[knownNumber(state.data.selectedUsage.totalTokens) ? "totalTokens" : "outputTokens", "requests", "cacheReadTokens"]} compact />
+      : <p>No recorded usage matches this session and the current selection.</p>}</LoadState>
+    <p className="scope-note">Model, scope and UTC day must match the same record. These are not whole-session totals; shutdown aggregates cannot match a request day.</p>
+  </section>;
 }
 
 export default function SessionDetail() {
-  const { id } = useParams();
-  const [isHidden, setIsHidden] = useState(false);
-  const [tab, setTab] = useState("summary");
-  const [sessionIntent, setSessionIntentState] = useState(null);
-  const [intentSuggestion, setIntentSuggestion] = useState(null);
-
-  const initialEntries = useMemo(() => ({
-    data: () => fetchSessionDetail(id),
-    sprawl: () => fetchSessionSprawl(id).catch(() => null),
-    efficiency: () => fetchSessionEfficiency(id).catch(() => null),
-    replay: () => fetchSessionReplay(id).catch(() => null),
-    complexity: () => fetchSessionComplexity(id).catch(() => null),
-    hiddenData: () => fetchHiddenSessions().catch(() => ({ sessionIds: [] })),
-    sessionIntentData: () => fetchSessionIntent(id).catch(() => null),
-    intentSuggestionData: () => fetchIntentSuggestion(id).catch(() => null),
-  }), [id]);
-  const deferredByTab = useMemo(() => ({
-    improve: { improve: () => fetchChronicleImprove(id).catch(() => null) },
-    tokens: { tokenInfo: () => fetchSessionTokens(id).catch(() => null) },
-  }), [id]);
-  const { data: pageData, loading, error } = useProgressivePageData({
-    deps: [id],
-    initialEntries,
-    deferredByTab,
-    activeTab: tab,
-    validateInitial: (next, results) => {
-      if (next.data) return null;
-      const firstRejected = results.find((result) => result.status === "rejected");
-      return firstRejected?.reason?.message || "Failed to load session details.";
-    },
-  });
-  const {
-    data,
-    sprawl,
-    efficiency,
-    replay,
-    complexity,
-    hiddenData,
-    tokenInfo,
-    improve,
-    sessionIntentData,
-    intentSuggestionData,
-  } = pageData;
-
+  const { handle } = useParams();
+  const query = useUsageQuery();
+  const state = useUsageData(useCallback((options) => fetchSessionDetail(handle, options, "summary"), [handle]), { pollActive: true });
+  const revision = state.data?.revision ?? state.data?.session;
+  const tools = useUsageData(useCallback((options) => fetchSessionTools(handle, options), [handle, revision]), { enabled: Boolean(revision) });
+  const [saving, setSaving] = useState(false);
+  const [hideError, setHideError] = useState(null);
+  const [openAttribution, setOpenAttribution] = useState({});
+  const [view, setView] = useState("turns");
+  const { key: refreshKey, refreshing } = useRefresh();
+  const attributionNodes = useRef(new Map());
+  const returnTarget = useRef(null);
+  const [returnKey, setReturnKey] = useState(null);
   useEffect(() => {
-    setIsHidden(hiddenData?.sessionIds?.includes(id) ?? false);
-  }, [hiddenData, id]);
-
-  useEffect(() => {
-    setSessionIntentState(sessionIntentData?.intent ?? null);
-  }, [sessionIntentData]);
-
-  useEffect(() => {
-    setIntentSuggestion(intentSuggestionData ?? null);
-  }, [intentSuggestionData]);
-
-  const toggleHide = useCallback(async () => {
+    returnTarget.current = null;
+    setReturnKey(null);
+    setOpenAttribution({});
+    setView("turns");
+  }, [handle]);
+  const data = state.data;
+  const selectedModel = data?.session.models.find((model) => model === query.model);
+  const inspectAttribution = (key, origin = document.activeElement) => {
+    const node = attributionNodes.current.get(key);
+    if (!node) return;
+    returnTarget.current = { node: origin, view };
+    setView("agents");
+    setReturnKey(key);
+    setOpenAttribution((previous) => ({ ...previous, [key]: true }));
+    node.open = true;
+    requestAnimationFrame(() => {
+      node.querySelector("summary").focus();
+      node.scrollIntoView({ block: "nearest" });
+    });
+  };
+  const returnToOrigin = () => {
+    const target = returnTarget.current;
+    setView(target?.view || "turns");
+    requestAnimationFrame(() => {
+      const origin = target?.node?.isConnected ? target.node : document.getElementById("turn-usage-heading");
+      if (!origin) return;
+      if (origin.tagName === "H2") origin.tabIndex = -1;
+      origin.focus({ preventScroll: true });
+      origin.scrollIntoView({ block: "nearest" });
+    });
+    setReturnKey(null);
+  };
+  const hide = async () => {
+    setSaving(true);
+    setHideError(null);
     try {
-      if (isHidden) { await unhideSession(id); setIsHidden(false); }
-      else { await hideSession(id); setIsHidden(true); }
-    } catch (err) {
-      console.warn("Failed to toggle session visibility:", err.message);
-    }
-  }, [id, isHidden]);
-
-  if (loading) return (
-    <>
-      <div className="page-header"><h1>Session Detail</h1></div>
-      <SkeletonGrid count={4} />
-      <SkeletonCard lines={5} />
-      <SkeletonCard lines={3} />
-    </>
-  );
-  if (error) return (
-    <div className="empty">
-      <div className="empty-icon">⚠️</div>
-      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-        {error.includes("HTTP 404")
-          ? "Session not found. It may have been deleted or the ID is incorrect."
-          : error.includes("HTTP 500")
-          ? "Couldn't load session details. Make sure the Copilot Insights server is running."
-          : error}
-      </p>
-    </div>
-  );
-  if (!data) return null;
-
-  const { session, stats, categoryBreakdown, redirections, thrashedFiles } =
-    data;
-  const telemetry = data.telemetry;
-  const toolUsage = telemetry?.toolUsage || [];
-  const skillUsage = telemetry?.skillUsage || [];
-  const subagentUsage = telemetry?.subagentUsage || [];
-  const hookUsage = telemetry?.hookUsage || [];
-  const modelMetrics = telemetry?.shutdown?.modelMetrics || [];
-
-  const isLearningSession = complexity && complexity.breakdown && complexity.breakdown.fileOps === 0 && complexity.breakdown.uniqueFiles === 0;
-
-  // Testing/feedback session detection:
-  // 1. Scan user messages for feedback-like language patterns
-  // 2. Also check structural signals: high turns, repeated file edits, plan mode usage
-  const isTestingSession = (() => {
-    if (isLearningSession) return false;
-    const FEEDBACK_PATTERNS = /\b(feedback|round of|another round|testing|let'?s fix|here'?s what|improvements?|issues?:|bugs?:|fix(es|ing)?:|update(s|d)?:|change(s|d)?:|should be|needs to|doesn'?t (work|look|line|align|match)|still (not|doesn'?t|broken|wrong|missing)|try again|one more)\b/i;
-    const PLAN_PATTERNS = /\[\[PLAN\]\]|plan mode/i;
-
-    let feedbackTurns = 0;
-    let planTurns = 0;
-    const userMessages = replay?.turns?.filter(t => t.speaker === "user") || [];
-
-    for (const turn of userMessages) {
-      const msg = turn.messagePreview || "";
-      if (FEEDBACK_PATTERNS.test(msg)) feedbackTurns++;
-      if (PLAN_PATTERNS.test(msg)) planTurns++;
-    }
-
-    // Auto-suggest if: multiple feedback-patterned turns, or plan mode + high corrections
-    const hasFeedbackLanguage = feedbackTurns >= 3;
-    const hasStructuralSignals = session.turnCount >= 20 && stats.redirectionRate >= 0.15 && complexity?.breakdown?.fileOps > 3;
-
-    return hasFeedbackLanguage || (planTurns >= 2 && hasStructuralSignals);
-  })();
-
-  const handleIntentChange = async (intent) => {
-    const newIntent = sessionIntent === intent ? null : intent;
-    const previousIntent = sessionIntent;
-    setSessionIntentState(newIntent);
-    try {
-      await setSessionIntent(id, newIntent);
-    } catch (err) {
-      setSessionIntentState(previousIntent);
-      console.warn("Failed to save intent:", err.message);
+      await setSessionHidden(handle, !data.session.hidden);
+      state.retry();
+    } catch {
+      setHideError("Session visibility could not be changed. Try again.");
+    } finally {
+      setSaving(false);
     }
   };
-
-  return (
-    <>
-      <Link to="/sessions" className="back-link">
-        ← Back to Sessions
-      </Link>
-
-      <div className="page-header" style={{ flexDirection: "column", alignItems: "flex-start" }}>
-        <h1>🔍 Session Detail</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", maxWidth: "100%" }}>
-          <p style={{ margin: 0, minWidth: 0 }}>
-            <code style={{ wordBreak: "break-all", fontSize: "clamp(10px, 2.5vw, 14px)" }}>{session.id}</code>
-          </p>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "3px 8px",
-              borderRadius: 999,
-              border: "1px solid var(--border-color)",
-              background: "rgba(88, 166, 255, 0.08)",
-              color: "var(--accent)",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.04em",
-            }}
-          >
-            CLI
-          </span>
-          <button
-            onClick={toggleHide}
-            style={{
-              background: isHidden ? "#da3633" : "var(--bg-card)",
-              color: isHidden ? "#fff" : "var(--text-secondary)",
-              border: "1px solid var(--border-color)",
-              borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 13,
-              whiteSpace: "nowrap", flexShrink: 0,
-            }}
-          >
-            {isHidden ? "🙈 Hidden from analysis" : "Hide from analysis"}
-          </button>
-        </div>
+  return <LocalContentProvider key={handle} handle={handle} refreshing={refreshing} refreshKey={refreshKey}>
+    <Link className="back-link" to={query.link("/sessions")}>← Back to Sessions</Link>
+    <LoadState {...state} skeleton="detail" loadingLabel="Loading session totals and attribution...">{data && <div className="session-explorer">
+      <PageHeading title={data.session.label} description="Follow a turn into its model calls, agents and recorded evidence." />
+      <div className="section-heading"><p className="scope-note">Created {formatDate(data.session.createdAt)} · {data.session.source === "cli" ? "Copilot CLI" : "VS Code"}</p>
+        <button onClick={hide} disabled={saving}>{saving ? "Saving..." : data.session.hidden ? "Unhide session" : "Hide session"}</button></div>
+      {hideError && <p role="alert" className="notice error">{hideError}</p>}
+      {(query.model || query.day || query.scope) && <div className="notice session-filter-context" aria-label="Session filter context">
+        {query.model && <strong>Selected model: {selectedModel || "Not recorded in this session"}</strong>}
+        {query.scope && <p>Selected scope: {scopeLabels[query.scope] || "Invalid scope filter"}</p>}
+        {query.day && <p>Selected UTC day: {validUtcDay(query.day) ? query.day : "Invalid day filter"}</p>}
+      </div>}
+      {(query.model || query.day || query.scope) && <SelectedSessionUsage session={data.session} query={query} />}
+      <section className="detail-summary" aria-label="Whole-session totals">
+        <h2>Whole-session totals (all models)</h2>
+        <MetricGrid metrics={data.session.metrics} evidence={data.session.evidence}
+          names={[knownNumber(data.session.metrics.totalTokens) ? "totalTokens" : "outputTokens", "requests", "cacheReadTokens"]} compact />
+      </section>
+      <LocalContentConsent />
+      <nav className="detail-sections" aria-label="Session analysis">
+        {[["turns", "Turns"], ["agents", "Agents & models"], ["tools", "Tool activity"]].map(([key, label]) =>
+          <button key={key} aria-pressed={view === key} aria-controls={`session-view-${key}`} onClick={() => setView(key)}>{label}</button>)}
+        <Link to={query.link("/tokens/compare", { session: handle, timeframe: "all", includeHidden: data.session.hidden || query.includeHidden ? "true" : "" })}>Compare models for this session</Link>
+      </nav>
+      <div id="session-view-turns" hidden={view !== "turns"}>
+        <TurnUsage key={`${handle}:${query.model}:${query.scope}:${query.day}`} handle={handle} revision={revision} models={data.session.models}
+          attribution={data.attribution} toolUsage={tools.data} initialFilters={query} onInspect={inspectAttribution} />
       </div>
-
-      {/* Session metadata */}
-      <div className="stats-grid">
-        {session.repository && (
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-header">Repository</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>
-              {session.repository}
-            </div>
-          </div>
-        )}
-        {session.branch && (
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-header">Branch</div>
-            <div style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>
-              <code style={{ wordBreak: "break-all" }}>{session.branch}</code>
-            </div>
-          </div>
-        )}
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header">Total Turns</div>
-          <div className="stat-value">{session.turnCount}</div>
-        </div>
-        <div className="card" style={{ textAlign: "center" }}>
-          <div className="card-header"><MetricHelp
-            label="Redirections"
-            definition="Turns where you corrected, redirected, or repeated yourself to the agent. Each one means the agent didn't do what you wanted on the first try."
-            target="Fewer is better. Under 10% of turns is smooth; over 25% means your opening prompt needed more context."
-            action="Add file paths, constraints, and acceptance criteria to your first message. The clearer your initial prompt, the fewer redirections you'll need."
-          /></div>
-          <div className={`stat-value ${rateColor(stats.redirectionRate)}`}>
-            {stats.totalRedirections}
-          </div>
-          <div className="stat-label">
-            <ScoreBadge rate={stats.redirectionRate} />
-          </div>
-        </div>
-        {stats.autoGeneratedCount > 0 && (
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-header">Auto-generated</div>
-            <div className="stat-value" style={{ color: "#6e7681" }}>
-              🤖 {stats.autoGeneratedCount}
-            </div>
-            <div className="stat-label">turns excluded</div>
-          </div>
-        )}
-        {complexity && (
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="card-header"><MetricHelp
-              label="Complexity"
-              definition="A measure of how complex this session was — based on file operations, unique files touched, and checkpoints created."
-              target="Not a target — just context. Higher complexity sessions naturally have more redirections."
-            /></div>
-            <div className="stat-value">{complexity.tierEmoji} {complexity.complexityScore}</div>
-            <div className="stat-label">{complexity.tier}</div>
-            <div className="stat-sub">{complexity.fileOps} ops · {complexity.uniqueFiles} files · {complexity.checkpointCount} checkpoints</div>
-          </div>
-        )}
+      <div id="session-view-agents" hidden={view !== "agents"}>
+      <section aria-labelledby="attribution-heading"><div className="section-heading"><div>
+        <h2 id="attribution-heading">Usage attribution</h2><p>Scope → model → metrics and evidence. Expand only what you need.</p>
+      </div></div>
+        <div className="attribution-tree">{[...data.attribution].sort((a, b) => scopeOrder[a.scope] - scopeOrder[b.scope]).map((group) => <details className="card attribution-group" key={group.key}
+          open={Boolean(openAttribution[group.key])}
+          id={`attribution-${data.attribution.findIndex((entry) => entry.key === group.key)}`}
+          onToggle={(event) => {
+            if (event.target === event.currentTarget) {
+              const open = event.currentTarget.open;
+              setOpenAttribution((previous) => ({ ...previous, [group.key]: open }));
+            }
+          }}
+          ref={(node) => { if (node) attributionNodes.current.set(group.key, node); else attributionNodes.current.delete(group.key); }}>
+          <summary><span><strong>{group.label}</strong><span className="scope-note">{correlations[group.correlation]}</span></span>
+            {query.scope === group.scope && <span className="pill">Selected scope</span>}
+            <span className="attribution-total"><UsageTotal metrics={group.metrics} />{group.outcome !== "not-recorded" && <span className="scope-note">{outcomes[group.outcome]}</span>}</span>
+          </summary>
+          {returnKey === group.key && <button className="return-to-call" onClick={returnToOrigin}>Return to model call or tool link</button>}
+          <p className="scope-note">Whole invocation / scope totals across this session, not just the matching calls.</p>
+          <Evidence value={group.evidence.totalTokens} />
+          <InvocationMetadata group={group} />
+          <AgentToolActivity group={tools.data?.groups.find((entry) => entry.attributionKey === group.key)} />
+          {openAttribution[group.key] && group.correlation === "exact-child" && <LocalContentPanel kind="agent" attributionKey={group.key} />}
+          {group.models.length ? group.models.map((row) => <details className="model-attribution" key={row.model}>
+            <summary><strong>{row.model}</strong>{query.model === row.model && <span className="pill">Selected model</span>}
+              <span><UsageTotal metrics={row.metrics} /></span></summary>
+            {Object.values(row.evidence).some((value) => value.source === "jsonl-shutdown") &&
+              <p className="scope-note">Session/model shutdown aggregate. Individual request and child attribution are unavailable for these totals.</p>}
+            <AllMetrics metrics={row.metrics} evidence={row.evidence} />
+          </details>) : <><p>Model breakdown not recorded. Available scope evidence:</p><AllMetrics metrics={group.metrics} evidence={group.evidence} /></>}
+        </details>)}</div>
+        {!data.attribution.length && <div className="notice">Attribution is not recorded.</div>}
+      </section>
+      <div className="card"><Skills skills={data.skills} /></div>
       </div>
-
-      {/* Session Intent */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Session Intent</div>
-        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-          What was this session&apos;s purpose? This adjusts how your scores are calculated.
-        </p>
-        {intentSuggestion && !sessionIntent && (
-          <div style={{
-            background: "var(--bg-hover)",
-            border: "1px solid var(--accent)",
-            borderRadius: 8,
-            padding: "8px 12px",
-            marginBottom: 8,
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-          }}>
-            <span>💡 Suggested: <strong>{intentSuggestion.intent.charAt(0).toUpperCase() + intentSuggestion.intent.slice(1)}</strong></span>
-            <span style={{ color: "var(--text-muted)" }}>
-              ({intentSuggestion.confidence} confidence{intentSuggestion.signals.length > 0 ? ` — ${intentSuggestion.signals[0]}` : ""})
-            </span>
-            <button
-              onClick={() => handleIntentChange(intentSuggestion.intent)}
-              style={{
-                background: "var(--accent)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                padding: "4px 12px",
-                cursor: "pointer",
-                fontSize: 11,
-                marginLeft: "auto",
-              }}
-            >
-              Accept
-            </button>
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            { id: "build", emoji: "🎯", label: "Build", desc: "Clear deliverable" },
-            { id: "explore", emoji: "🧠", label: "Explore", desc: "Research & learn" },
-            { id: "iterate", emoji: "🔄", label: "Iterate", desc: "Brainstorm & Improve" },
-            { id: "debug", emoji: "🔧", label: "Debug", desc: "Troubleshoot" },
-          ].map(({ id: intentId, emoji, label, desc }) => (
-            <button
-              key={intentId}
-              onClick={() => handleIntentChange(intentId)}
-              style={{
-                background: sessionIntent === intentId ? "var(--accent)" : "var(--bg-card)",
-                color: sessionIntent === intentId ? "#fff" : "var(--text-secondary)",
-                border: `1px solid ${sessionIntent === intentId ? "var(--accent)" : "var(--border-color)"}`,
-                borderRadius: 8,
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: 13,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                minWidth: 90,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>{emoji}</span>
-              <strong>{label}</strong>
-              <span style={{ fontSize: 10, opacity: 0.7 }}>{desc}</span>
-            </button>
-          ))}
-        </div>
+      <div id="session-view-tools" hidden={view !== "tools"}>
+        <LoadState {...tools} loadingLabel="Loading tool activity...">{tools.data && <ToolActivity value={tools.data} attribution={data.attribution} onInspect={inspectAttribution} />}</LoadState>
       </div>
-
-      {session.summary && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">Summary</div>
-          <p>{session.summary}</p>
-        </div>
-      )}
-
-      <TabBar
-        tabs={[
-          { id: "summary", label: "📊 Summary" },
-          { id: "deep-dive", label: "🎬 Deep Dive" },
-          { id: "improve", label: "📈 Chronicle Improve" },
-          { id: "tokens", label: "💰 Tokens" },
-        ]}
-        activeTab={tab}
-        onTabChange={setTab}
-      />
-
-      <TabPanel id="summary" activeTab={tab}>
-      {/* Session grade + coaching tips from replay */}
-      {replay?.summary && (() => {
-        const gradeColors = { A: "#3fb950", B: "#58a6ff", C: "#d29922", D: "#f85149" };
-        const grade = replay.summary.overallGrade;
-        return (
-          <>
-          <div className="stats-grid" style={{ marginBottom: 24 }}>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: gradeColors[grade] || "var(--text)", fontSize: 36 }}>
-                {grade}
-              </div>
-              <div className="stat-label">Session Grade</div>
-              <div className="stat-sub">{replay.summary.totalTurns} turns reviewed</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: "#3fb950" }}>
-                {replay.summary.goodSignals}
-              </div>
-              <div className="stat-label">Good Signals</div>
-              <div className="stat-sub">delegation, quality catches, clear feedback</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: "#f85149" }}>
-                {replay.summary.redirectionCount + replay.summary.dripFeedCount + replay.summary.rubberStampCount}
-              </div>
-              <div className="stat-label">Areas to Improve</div>
-              <div className="stat-sub">{replay.summary.redirectionCount} redirections · {replay.summary.dripFeedCount} drip-feeds · {replay.summary.rubberStampCount} rubber stamps</div>
-            </div>
-          </div>
-          <div className="card" style={{ marginBottom: 24, borderLeft: `3px solid ${gradeColors[grade] || "var(--text-muted)"}` }}>
-            <div className="card-header">📐 Grade Breakdown</div>
-            {isLearningSession && (
-              <div style={{ background: "rgba(88, 166, 255, 0.1)", border: "1px solid rgba(88, 166, 255, 0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "var(--accent)" }}>
-                📚 Learning session — delegation metrics don't apply here.
-              </div>
-            )}
-            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0" }}>
-              Average of delegation + judgment + feedback (each 0-100).
-              <strong style={{ color: "var(--text)" }}> A</strong> ≥ 80 · <strong style={{ color: "var(--text)" }}>B</strong> ≥ 65 · <strong style={{ color: "var(--text)" }}>C</strong> ≥ 50 · <strong style={{ color: "var(--text)" }}>D</strong> &lt; 50
-            </p>
-          </div>
-          </>
-        );
-      })()}
-
-      {replay?.summary?.coachingTips?.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">💡 Coaching Tips</div>
-          <ul style={{ margin: 0, padding: "8px 0 0 20px", listStyle: "none" }}>
-            {replay.summary.coachingTips.map((tip, i) => (
-              <li key={i} style={{ padding: "6px 0", color: "var(--text)", fontSize: 14, lineHeight: 1.5 }}>
-                <span style={{ marginRight: 8, color: "#d29922" }}>💬</span>{tip}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Efficiency + Sprawl badges */}
-      {(efficiency || sprawl) && (
-        <div className="stats-grid" style={{ marginBottom: 24 }}>
-          {efficiency && (
-            <>
-              <div className="stat-card">
-                <div className="stat-value" style={{ color: efficiency.grade?.color || "var(--text)" }}>
-                  {efficiency.grade?.emoji} {Math.round(efficiency.efficiencyRatio * 100)}%
-                </div>
-                <div className="stat-label">Turn Efficiency</div>
-                <div className="stat-sub">{efficiency.productiveTurns} productive / {efficiency.turnCount} total</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value" style={{ color: efficiency.recoverySpeed.avgTurns <= 2 ? "#3fb950" : "#f85149" }}>
-                  {efficiency.recoverySpeed.avgTurns || "—"}
-                </div>
-                <div className="stat-label">Avg Recovery</div>
-                <div className="stat-sub">turns after redirect ({efficiency.recoverySpeed.incidents} incidents)</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-value">{efficiency.completion?.emoji}</div>
-                <div className="stat-label">{efficiency.completion?.label}</div>
-                <div className="stat-sub">session outcome</div>
-              </div>
-            </>
-          )}
-          {sprawl && (
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: sprawl.level?.color === "red" ? "#f85149" : sprawl.level?.color === "yellow" ? "#d29922" : "#3fb950" }}>
-                {sprawl.level?.emoji} {sprawl.sprawlScore}
-              </div>
-              <div className="stat-label">{sprawl.level?.label}</div>
-              <div className="stat-sub">{sprawl.fileSpread?.directories} dirs, {sprawl.fileSpread?.files} files touched</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {telemetry && (
-        <>
-          <div className="stats-grid" style={{ marginBottom: 24 }}>
-            <div className="stat-card">
-              <div className="stat-value">{telemetry.currentModel || "—"}</div>
-              <div className="stat-label">Current Model</div>
-              <div className="stat-sub">{telemetry.modelChanges.length} model switch{telemetry.modelChanges.length === 1 ? "" : "es"}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{telemetry.modeChanges.length}</div>
-              <div className="stat-label">Mode Changes</div>
-              <div className="stat-sub">plan / interactive / autopilot</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{Math.round((telemetry.shutdown?.totalApiDurationMs || 0) / 1000)}s</div>
-              <div className="stat-label">API Duration</div>
-              <div className="stat-sub">{telemetry.shutdown?.totalPremiumRequests || 0} premium request{(telemetry.shutdown?.totalPremiumRequests || 0) === 1 ? "" : "s"}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{(telemetry.shutdown?.currentTokens || 0).toLocaleString()}</div>
-              <div className="stat-label">Context Tokens</div>
-              <div className="stat-sub">{(telemetry.shutdown?.systemTokens || 0).toLocaleString()} system · {(telemetry.shutdown?.conversationTokens || 0).toLocaleString()} convo</div>
-            </div>
-          </div>
-
-          <div className="charts-grid" style={{ marginBottom: 24 }}>
-            <div className="card">
-              <div className="card-header">Runtime Telemetry</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
-                <div><strong>Copilot version:</strong> {telemetry.start?.copilotVersion || "unknown"}</div>
-                <div><strong>Producer:</strong> {telemetry.start?.producer || "unknown"}</div>
-                <div><strong>Started with:</strong> {telemetry.start?.selectedModel || "unknown model"}</div>
-                <div><strong>Shutdown:</strong> {telemetry.shutdown?.shutdownType || "unknown"}</div>
-                <div><strong>Code changes:</strong> +{telemetry.shutdown?.codeChanges?.linesAdded || 0} / -{telemetry.shutdown?.codeChanges?.linesRemoved || 0} across {(telemetry.shutdown?.codeChanges?.filesModified || []).length} file(s)</div>
-              </div>
-              {telemetry.modeChanges.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Mode timeline</div>
-                  {telemetry.modeChanges.map((change, index) => (
-                    <div key={`${change.timestamp || "mode"}-${index}`} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                      {change.previousMode || "unknown"} → <strong style={{ color: "var(--text)" }}>{change.newMode || "unknown"}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {telemetry.modelChanges.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Model switches</div>
-                  {telemetry.modelChanges.map((change, index) => (
-                    <div key={`${change.timestamp || "model"}-${index}`} style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                      <strong style={{ color: "var(--text)" }}>{change.newModel}</strong>
-                      {change.reasoningEffort ? ` · ${change.reasoningEffort}` : ""}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="card">
-              <div className="card-header">Tool Activity</div>
-              {toolUsage.length > 0 ? (
-                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                  <tbody>
-                    {toolUsage.slice(0, 8).map((tool) => (
-                      <tr key={tool.name} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={{ padding: "6px 0" }}>{tool.name}</td>
-                        <td style={{ padding: "6px 0", textAlign: "right" }}>{tool.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="empty" style={{ padding: 24 }}>
-                  <p>No tool execution events captured.</p>
-                </div>
-              )}
-              {(skillUsage.length > 0 || subagentUsage.length > 0 || hookUsage.length > 0) && (
-                <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                  {skillUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Skills:</strong> {skillUsage.map((skill) => `${skill.name} (${skill.count})`).join(", ")}</div>}
-                  {subagentUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Subagents:</strong> {subagentUsage.map((agent) => `${agent.name} (${agent.count})`).join(", ")}</div>}
-                  {hookUsage.length > 0 && <div><strong style={{ color: "var(--text)" }}>Hooks:</strong> {hookUsage.map((hook) => `${hook.name} (${hook.count})`).join(", ")}</div>}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {modelMetrics.length > 0 && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <div className="card-header">Per-Model Usage</div>
-              <div style={{ maxHeight: 320, overflow: "auto" }}>
-                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                      <th style={{ padding: "6px 8px" }}>Model</th>
-                      <th style={{ padding: "6px 8px" }}>Requests</th>
-                      <th style={{ padding: "6px 8px" }}>Input</th>
-                      <th style={{ padding: "6px 8px" }}>Output</th>
-                      <th style={{ padding: "6px 8px" }}>Cache Read</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modelMetrics.map((metric) => (
-                      <tr key={metric.model} style={{ borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.05))" }}>
-                        <td style={{ padding: "6px 8px" }}>{metric.model}</td>
-                        <td style={{ padding: "6px 8px" }}>{metric.requests}</td>
-                        <td style={{ padding: "6px 8px" }}>{metric.inputTokens.toLocaleString()}</td>
-                        <td style={{ padding: "6px 8px" }}>{metric.outputTokens.toLocaleString()}</td>
-                        <td style={{ padding: "6px 8px" }}>{metric.cacheReadTokens.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Category breakdown + repeated edits side by side */}
-      <div className="charts-grid" style={{ marginBottom: 24 }}>
-        <div className="card">
-          <div className="card-header">Category Breakdown</div>
-          <CategoryBreakdown categoryTotals={categoryBreakdown} />
-        </div>
-        <div className="card">
-          <div className="card-header">
-            <MetricHelp
-              label={thrashedFiles.length > 0 ? "⚠️ Repeated File Edits" : "File Edits"}
-              definition="When the same file is edited many times in one session — a sign of iterative refinement that could be reduced with clearer initial direction."
-              target="Minimal re-editing. If a file is edited 5+ times, consider providing more detail upfront."
-              action="Specify expected behavior and constraints in your first message."
-            />
-          </div>
-          {thrashedFiles.length > 0 ? (
-            <ul className="thrash-list">
-              {thrashedFiles.map((f, i) => (
-                <li key={i} className="thrash-item">
-                  <code>{f.file_path}</code>
-                  <span className="thrash-count">{f.edit_count} edits</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="empty" style={{ padding: 30 }}>
-              <p>No repeated file edits detected ✅</p>
-            </div>
-          )}
-        </div>
-      </div>
-      </TabPanel>
-
-      <TabPanel id="deep-dive" activeTab={tab}>
-      {/* Sprawl details */}
-      {sprawl && (sprawl.scopeAdditions?.length > 0 || sprawl.topicShifts?.length > 0) && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">📐 Session Sprawl</div>
-          {sprawl.scopeAdditions?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, color: "#d29922", marginBottom: 8 }}>
-                Scope Additions ({sprawl.scopeAdditions.length})
-              </h3>
-              {sprawl.scopeAdditions.map((s, i) => (
-                <div key={i} className="sprawl-item">
-                  <span className="sprawl-turn">Turn {s.turnIndex}</span>
-                  <span className="sprawl-label">{s.label}</span>
-                  <span className="sprawl-msg">{s.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {sprawl.topicShifts?.length > 0 && (
-            <div>
-              <h3 style={{ fontSize: 14, color: "#58a6ff", marginBottom: 8 }}>
-                Topic Shifts ({sprawl.topicShifts.length})
-              </h3>
-              {sprawl.topicShifts.map((s, i) => (
-                <div key={i} className="sprawl-item">
-                  <span className="sprawl-turn">Turn {s.fromTurn} → {s.toTurn}</span>
-                  <span className="sprawl-msg">{s.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Anti-pattern signals */}
-      {efficiency && (efficiency.dripFeeding?.count > 0 || efficiency.responseSkimming?.count > 0) && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div className="card-header">🔍 Improvement Opportunities</div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {efficiency.dripFeeding?.count > 0 && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{ fontSize: 14, color: "#d29922", marginBottom: 8 }}>
-                  💧 Context Drip-Feeding ({efficiency.dripFeeding.count})
-                </h3>
-                {efficiency.dripFeeding.instances.map((d, i) => (
-                  <div key={i} className="sprawl-item">
-                    <span className="sprawl-turn">Turn {d.turnIndex}</span>
-                    <span className="sprawl-msg">{d.message}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {efficiency.responseSkimming?.count > 0 && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{ fontSize: 14, color: "#f85149", marginBottom: 8 }}>
-                  👀 Response Skimming ({efficiency.responseSkimming.count})
-                </h3>
-                {efficiency.responseSkimming.instances.map((s, i) => (
-                  <div key={i} className="sprawl-item">
-                    <span className="sprawl-turn">Turn {s.turnIndex}</span>
-                    <span className="sprawl-msg">{s.message}</span>
-                    <span className="stat-sub" style={{ wordBreak: "break-word" }}>({s.responseLength} char response → {s.userMessageLength} char reply)</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Session replay annotations (falls back to redirection timeline) */}
-      <div className="card">
-        <div className="card-header">{replay ? "🎬 Session Replay" : "Redirection Timeline"}</div>
-        {replay?.turns?.length > 0 ? (
-          <div style={{ padding: "12px 0", maxHeight: 600, overflowY: "auto" }}>
-            {replay.turns.map((turn) => (
-              <div
-                key={turn.turnIndex}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  padding: "10px 12px",
-                  borderBottom: "1px solid var(--border)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <span style={{ fontSize: 12, color: "var(--text-muted)", minWidth: 28, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                  #{turn.turnIndex}
-                </span>
-                <span style={{ fontSize: 16, minWidth: 20, flexShrink: 0 }}>
-                  {turn.speaker === "user" ? "👤" : "🤖"}
-                </span>
-                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                  <div style={{ fontSize: 13, color: "var(--text)", marginBottom: turn.tags?.length ? 6 : 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                    {turn.messagePreview}
-                  </div>
-                  {turn.tags?.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {turn.tags.map((tag, ti) => (
-                        <span
-                          key={ti}
-                          title={tag.tip || tag.label}
-                          style={{
-                            display: "inline-block",
-                            padding: "2px 8px",
-                            borderRadius: 12,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#0d1117",
-                            backgroundColor: tag.color || "#8b949e",
-                            cursor: tag.tip ? "help" : "default",
-                          }}
-                        >
-                          {tag.label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ padding: "12px 0" }}>
-            <RedirectionTimeline redirections={redirections} />
-          </div>
-        )}
-      </div>
-      </TabPanel>
-
-      <TabPanel id="improve" activeTab={tab}>
-        <div className="card" style={{ marginBottom: 16, borderLeft: "3px solid var(--accent)" }}>
-          <div className="card-header">📈 Chronicle Improve</div>
-          <p style={{ color: "var(--text-muted)", fontSize: 12, padding: "0 16px" }}>
-            {improve?.overallAdvice || "Chronicle coaching is not available for this session yet. When it is, you'll see concrete suggestions for improving your next similar session."}
-          </p>
-        </div>
-
-        {improve && improve.suggestions && improve.suggestions.length > 0 ? (
-          <div>
-            {improve.suggestions.map((s, i) => (
-              <div key={i} className="card" style={{ marginBottom: 12, borderLeft: "3px solid var(--yellow)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span className="pillar-pill" data-pillar={s.pillar}>{s.pillar}</span>
-                  <strong>{s.issue}</strong>
-                </div>
-                <div style={{ fontSize: 13, marginBottom: 8 }}>
-                  <div style={{ color: "var(--text-muted)", marginBottom: 4 }}>
-                    <strong>What happened:</strong> {s.whatHappened}
-                  </div>
-                  <div style={{ color: "var(--green)" }}>
-                    <strong>Better approach:</strong> {s.whatWouldBeBetter}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : improve ? (
-          <div className="card" style={{ padding: 24, textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
-            <p style={{ color: "var(--text-muted)" }}>
-              This session was already well-scoped — no specific Chronicle improvements were identified.
-            </p>
-          </div>
-        ) : (
-          <div className="card" style={{ padding: 24, textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
-            <p style={{ color: "var(--text-muted)" }}>
-              Chronicle Improve data is not available for this session yet. Session detail scoring on this page currently reflects CLI session data.
-            </p>
-          </div>
-        )}
-      </TabPanel>
-
-      <TabPanel id="tokens" activeTab={tab}>
-        {tokenInfo ? (
-          <div>
-            {(() => {
-              const inputTokens = tokenInfo.tokens?.input || tokenInfo.totals?.input || 0;
-              const outputTokens = tokenInfo.tokens?.output || tokenInfo.totals?.output || 0;
-              const cachedTokens = tokenInfo.tokens?.cached || tokenInfo.totals?.cached || 0;
-              const totalTokens = tokenInfo.tokens?.total || tokenInfo.totals?.total || 0;
-              const cacheRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
-              const avgTokensPerRequest = tokenInfo.avgTokensPerRequest || (tokenInfo.requestCount ? Math.round(totalTokens / tokenInfo.requestCount) : 0);
-              const guidance = [];
-              if (avgTokensPerRequest > 12000) guidance.push("High average tokens per request. Consider splitting large goals into smaller prompts or attaching only the files needed for each step.");
-              if (inputTokens > 0 && outputTokens / inputTokens > 2) guidance.push("Output-heavy session. This usually means long generated explanations, diffs, or logs; ask for concise answers when exploring.");
-              if (inputTokens > 0 && cacheRate === 0) guidance.push("No cached input tokens were recorded locally. That may mean the source did not expose cache reads, or this session did not reuse much context.");
-              if (guidance.length === 0) guidance.push("Usage looks balanced for this session. Cached tokens and exact request counts depend on which local usage fields were captured.");
-
-              return (
-                <>
-                  <div style={{ marginBottom: 16, padding: "0.75rem 1rem", background: "rgba(88, 166, 255, 0.08)", border: "1px solid rgba(88, 166, 255, 0.3)", borderRadius: 8, fontSize: 13, color: "var(--text-muted)" }}>
-                    🗄️ Token data comes from local Copilot session DB/session-state files. It is useful for coaching and investigation, but is not an imported GitHub org usage or billing report.
-                  </div>
-
-            <div className="stats-grid" style={{ marginBottom: 16 }}>
-              <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Input Tokens</div>
-                      <div className="stat-value">{inputTokens.toLocaleString()}</div>
-                <div className="stat-sub">your prompts</div>
-              </div>
-              <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Output Tokens</div>
-                      <div className="stat-value">{outputTokens.toLocaleString()}</div>
-                <div className="stat-sub">agent responses</div>
-              </div>
-              <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Cached Input</div>
-                      <div className="stat-value">{cachedTokens.toLocaleString()}</div>
-                      <div className="stat-sub">{cacheRate}% cache hit</div>
-              </div>
-              <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Total Tokens</div>
-                      <div className="stat-value">{totalTokens.toLocaleString()}</div>
-              </div>
-              <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Est. Local Credits</div>
-                <div className="stat-value" style={{ color: "var(--accent)" }}>
-                        {formatLocalCredits(tokenInfo.estimatedCost)}
-                </div>
-                      <div className="stat-sub">{(tokenInfo.estimatedCost || 0) < 0.01 ? "<$0.01" : `$${(tokenInfo.estimatedCost || 0).toFixed(4)}`} equivalent</div>
-                    </div>
-                    <div className="card" style={{ textAlign: "center" }}>
-                      <div className="card-header">Prompts / Requests</div>
-                      <div className="stat-value">{tokenInfo.promptCount || tokenInfo.turnCount || 0} / {tokenInfo.requestCount || 0}</div>
-                      <div className="stat-sub">{avgTokensPerRequest.toLocaleString()} tokens / request</div>
-                    </div>
-                  </div>
-
-                  <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-                    <div className="card-header" style={{ marginBottom: 8 }}>Usage guidance</div>
-                    <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text-muted)", fontSize: 13, lineHeight: 1.6 }}>
-                      {guidance.map((item, i) => <li key={i}>{item}</li>)}
-                    </ul>
-                    <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
-                      Source: <strong>{tokenInfo.source || "estimated"}</strong> · Model: <strong>{tokenInfo.model || "unknown"}</strong>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
-
-            {tokenInfo.turns && tokenInfo.turns.length > 0 && (
-              <div className="card" style={{ marginBottom: 16 }}>
-                <div className="card-header" style={{ marginBottom: 8 }}>Per-Turn Token Breakdown</div>
-                <div style={{ maxHeight: 400, overflow: "auto" }}>
-                  <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Turn</th>
-                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Input</th>
-                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Output</th>
-                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Total</th>
-                        <th style={{ padding: "6px 8px", color: "var(--text-muted)" }}>Preview</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tokenInfo.turns.map((t, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.05))" }}>
-                          <td style={{ padding: "6px 8px", fontWeight: 500 }}>{t.turnIndex}</td>
-                          <td style={{ padding: "6px 8px" }}>{(t.inputTokens || 0).toLocaleString()}</td>
-                          <td style={{ padding: "6px 8px" }}>{(t.outputTokens || 0).toLocaleString()}</td>
-                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{((t.inputTokens || 0) + (t.outputTokens || 0)).toLocaleString()}</td>
-                          <td style={{ padding: "6px 8px", color: "var(--text-muted)", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {t.preview || "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
-              {tokenInfo.source === "jsonl" 
-                ? "✅ Output tokens from real Copilot session data. Input tokens estimated from message text."
-                : tokenInfo.source === "events"
-                ? "✅ Token data from session events table."
-                : "⚡ Token counts estimated from message text (~4 chars/token). Actual usage may differ."
-              }
-            </div>
-          </div>
-        ) : (
-          <div className="empty" style={{ padding: 24 }}>
-            <div className="empty-icon">💰</div>
-            <p>Token data not available for this session.</p>
-          </div>
-        )}
-      </TabPanel>
-    </>
-  );
+      <details className="card diagnostic" aria-label="Session diagnostic">
+        <summary>Session information · {data.diagnostic.active === true ? "Recorded open lifecycle" : "Recorded history"}</summary>
+        <p className="scope-note">Hiding changes only this app's visibility. It does not delete source data.</p>
+        <div className="section-heading"><span className={`pill${data.diagnostic.active === true ? " active" : ""}`}>
+          {data.diagnostic.status === "active" ? "Recorded open lifecycle" : data.diagnostic.status === "completed" ? "Recorded closed lifecycle" : "Not recorded"}
+        </span></div>
+        <p>Not verified live; history may be incomplete.</p>
+        <p>Last recorded activity: {formatDate(data.diagnostic.updatedAt)}</p>
+        <p>Child observations: {formatMetric(data.diagnostic.childCount)}</p>
+        {knownNumber(data.session.metrics.apiDurationMs) && <p>Session API duration: <MetricValue value={data.session.metrics.apiDurationMs} name="apiDurationMs" />.
+          Not allocated to individual models or child invocations. <Evidence value={data.session.evidence.apiDurationMs} /></p>}
+        {data.session.evidence.totalNanoAiu?.scope === "session" && knownNumber(data.session.metrics.totalNanoAiu) && <p>
+          Recorded session nano-AIU: <MetricValue value={data.session.metrics.totalNanoAiu} name="totalNanoAiu" />.
+          Opaque units, not currency. This session total may differ from the model sum; the difference is not allocated.
+          <Evidence value={data.session.evidence.totalNanoAiu} /></p>}
+        {data.diagnostic.active === true && <p className="scope-note">Usage metadata refreshes every 15 seconds while the lifecycle remains recorded open. This does not verify a running process. Text follows the Local text controls and stays separate from usage caching.</p>}
+        <Capabilities value={data.capabilities} />
+      </details>
+      <Recommendation value={data.recommendation} />
+    </div>}</LoadState>
+  </LocalContentProvider>;
 }

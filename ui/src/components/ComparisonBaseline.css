@@ -1,0 +1,31 @@
+.comparison-baseline {
+  margin-block: 2rem;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--cp-border);
+}
+.comparison-baseline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin-block: 1rem;
+}
+.comparison-snapshot-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.comparison-snapshot-context p {
+  overflow-wrap: anywhere;
+}
+.comparison-later-sessions {
+  display: grid;
+  gap: 1rem;
+  padding-inline-start: 1.25rem;
+}
+.comparison-later-sessions .scope-note {
+  display: block;
+}
+@media (max-width: 640px) {
+  .comparison-snapshot-context { grid-template-columns: 1fr; gap: .25rem; }
+  .comparison-baseline-actions button { min-height: 44px; }
+}

@@ -1,0 +1,64 @@
+/* One native table supplies both layouts. Give cells data-label matching the column heading;
+   data-primary emphasizes identity and data-action enlarges next-step targets. Keep native
+   table roles explicit when changing display. Sortable tables need a visible mobile sort control. */
+.session-table.responsive-card-table .cell-note,
+.session-table.responsive-card-table .source-cell { font-size: 12px; }
+
+@media (max-width: 760px) {
+  table.session-table.responsive-card-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .responsive-card-table > caption { display: block; }
+  .responsive-card-table > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .responsive-card-table > thead button { display: none; }
+  .responsive-card-table > tbody { display: block; }
+  .responsive-card-table > tbody > tr {
+    display: block;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--cp-border);
+  }
+  .responsive-card-table > tbody > tr:last-child { border-bottom: 0; }
+  table.session-table.responsive-card-table > tbody > tr > :is(th, td) {
+    display: block;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    border: 0;
+    padding: 8px 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    font-size: 14px;
+  }
+  .responsive-card-table > tbody > tr > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--cp-text-soft);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  table.responsive-card-table > tbody > tr > [data-primary] { font-size: 16px; }
+  .responsive-card-table .table-models,
+  .responsive-card-table .evidence { min-width: 0; max-width: none; }
+  .responsive-card-table [data-primary] > a,
+  .responsive-card-table [data-action] :is(a, button),
+  .responsive-card-table .table-models summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: normal;
+  }
+  .responsive-card-table [data-action] :is(a, button) { max-width: 100%; }
+}

@@ -1,451 +1,196 @@
-const API_BASE = "/api";
-const DEFAULT_SETTINGS = Object.freeze({
-  vscodeSessionsEnabled: false,
-});
-const DEFAULT_VSCODE_SUMMARY = Object.freeze({
-  enabled: false,
-  totalSessions: 0,
-  totalTurns: 0,
-  avgTurnsPerSession: 0,
-  sessionsWithAttachments: 0,
-  models: [],
-  modes: [],
-  pillarScores: null,
-});
+import { createUsageCache, usageAbortError } from "./usage-cache.js";
 
-// ── TTL + LRU Cache ─────────────────────────────────────────
-const CACHE_TTL_MS = 60_000; // 60 seconds
-const CACHE_MAX_SIZE = 200;
-const cache = new Map(); // url → { data, ts }
+const API_BASE = "/api";
+const REQUEST_TIMEOUT_MS = 30_000;
+// A cold usage read may need to scan all local sources before returning.
+const USAGE_GET_TIMEOUT_MS = 120_000;
+const cache = createUsageCache();
+
+export { USAGE_CACHE_POLICY } from "./usage-cache.js";
+export const getUsageCacheStatus = () => cache.status();
 
 export function clearCache() {
   cache.clear();
 }
 
-function getCached(url) {
-  const entry = cache.get(url);
-  if (!entry) return undefined;
-  if (Date.now() - entry.ts > CACHE_TTL_MS) {
-    cache.delete(url);
-    return undefined;
+function safeFetch(url, options = {}) {
+  const { noCache, signal, ...fetchOptions } = options;
+  if ((fetchOptions.method || "GET").toUpperCase() !== "GET") {
+    return fetchUsage(url, { ...fetchOptions, signal });
   }
-  // Move to end for LRU ordering
-  cache.delete(url);
-  cache.set(url, entry);
-  return entry.data;
+  const key = url.replace(/^\/api\/tokens\/summary(?=\?|$)/, "/api/summary");
+  const timeoutMs = /^\/api\/(?:summary|tokens\/summary|sessions|comparison)(?:[/?]|$)/.test(url)
+    ? USAGE_GET_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  if (noCache && isUsageCollection(key)) cache.invalidate((candidate) => isUsageCollection(candidate) && candidate !== key);
+  return cache.load(key, (sharedSignal) => fetchUsage(url, {
+    ...fetchOptions, signal: sharedSignal,
+  }, timeoutMs), { noCache, signal });
 }
 
-function setCache(url, data) {
-  // Evict oldest entries when cache is full
-  if (cache.size >= CACHE_MAX_SIZE) {
-    const oldest = cache.keys().next().value;
-    cache.delete(oldest);
-  }
-  cache.set(url, { data, ts: Date.now() });
-}
-
-function normalizeSettingsPayload(data) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return { ...DEFAULT_SETTINGS };
-  }
-  return {
-    ...DEFAULT_SETTINGS,
-    ...(typeof data.vscodeSessionsEnabled === "boolean"
-      ? { vscodeSessionsEnabled: data.vscodeSessionsEnabled }
-      : {}),
-  };
-}
-
-function normalizeVSCodeSessionsPayload(data) {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object" && Array.isArray(data.sessions)) {
-    return data.sessions;
-  }
-  return [];
-}
-
-function normalizeVSCodeSummaryPayload(data) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return { ...DEFAULT_VSCODE_SUMMARY };
-  }
-  return {
-    ...DEFAULT_VSCODE_SUMMARY,
-    ...data,
-    models: Array.isArray(data.models) ? data.models : [],
-    modes: Array.isArray(data.modes) ? data.modes : [],
-  };
-}
-
-const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
-
-/**
- * Wrapper around fetch that handles HTTP errors, JSON parse failures, and timeouts.
- * GET requests are cached with a 60-second TTL and LRU eviction at 200 entries.
- * Pass { text: true } in options to return raw text instead of JSON.
- */
-async function safeFetch(url, options) {
-  const isGet = !options || !options.method || options.method === "GET";
-  const returnText = options?.text === true;
-  const useCache = isGet && !returnText && options?.noCache !== true;
-  if (useCache) {
-    const hit = getCached(url);
-    if (hit !== undefined) return hit;
-  }
-
+async function fetchUsage(url, { signal, ...fetchOptions }, timeoutMs = REQUEST_TIMEOUT_MS) {
+  if (signal?.aborted) throw usageAbortError();
   const controller = new AbortController();
   let timedOut = false;
+  let safeError;
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, FETCH_TIMEOUT_MS);
-
-  // Strip custom options before passing to fetch
-  const { text: _text, noCache: _noCache, signal, ...fetchOptions } = options || {};
-  const abortForwarder = () => controller.abort();
-
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", abortForwarder, { once: true });
-  }
-
-  let res;
+  }, timeoutMs);
+  const abort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener("abort", abort, { once: true });
   try {
-    res = await fetch(url, { ...fetchOptions, signal: controller.signal });
-  } catch (err) {
-    if (err.name === "AbortError") {
-      if (timedOut) {
-        throw new Error("Request timed out — the server took too long to respond. Try again or check that the server is running.");
-      }
-      throw err;
+    const response = await fetch(url, { ...fetchOptions, cache: "no-store", signal: controller.signal });
+    if (!response.ok) {
+      safeError = new Error(response.status === 404
+        ? "This view is unavailable. The session may no longer be recorded."
+        : "Usage data could not be loaded. Try again.");
+      throw safeError;
     }
-    throw new Error(
-      "Can't reach the Copilot Insights server. Make sure it's running (npm start) and try refreshing."
-    );
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      safeError = new Error("The server returned an invalid usage response. Try again.");
+      throw safeError;
+    }
+    if (controller.signal.aborted) throw usageAbortError();
+    return data;
+  } catch (error) {
+    if (timedOut) throw new Error("The usage request timed out. Try again.");
+    if (controller.signal.aborted || error?.name === "AbortError") throw usageAbortError();
+    if (safeError && error === safeError) throw error;
+    if (error instanceof TypeError) throw new Error("Cannot reach the local usage server. Try again.");
+    throw new Error("Usage data could not be loaded. Try again.");
   } finally {
     clearTimeout(timeout);
-    if (signal) signal.removeEventListener("abort", abortForwarder);
+    signal?.removeEventListener("abort", abort);
   }
-  if (!res.ok) {
-    let errorMessage;
-    try {
-      const body = await res.json();
-      errorMessage = body.error;
-    } catch {
-      // no JSON body
-    }
-    throw new Error(errorMessage || `Server returned HTTP ${res.status} — check the server logs for details.`);
-  }
-
-  if (returnText) {
-    return res.text();
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error("Invalid JSON response from server");
-  }
-
-  if (useCache) setCache(url, data);
-  return data;
 }
 
-function tfParams(timeframe, repo) {
-  const params = new URLSearchParams();
-  if (timeframe && timeframe !== "all") params.set("timeframe", timeframe);
-  if (repo) params.set("repo", repo);
+function query(timeframe, { model, day, scope, includeHidden, ...extra } = {}) {
+  const params = new URLSearchParams({ timeframe });
+  if (model) params.set("model", model);
+  if (day) params.set("day", day);
+  if (scope) params.set("scope", scope);
+  if (includeHidden) params.set("includeHidden", "true");
+  for (const key of ["page", "pageSize", "sort", "source", "session", "after", "exclude"]) {
+    if (key === "page" && extra[key] === 1 || key === "pageSize" && extra[key] === 25 || key === "sort" && extra[key] === "tokens") continue;
+    if (extra[key] !== undefined && extra[key] !== "") params.set(key, extra[key]);
+  }
   return params;
 }
 
-export async function fetchSessions(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/sessions?${tfParams(timeframe, repo)}`, options);
+export const fetchSummary = (timeframe, options) =>
+  safeFetch(`${API_BASE}/summary?${query(timeframe)}`, options);
+export const fetchTokenSummary = (timeframe, options) =>
+  safeFetch(`${API_BASE}/tokens/summary?${query(timeframe)}`, options);
+export async function fetchSessions(timeframe, filters = {}, options = {}) {
+  if (options.signal?.aborted) throw usageAbortError();
+  const summaryUrl = `${API_BASE}/summary?${query(timeframe)}`;
+  if (!filters.model && !filters.day && !filters.scope && !filters.includeHidden &&
+      !filters.source && !filters.session && !filters.after && !filters.exclude &&
+      (!filters.page || filters.page === 1) && (!filters.pageSize || filters.pageSize === 25) &&
+      (!filters.sort || filters.sort === "tokens") &&
+      !options.noCache && (!options.method || options.method.toUpperCase() === "GET")) {
+    const snapshot = cache.peek(summaryUrl) ?? (cache.hasPending(summaryUrl) ? await safeFetch(summaryUrl, options) : null);
+    if (snapshot?.sessions && snapshot.models && snapshot.capabilities) {
+      return { sessions: snapshot.sessions, models: snapshot.models, capabilities: snapshot.capabilities,
+        ...(snapshot.pagination ? { pagination: snapshot.pagination } : {}) };
+    }
+  }
+  return safeFetch(`${API_BASE}/sessions?${query(timeframe, filters)}`, options);
 }
 
-export async function fetchSessionCatalog(timeframe, repo) {
-  return safeFetch(`${API_BASE}/sessions/catalog?${tfParams(timeframe, repo)}`);
-}
+const isUsageCollection = (key) => /^\/api\/(?:summary|sessions|comparison)(?:\?|$)/.test(key);
+const sessionSignature = (session) => session ? JSON.stringify({ ...session, selectedUsage: null, selectedEvidence: null }) : null;
 
-export async function fetchSettings(options) {
-  const data = await safeFetch(`${API_BASE}/settings`, options);
-  return normalizeSettingsPayload(data);
+export async function fetchSessionDetail(handle, options, view = "") {
+  const base = `${API_BASE}/sessions/${encodeURIComponent(handle)}`;
+  const url = `${base}${view === "summary" ? "?view=summary" : ""}`;
+  const previous = cache.peek(url);
+  const data = await safeFetch(url, options);
+  if (data === previous || cache.peek(url) !== data) return data;
+  const current = sessionSignature(data?.session);
+  let changed = previous?.session && (sessionSignature(previous.session) !== current || previous.revision !== data.revision);
+  if (data?.session && !changed) {
+    changed = ["all", "90d", "30d", "7d"].some((timeframe) => {
+      const snapshot = cache.peek(`${API_BASE}/summary?${query(timeframe)}`);
+      const recorded = snapshot?.sessions?.find((session) => session.handle === handle);
+      return recorded && sessionSignature(recorded) !== current;
+    });
+  }
+  if (changed) cache.invalidate((key) => isUsageCollection(key) || key.startsWith(`${base}/`));
+  return data;
 }
+export function fetchSessionTurns(handle, filters, options) {
+  const params = new URLSearchParams();
+  for (const key of ["model", "scope", "day", "assignment", "sort", "page", "turn", "requestPage"]) {
+    if (filters[key] !== undefined && filters[key] !== "") params.set(key, filters[key]);
+  }
+  return safeFetch(`${API_BASE}/sessions/${encodeURIComponent(handle)}/turns?${params}`, options);
+}
+export const fetchSessionTools = (handle, options) =>
+  safeFetch(`${API_BASE}/sessions/${encodeURIComponent(handle)}/tools`, options);
+export const fetchSettings = (options) => safeFetch(`${API_BASE}/settings`, options);
 
+export async function fetchModelComparison(timeframe, filters = {}, options = {}) {
+  if (options.signal?.aborted) throw usageAbortError();
+  const params = query(timeframe, filters);
+  if (filters.session) params.set("session", filters.session);
+  if (filters.source) params.set("source", filters.source);
+  const url = `${API_BASE}/comparison?${params}`;
+  if (!options.noCache && (!options.method || options.method.toUpperCase() === "GET") &&
+      (cache.peek(url) !== undefined || cache.hasPending(url))) {
+    return safeFetch(url, options);
+  }
+  if (filters.session && timeframe === "all" && !filters.model && !filters.day && !filters.scope &&
+      !options.noCache && (!options.method || options.method.toUpperCase() === "GET")) {
+    const detail = cache.peek(`${API_BASE}/sessions/${encodeURIComponent(filters.session)}?view=summary`)
+      ?? cache.peek(`${API_BASE}/sessions/${encodeURIComponent(filters.session)}`);
+    if (detail?.comparison && (!detail.session.hidden || filters.includeHidden) &&
+        (!filters.source || filters.source === detail.session.source)) {
+      return { ...detail.comparison, capabilities: detail.capabilities, diagnostic: detail.diagnostic };
+    }
+  }
+  const summaryUrl = `${API_BASE}/summary?${query(timeframe)}`;
+  if (!filters.model && !filters.day && !filters.scope && !filters.includeHidden && !filters.session &&
+      !filters.source && !options.noCache && (!options.method || options.method.toUpperCase() === "GET")) {
+    const snapshot = cache.peek(summaryUrl) ?? (cache.hasPending(summaryUrl) ? await safeFetch(summaryUrl, options) : null);
+    if (snapshot?.comparison) return { ...snapshot.comparison, capabilities: snapshot.capabilities, diagnostic: { active: false } };
+  }
+  return safeFetch(url, options);
+}
 export async function updateSettings(patch) {
-  const data = await safeFetch(`${API_BASE}/settings`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  clearCache();
-  return normalizeSettingsPayload(data);
+  const finish = cache.beginMutation();
+  try {
+    return await safeFetch(`${API_BASE}/settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enableVSCode: patch.enableVSCode }),
+    });
+  } finally {
+    finish();
+  }
 }
 
-export async function fetchSessionDetail(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}`);
+export async function setSessionHidden(handle, hidden) {
+  const detailUrl = `${API_BASE}/sessions/${encodeURIComponent(handle)}`;
+  const finish = cache.beginMutation((key) => isUsageCollection(key) || key === detailUrl || key.startsWith(`${detailUrl}?`) || key.startsWith(`${detailUrl}/`));
+  try {
+    return await safeFetch(`${API_BASE}/sessions/${encodeURIComponent(handle)}/hide`, {
+      method: hidden ? "POST" : "DELETE",
+    });
+  } finally {
+    finish();
+  }
 }
 
-export async function fetchTrends(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/trends?${tfParams(timeframe, repo)}`, options);
-}
-
-export async function fetchInsights(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/insights?${tfParams(timeframe, repo)}`, options);
-}
-
-export async function fetchClarity(timeframe, repo) {
-  return safeFetch(`${API_BASE}/clarity?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchEfficiency(timeframe, repo) {
-  return safeFetch(`${API_BASE}/efficiency?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchSessionSprawl(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/sprawl`);
-}
-
-export async function fetchSessionEfficiency(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/efficiency`);
-}
-
-export async function fetchPromptLength(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/prompt-length?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchRepoHealth(timeframe) {
-  return safeFetch(`${API_BASE}/analytics/repos?${tfParams(timeframe)}`);
-}
-
-export async function fetchHotFiles(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/hot-files?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchSessionDepth(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/depth?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchToolUsage(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/tools?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchInstructionGaps(timeframe, repo) {
-  return safeFetch(`${API_BASE}/instruction-gaps?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchInstructionFailures(timeframe, repo) {
-  return safeFetch(`${API_BASE}/instruction-failures?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchDelegation(timeframe, repo) {
-  return safeFetch(`${API_BASE}/delegation?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchJudgment(timeframe, repo) {
-  return safeFetch(`${API_BASE}/judgment?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchDevPlan(timeframe, repo) {
-  return safeFetch(`${API_BASE}/dev-plan?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchProgressCheck(timeframe, repo) {
-  return safeFetch(`${API_BASE}/progress-check?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchRetro(timeframe, repo) {
-  return safeFetch(`${API_BASE}/retro?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchPillarTrends(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/pillar-trends?${tfParams(timeframe, repo)}`, options);
-}
-
-export async function fetchWorkStyle(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/work-style?${tfParams(timeframe, repo)}`, options);
-}
-
-export async function fetchSessionReplay(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/replay`);
-}
-
-export async function fetchSessionComplexity(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/complexity`);
-}
-
-export async function fetchCreateEditRatio(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/create-edit-ratio?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchFileTypes(timeframe, repo) {
-  return safeFetch(`${API_BASE}/analytics/file-types?${tfParams(timeframe, repo)}`);
-}
-
-export async function analyzePracticePrompt(text) {
-  return safeFetch(`${API_BASE}/practice/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
-}
-
-export async function fetchPracticeChallenge(timeframe) {
-  const params = new URLSearchParams();
-  if (timeframe) params.set("timeframe", timeframe);
-  return safeFetch(`${API_BASE}/practice/challenge?${params}`);
-}
-
-export async function fetchLibraryChallenge(tag) {
-  const params = new URLSearchParams({ random: "1" });
-  if (tag) params.set("tag", tag);
-  return safeFetch(`${API_BASE}/practice/library?${params}`);
-}
-
-export async function fetchLibraryTags() {
-  return safeFetch(`${API_BASE}/practice/library`);
-}
-
-export async function fetchWeaknesses(timeframe) {
-  const params = new URLSearchParams();
-  if (timeframe) params.set("timeframe", timeframe);
-  return safeFetch(`${API_BASE}/practice/weaknesses?${params}`);
-}
-
-export async function fetchLiveFeed(since) {
-  const params = new URLSearchParams();
-  if (since) params.set("since", since);
-  return safeFetch(`${API_BASE}/live/feed?${params}`);
-}
-
-// -- Token Usage & Cost -----------------------------------
-
-export async function fetchTokenPricing() {
-  return safeFetch(`${API_BASE}/tokens/pricing`);
-}
-
-export async function fetchTokenSummary(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/tokens/summary?${tfParams(timeframe, repo)}`, options);
-}
-
-export async function fetchTokenSummaryProgress(timeframe, repo, options) {
-  return safeFetch(`${API_BASE}/tokens/summary/progressive?${tfParams(timeframe, repo)}`, {
-    ...options,
-    noCache: true,
-  });
-}
-
-export async function fetchTokensByModel(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/by-model?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchTokenTrends(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/trends?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchTokenEfficiency(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/efficiency?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchTokenCorrelations(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/correlations?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchTokenBudget(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/budget?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchTokenTips(timeframe, repo) {
-  return safeFetch(`${API_BASE}/tokens/tips?${tfParams(timeframe, repo)}`);
-}
-
-export async function fetchSessionTokens(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/tokens`);
-}
-
-export async function fetchHiddenSessions() {
-  return safeFetch(`${API_BASE}/hidden-sessions`);
-}
-
-export async function hideSession(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "POST" });
-}
-
-export async function unhideSession(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/hide`, { method: "DELETE" });
-}
-
-// Chronicle
-export async function fetchChronicleTips(timeframe, repo) {
-  return safeFetch(`${API_BASE}/chronicle/tips?${tfParams(timeframe, repo)}`);
-}
-export async function fetchChronicleImprove(sessionId) {
-  return safeFetch(`${API_BASE}/chronicle/improve/${sessionId}`);
-}
-
-// Session Intent Tags
-export async function fetchSessionIntent(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/intent`);
-}
-
-export async function fetchIntentSuggestion(id) {
-  return safeFetch(`${API_BASE}/sessions/${id}/intent-suggestion`);
-}
-
-export async function setSessionIntent(id, intent) {
-  return safeFetch(`${API_BASE}/sessions/${id}/intent`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ intent }),
-  });
-}
-
-export async function fetchAllIntents() {
-  return safeFetch(`${API_BASE}/session-intents`);
-}
-
-// Dev Plan Goals
-export async function fetchDevPlanGoals(withProgress = false) {
-  return safeFetch(`${API_BASE}/devplan/goals${withProgress ? "?progress=true" : ""}`);
-}
-
-export async function addDevPlanGoal({ pillar, title, description, source, baselineScore }) {
-  return safeFetch(`${API_BASE}/devplan/goals`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pillar, title, description, source, baselineScore }),
-  });
-}
-
-export async function updateDevPlanGoalStatus(id, status) {
-  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-}
-
-export async function addGoalNote(id, text) {
-  return safeFetch(`${API_BASE}/devplan/goals/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addNote: text }),
-  });
-}
-
-export async function fetchJournal() {
-  return safeFetch(`${API_BASE}/devplan/journal`, { text: true });
-}
-
-export async function deleteDevPlanGoal(id) {
-  return safeFetch(`${API_BASE}/devplan/goals/${id}`, { method: "DELETE" });
-}
-
-// VS Code sessions
-export async function fetchVSCodeSessions(options) {
-  const data = await safeFetch(`${API_BASE}/vscode/sessions`, options);
-  return normalizeVSCodeSessionsPayload(data);
-}
-export async function fetchVSCodeSummary(options) {
-  const data = await safeFetch(`${API_BASE}/vscode/summary`, options);
-  return normalizeVSCodeSummaryPayload(data);
+export async function refreshData() {
+  const finish = cache.beginMutation();
+  try {
+    await safeFetch(`${API_BASE}/refresh`, { method: "POST" });
+  } finally {
+    finish();
+  }
 }

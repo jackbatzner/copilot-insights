@@ -1,253 +1,79 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { fetchSessionCatalog, fetchSessions, fetchHiddenSessions, hideSession, unhideSession } from "../api.js";
-import { ScoreBadge, CATEGORY_META } from "../components/ScoreBadge.jsx";
-import { TimeframeSelector } from "../components/TimeframeSelector.jsx";
-import { SkeletonTable } from "../components/SkeletonCard.jsx";
-import { useRefresh } from "../App.jsx";
-import { useTimeframe } from "../TimeframeContext.jsx";
-import { PageBanner } from "../components/PageBanner.jsx";
-import { SuggestedNext } from "../components/SuggestedNext.jsx";
-import { EmptyState, MIN_SESSIONS_FOR_TRENDS } from "../components/EmptyState.jsx";
+import { useCallback } from "react";
+import { Link } from "react-router-dom";
+import { fetchSessions } from "../api.js";
+import { useUsageData } from "../hooks/useUsageData.js";
+import { scopeLabels, useUsageQuery, validUtcDay } from "../hooks/useUsageQuery.js";
+import { Capabilities, EmptyUsage, LoadState, PageHeading, TimeframeNote } from "../components/Usage.jsx";
+import { SessionTable, TableExplanation } from "../components/SessionTable.jsx";
 
+const PAGE_SIZE = 25;
 export default function Sessions() {
-  const { key: refreshKey } = useRefresh();
-  const { timeframe, setTimeframe } = useTimeframe();
-  const [data, setData] = useState(null);
-  const [catalog, setCatalog] = useState(null);
-  const [hiddenIds, setHiddenIds] = useState(new Set());
-  const [showHidden, setShowHidden] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [repoFilter, setRepoFilter] = useState("");
-  const [sortField, setSortField] = useState("totalWeight");
-  const [sortDir, setSortDir] = useState("desc");
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetchSessions(timeframe, repoFilter || undefined),
-      fetchSessionCatalog(timeframe, repoFilter || undefined),
-      fetchHiddenSessions(),
-    ])
-      .then(([sessions, catalogData, hidden]) => {
-        setData(sessions);
-        setCatalog(catalogData);
-        setHiddenIds(new Set(hidden.sessionIds));
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [repoFilter, timeframe, refreshKey]);
-
-  const toggleHide = useCallback(async (id, e) => {
-    e.stopPropagation();
-    try {
-      if (hiddenIds.has(id)) {
-        await unhideSession(id);
-        setHiddenIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-      } else {
-        await hideSession(id);
-        setHiddenIds((prev) => new Set(prev).add(id));
-      }
-    } catch (err) {
-      console.warn("Failed to toggle session visibility:", err.message);
-    }
-  }, [hiddenIds]);
-
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortDir(sortDir === "desc" ? "asc" : "desc");
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
-  };
-
-  if (loading) return (
-    <>
-      <div className="page-header"><h1>📋 Sessions</h1><TimeframeSelector value={timeframe} onChange={setTimeframe} /></div>
-      <SkeletonTable rows={6} />
-    </>
-  );
-  if (error) return (
-    <div className="empty">
-      <div className="empty-icon">⚠️</div>
-      <p style={{ fontSize: 14, lineHeight: 1.6 }}>
-        {error.includes("HTTP 500")
-          ? "Couldn't load session data. Make sure the Copilot Insights server is running and your session database exists."
-          : error}
-      </p>
+  const query = useUsageQuery();
+  const { timeframe, model, day, scope, includeHidden, source, sort, page: requestedPage } = query;
+  const state = useUsageData(useCallback((options) => fetchSessions(timeframe, { model, day, scope, includeHidden, source, sort, page: requestedPage }, options),
+    [timeframe, model, day, scope, includeHidden, source, sort, requestedPage]));
+  const data = state.data;
+  const safeModel = data?.models.find((row) => row.model === model)?.model;
+  const filtered = Boolean(model || day || scope);
+  const sessions = data?.sessions || [];
+  const total = data?.pagination?.total ?? sessions.length;
+  const pageCount = data?.pagination?.pages ?? 1;
+  const page = data?.pagination?.page ?? 1;
+  const start = (page - 1) * PAGE_SIZE;
+  return <>
+    <PageHeading title="Sessions" description="Compare recorded usage, then inspect the session behind it." {...query} />
+    <TimeframeNote />
+    <nav className="attention-switches" aria-label="Session attention">
+      <button aria-pressed={sort === "tokens"} onClick={() => query.update({ sort: "tokens" })}>High usage</button>
+      <button aria-pressed={sort === "duration"} onClick={() => query.update({ sort: "duration" })}>Long request durations</button>
+      <button aria-pressed={sort === "delegation"} onClick={() => query.update({ sort: "delegation" })}>Delegated usage</button>
+      <Link className="button-link" to={query.link("/tokens/compare")}>Compare models in this selection</Link>
+    </nav>
+    <div className="filter-bar session-filters">
+      <label>Model<select aria-label="Model" value={model} onChange={(event) => query.update({ model: event.target.value })}>
+        <option value="">All models</option>
+        {model && !safeModel && <option value={model}>Model not in this timeframe</option>}
+        {data?.models.map((row) => <option key={row.model} value={row.model}>{row.model}</option>)}
+      </select></label>
+      <label>Scope<select aria-label="Scope" value={scope} onChange={(event) => query.update({ scope: event.target.value })}>
+        <option value="">All scopes</option>
+        {scope && !scopeLabels[scope] && <option value={scope}>Invalid scope filter</option>}
+        {Object.entries(scopeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select></label>
+      <label>UTC day<input aria-label="UTC day" type="date" value={validUtcDay(day) ? day : ""} onChange={(event) => query.update({ day: event.target.value })} /></label>
+      <label>Source<select aria-label="Source" value={source} onChange={(event) => query.update({ source: event.target.value })}>
+        <option value="">All sources</option><option value="cli">Copilot CLI</option><option value="vscode">VS Code</option>
+      </select></label>
+      <label>Sort by<select aria-label="Sort by" value={sort} onChange={(event) => query.update({ sort: event.target.value })}>
+        <option value="tokens">Highest tokens</option><option value="recent">Latest recorded update</option>
+        <option value="duration">Longest request duration</option><option value="cache">Most cache read tokens</option>
+        <option value="delegation">Most child tokens</option>
+      </select></label>
+      <label className="checkbox-label"><input type="checkbox" checked={includeHidden}
+        onChange={(event) => query.update({ includeHidden: event.target.checked ? "true" : "" })} />Include hidden</label>
     </div>
-  );
-  if (!data) return null;
-
-  const metricsById = new Map((data.sessions || []).map((session) => [session.id, session]));
-  const allSessions = (catalog?.sessions || []).map((session) => ({
-    ...session,
-    ...(metricsById.get(session.id) || {
-      redirectionCount: 0,
-      redirectionRate: 0,
-      totalWeight: 0,
-      categoryBreakdown: {},
-    }),
-    metricsReady: metricsById.has(session.id),
-  }));
-  const sessionCount = allSessions.length;
-
-  const sorted = [...allSessions].sort((a, b) => {
-    const mul = sortDir === "desc" ? -1 : 1;
-    if (sortField === "createdAt") {
-      return String(a.createdAt || "").localeCompare(String(b.createdAt || "")) * mul;
-    }
-    return ((a[sortField] || 0) - (b[sortField] || 0)) * mul;
-  });
-
-  const arrow = (field) =>
-    sortField === field ? (sortDir === "desc" ? " ↓" : " ↑") : "";
-
-  return (
-    <>
-      <div className="page-header">
-        <h1>📋 Sessions</h1>
-        <TimeframeSelector value={timeframe} onChange={setTimeframe} />
-      </div>
-      <PageBanner pageId="sessions">
-        Every session is listed here. Analysis columns fill in when scoring is available.
-      </PageBanner>
-
-      <div className="filter-bar">
-        <label htmlFor="repo-filter" className="sr-only">Filter by repository</label>
-        <input
-          id="repo-filter"
-          type="text"
-          placeholder="Filter by repository…"
-          aria-label="Filter by repository"
-          value={repoFilter}
-          onChange={(e) => {
-            setLoading(true);
-            setRepoFilter(e.target.value);
-          }}
-        />
-        <span style={{ color: "var(--text-muted)", fontSize: 13 }}>
-          {sorted.length} session(s)
-          {hiddenIds.size > 0 && (
-            <>
-              {" · "}
-              <button
-                onClick={() => setShowHidden(!showHidden)}
-                style={{
-                  background: "none", border: "none", color: "#58a6ff",
-                  cursor: "pointer", fontSize: 13, padding: 0, textDecoration: "underline",
-                }}
-              >
-                {showHidden ? "hide" : "show"} {hiddenIds.size} hidden
-              </button>
-            </>
-          )}
-        </span>
-      </div>
-
-      {sessionCount === 0 && (
-        <EmptyState sessionCount={0} feature="session analysis" />
-      )}
-
-      <div className="card">
-        {sorted.length === 0 ? (
-          <div className="empty">
-            <div className="empty-icon">✅</div>
-            <p>No sessions found for the current filters.</p>
-          </div>
-        ) : (
-          <div className="session-table-wrapper">
-          <table className="session-table" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th onClick={() => handleSort("createdAt")} style={{ cursor: "pointer", textAlign: "left", minWidth: 140 }} scope="col">
-                  Session{arrow("createdAt")}
-                </th>
-                <th onClick={() => handleSort("turnCount")} style={{ cursor: "pointer", textAlign: "right", width: 60 }} scope="col">
-                  Turns{arrow("turnCount")}
-                </th>
-                <th onClick={() => handleSort("redirectionCount")} style={{ cursor: "pointer", textAlign: "right", width: 50 }} scope="col">
-                  Redir{arrow("redirectionCount")}
-                </th>
-                <th onClick={() => handleSort("redirectionRate")} style={{ cursor: "pointer", textAlign: "center", width: 90 }} scope="col">
-                  Rate{arrow("redirectionRate")}
-                </th>
-                <th style={{ width: 100 }} scope="col">Top Issue</th>
-                <th style={{ width: 32 }} scope="col"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.filter((s) => showHidden || !hiddenIds.has(s.id)).map((s) => {
-                const isHidden = hiddenIds.has(s.id);
-                const topCat = Object.entries(s.categoryBreakdown || {}).sort(
-                  (a, b) => b[1].count - a[1].count
-                )[0];
-                const topMeta = topCat
-                  ? CATEGORY_META[topCat[0]] || { emoji: "❓", label: topCat[0] }
-                  : null;
-
-                return (
-                  <tr
-                    key={s.id}
-                    tabIndex={0}
-                    onClick={() => navigate(`/sessions/${s.id}`)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/sessions/${s.id}`); } }}
-                    style={isHidden ? { opacity: 0.4 } : undefined}
-                    aria-label={`Session ${s.summary?.substring(0, 50) || s.id.substring(0, 8)}, ${s.turnCount} turns, ${s.redirectionCount} redirections`}
-                  >                    <td>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>
-                        {s.summary?.substring(0, 50) || s.branch?.substring(0, 30) || s.id.substring(0, 8)}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {s.createdAt ? new Date(s.createdAt).toLocaleString() : "Unknown time"}
-                      </div>
-                      {s.repository && (
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                          {s.repository}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.turnCount}</td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.redirectionCount}</td>
-                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      {s.metricsReady ? <ScoreBadge rate={s.redirectionRate} /> : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>—</span>}
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {topMeta && s.metricsReady ? (
-                        <span style={{ fontSize: 12 }}>
-                          {topMeta.emoji} {topMeta.label}
-                        </span>
-                      ) : s.metricsReady ? (
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Clean</span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Not scored</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        title={isHidden ? "Unhide session" : "Hide session from analysis"}
-                        onClick={(e) => toggleHide(s.id, e)}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          fontSize: 16, padding: "2px 6px", borderRadius: 4,
-                          opacity: isHidden ? 1 : 0.4,
-                        }}
-                      >
-                        {isHidden ? "👁️" : "🙈"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
-      <SuggestedNext to="/skills" icon="🎓" label="Skill Building" description="See coaching, retro prompts, and your current WTI focus areas" />
-    </>
-  );
+    {filtered && <div className="filter-context" aria-label="Selected usage filters">
+      <strong>Selected usage</strong>
+      {model && <button onClick={() => query.update({ model: "" })} aria-label="Clear model filter">Model: {safeModel || "Not in this timeframe"} <span aria-hidden="true">×</span></button>}
+      {scope && <button onClick={() => query.update({ scope: "" })} aria-label="Clear scope filter">Scope: {scopeLabels[scope] || "Invalid filter"} <span aria-hidden="true">×</span></button>}
+      {day && <button onClick={() => query.update({ day: "" })} aria-label="Clear day filter">UTC day: {validUtcDay(day) ? day : "Invalid filter"} <span aria-hidden="true">×</span></button>}
+      <p>Model, scope, and UTC day must match the same usage record. Whole-session totals stay unchanged; shutdown aggregates have no request-day timeline.</p>
+    </div>}
+    {source === "vscode" && <div className="notice">VS Code content-only sources cannot supply usage metadata. Data Sources in Settings explains availability.</div>}
+    <LoadState {...state} skeleton="sessions" loadingLabel="Loading matching sessions...">{data && <>
+      <div className="table-toolbar"><p className="result-count" role="status">{total} matching sessions
+        {sessions.length > 0 && ` · Showing ${start + 1}–${Math.min(start + PAGE_SIZE, total)}`}</p>
+        <p className="scope-note">Highest known values first; missing values last. {sort === "delegation" ? "Delegation sorts whole-session child tokens." : filtered ? "Usage sorting follows the selected records." : "Usage covers each session's whole recorded history."}</p></div>
+      <TableExplanation filtered={filtered} />
+      {sessions.length ? <>
+        <SessionTable sessions={sessions} link={query.link} filtered={filtered} sort={sort} onSort={(value) => query.update({ sort: value })} />
+        <nav className="pagination" aria-label="Session pages">
+          <button disabled={page === 1} onClick={() => query.update({ page: page - 1 })}>Previous page</button>
+          <span aria-live="polite">Page {page} of {pageCount} · {PAGE_SIZE} per page</span>
+          <button disabled={page === pageCount} onClick={() => query.update({ page: page + 1 })}>Next page</button>
+        </nav>
+      </> : <EmptyUsage filtered />}
+      <Capabilities value={data.capabilities} explain={false} />
+    </>}</LoadState>
+  </>;
 }

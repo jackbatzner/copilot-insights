@@ -2,15 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (() => {
+        const param = new URLSearchParams(window.location.search).get("scoutTheme");
+        let saved;
+        try { saved = localStorage.getItem("copilot-insights-theme"); } catch {}
+        const theme = param === "light" || param === "dark" ? param
+          : saved === "light" || saved === "dark" ? saved
+            : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Copilot Insights</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>" />
   </head>
   <body>
-    <script>
-      // Apply saved theme immediately to prevent flash
-      (function(){var t=localStorage.getItem("copilot-insights-theme");if(!t)t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";document.documentElement.setAttribute("data-theme",t);})();
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -15,4 +15,4 @@
 - [ ] I have tested this locally
 - [ ] Lint passes (`npm run lint`)
 - [ ] Documentation updated (if applicable)
-- [ ] Screenshots attached (for UI changes)
+- [ ] Synthetic-only, text-hidden screenshots attached (for UI changes); no real history, local paths or source identifiers

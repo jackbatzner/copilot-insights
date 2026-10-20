@@ -1,0 +1,28 @@
+.help-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  vertical-align: middle;
+  cursor: help;
+}
+.help-disclosure:hover { color: var(--text); background: var(--cp-accent-soft); }
+.help-disclosure:focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 3px; }
+.number-tooltip.help-tooltip {
+  pointer-events: auto;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  white-space: normal;
+}
+@media (pointer: coarse) {
+  .help-disclosure { min-width: 44px; min-height: 44px; }
+}
