@@ -106,6 +106,8 @@ curl -fsSL https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/s
 
 Both scripts download the latest GitHub Release tarball, verify its SHA-256 checksum, and install it globally with npm. Rerun the same command later to upgrade.
 
+The macOS / Linux installer supports Bash 3.2, including the Bash bundled with macOS; no Bash upgrade is required.
+
 ```powershell
 $env:COPILOT_INSIGHTS_VERSION = "v0.2.4"
 irm https://raw.githubusercontent.com/jackbatzner/copilot-insights/main/scripts/install.ps1 | iex
@@ -349,19 +351,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ### Releasing
 
-**Recommended:** merge what you want into `main`, then run the **Manual release** GitHub Actions workflow from the `main` branch. Pick `patch`, `minor`, `major`, or `explicit`, and the workflow will bump versions, update the changelog, commit, tag, and push. The existing tag-based release workflow then validates the tag, packages the tarball, and creates the GitHub Release.
-
-**Local fallback:**
+Prepare the version in a pull request: update the root and UI package versions and lockfiles, and add the changelog entry. For example, to prepare a patch release on your feature branch:
 
 ```bash
-npm run release patch         # 0.1.0 → 0.1.1
-npm run release minor         # 0.1.0 → 0.2.0
-npm run release major         # 0.1.0 → 1.0.0
-npm run release 0.2.0-beta.1  # explicit version
-npm run release patch --dry-run  # preview without changes
+npm version patch --no-git-tag-version --ignore-scripts
+npm --prefix ui version patch --no-git-tag-version --ignore-scripts
 ```
 
-The local script follows the same flow: it bumps versions, updates the changelog, commits, tags, and pushes. GitHub Actions then reruns install/build/lint/test validation, packages the tarball, and creates the GitHub Release automatically.
+After the PR is merged, run **Manual release** from `main`. It validates the merged commit, packages the tarball, and creates the matching version tag and GitHub Release with SHA-256 checksums. It does not push a version commit to protected `main`, and it calls the release workflow directly rather than relying on a token-created tag to trigger another workflow. Existing `v*` tag pushes still run the same release validation and publishing path.
+
+The legacy `npm run release` script pushes directly to `main` and is not compatible with protected branches; use the PR-based preparation flow above instead.
 
 ## Architecture
 

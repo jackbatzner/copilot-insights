@@ -72,7 +72,7 @@ fi
 release_json_path="$temp_root/release.json"
 curl -fsSL "${headers[@]}" "$release_endpoint" -o "$release_json_path"
 
-mapfile -t release_info < <(
+release_info="$(
   node - "$release_json_path" <<'NODE'
 const fs = require("fs");
 
@@ -106,13 +106,15 @@ console.log(packageName);
 console.log(packageAsset.browser_download_url);
 console.log(checksumsAsset.browser_download_url);
 NODE
-)
+)"
 
-release_tag="${release_info[0]}"
-release_version="${release_info[1]}"
-package_name="${release_info[2]}"
-package_url="${release_info[3]}"
-checksums_url="${release_info[4]}"
+{
+  IFS= read -r release_tag
+  IFS= read -r release_version
+  IFS= read -r package_name
+  IFS= read -r package_url
+  IFS= read -r checksums_url
+} <<< "$release_info"
 
 echo "Resolved release: ${release_tag}"
 
