@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2] - 2026-10-29
+
+### Fixed
+
+- Support macOS's bundled Bash 3.2 in the installer and stop immediately when release metadata parsing fails.
+- Publish manually requested releases from the version already merged to `main`, without pushing version commits to the protected branch.
+
 ## [0.3.1] - 2026-06-24
 
 _See [GitHub Release](https://github.com/jackbatzner/copilot-insights/releases/tag/v0.3.1) for full release notes._
